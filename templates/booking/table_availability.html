@@ -1,0 +1,256 @@
+{% extends 'base.html' %}
+{% block title %}Table Availability - My Restaurant{% endblock %}
+
+{% block content %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+.avail-page {
+    min-height: 100vh;
+    background: #f6f5f1;
+    font-family: 'Inter', sans-serif;
+    color: #1c2b28;
+    padding: 48px 16px;
+}
+
+.avail-wrap {
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+.avail-header {
+    text-align: center;
+    margin-bottom: 30px;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: riseIn 0.5s ease forwards;
+}
+
+@keyframes riseIn { to { opacity: 1; transform: translateY(0); } }
+
+.avail-header .eyebrow {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #a3824f;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+}
+
+.avail-header h1 {
+    font-family: 'Sora', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #14312c;
+}
+
+.avail-filter {
+    background: #ffffff;
+    border: 1px solid #e6e5da;
+    border-radius: 14px;
+    padding: 24px 26px;
+    margin-bottom: 24px;
+    box-shadow: 0 20px 45px -35px rgba(9,41,36,0.3);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: riseIn 0.5s ease 0.06s forwards;
+}
+
+.avail-filter form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 14px;
+    align-items: end;
+}
+
+.avail-filter label {
+    display: block;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #4a5a56;
+    margin-bottom: 7px;
+}
+
+.avail-filter input {
+    width: 100%;
+    border: 1px solid #dfe0d5;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: #1c2b28;
+    background: #fbfaf6;
+    box-sizing: border-box;
+}
+
+.avail-filter input:focus {
+    outline: none;
+    border-color: #1a7a6d;
+    box-shadow: 0 0 0 3px rgba(26,122,109,0.14);
+    background: #fff;
+}
+
+.avail-filter button {
+    background: linear-gradient(135deg, #1a7a6d, #145c53);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 22px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 12px 22px -12px rgba(20,92,83,0.5);
+}
+.avail-filter button:hover { transform: translateY(-1px); }
+
+.avail-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: riseIn 0.5s ease 0.12s forwards;
+}
+
+.avail-card {
+    background: #ffffff;
+    border: 1px solid #e6e5da;
+    border-radius: 14px;
+    padding: 22px 24px;
+}
+
+.avail-card .card-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #8a9490;
+    margin-bottom: 14px;
+}
+
+.avail-card .card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    font-size: 0.9rem;
+}
+
+.avail-card .card-row .lab { color: #4a5a56; font-weight: 500; }
+.avail-card .card-row .val { font-weight: 800; font-size: 1.1rem; }
+
+.val.total { color: #1c2b28; }
+.val.filled { color: #b3413a; }
+.val.available { color: #1a7a6d; }
+
+.progress-track {
+    height: 8px;
+    background: #eceae0;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 14px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #d4af6f, #b3413a);
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}
+
+.avail-status {
+    text-align: center;
+    padding: 16px 20px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.94rem;
+    opacity: 0;
+    transform: translateY(10px);
+    animation: riseIn 0.5s ease 0.18s forwards;
+}
+
+.avail-status.ok {
+    background: #eafaf0;
+    color: #1f9d55;
+    border: 1px solid #cdeedc;
+}
+
+.avail-status.full {
+    background: #fdecec;
+    color: #b3413a;
+    border: 1px solid #f6cfcf;
+}
+
+.avail-empty {
+    text-align: center;
+    color: #8a9490;
+    font-size: 0.88rem;
+    padding: 30px 0;
+}
+
+@media (max-width: 600px) {
+    .avail-filter form { grid-template-columns: 1fr; }
+    .avail-cards { grid-template-columns: 1fr; }
+}
+</style>
+
+<div class="avail-page">
+    <div class="avail-wrap">
+
+        <div class="avail-header">
+            <div class="eyebrow">Live Status</div>
+            <h1>Table Availability</h1>
+        </div>
+
+        <div class="avail-filter">
+            <form method="get">
+                <div>
+                    <label for="dateInput">Date</label>
+                    <input type="date" id="dateInput" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+                </div>
+                <div>
+                    <label for="timeInput">Time</label>
+                    <input type="time" id="timeInput" name="time" value="{{ selected_time|time:'H:i' }}">
+                </div>
+                <button type="submit">Check</button>
+            </form>
+        </div>
+
+        {% if availability %}
+            <div class="avail-cards">
+                <div class="avail-card">
+                    <div class="card-label">Tables</div>
+                    <div class="card-row"><span class="lab">Total</span><span class="val total">{{ availability.total_tables }}</span></div>
+                    <div class="card-row"><span class="lab">Filled</span><span class="val filled">{{ availability.filled_tables }}</span></div>
+                    <div class="card-row"><span class="lab">Available</span><span class="val available">{{ availability.available_tables }}</span></div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width: {% widthratio availability.filled_tables availability.total_tables 100 %}%;"></div>
+                    </div>
+                </div>
+
+                <div class="avail-card">
+                    <div class="card-label">Seats</div>
+                    <div class="card-row"><span class="lab">Total</span><span class="val total">{{ availability.total_seats }}</span></div>
+                    <div class="card-row"><span class="lab">Filled</span><span class="val filled">{{ availability.filled_seats }}</span></div>
+                    <div class="card-row"><span class="lab">Empty</span><span class="val available">{{ availability.available_seats }}</span></div>
+                    <div class="progress-track">
+                        <div class="progress-fill" style="width: {% widthratio availability.filled_seats availability.total_seats 100 %}%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            {% if availability.available_tables > 0 %}
+                <div class="avail-status ok">✓ {{ availability.available_tables }} table(s) free — go ahead and book</div>
+            {% else %}
+                <div class="avail-status full">✕ Fully booked for this slot — try a different time</div>
+            {% endif %}
+        {% else %}
+            <div class="avail-empty">Pick a date and time above to see live table &amp; seat availability.</div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}

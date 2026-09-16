@@ -1,0 +1,732 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ item.name }} - My Restaurant{% endblock %}
+
+{% block content %}
+
+<style>
+    .breadcrumb-bar {
+        font-size: 0.88rem;
+        color: #888;
+        margin-bottom: 24px;
+    }
+
+    .breadcrumb-bar a {
+        color: #888;
+        text-decoration: none;
+    }
+
+    .breadcrumb-bar a:hover {
+        color: #1f2937;
+        text-decoration: underline;
+    }
+
+    .detail-wrap {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr;
+        gap: 40px;
+        align-items: start;
+    }
+
+    @media (max-width: 900px) {
+        .detail-wrap {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .detail-image-wrap {
+        position: relative;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 8px 28px rgba(0,0,0,0.1);
+    }
+
+    .detail-image-wrap img {
+        width: 100%;
+        height: 420px;
+        object-fit: cover;
+        display: block;
+    }
+
+    .veg-badge {
+        position: absolute;
+        top: 18px;
+        left: 18px;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        backdrop-filter: blur(4px);
+    }
+
+    .veg-badge.non-veg { background: rgba(220, 38, 38, 0.9); }
+    .veg-badge.veg { background: rgba(22, 163, 74, 0.9); }
+
+    .discount-badge {
+        position: absolute;
+        top: 18px;
+        right: 18px;
+        background: rgba(230, 57, 70, 0.95);
+        color: #fff;
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-weight: 800;
+        font-size: 0.85rem;
+        backdrop-filter: blur(4px);
+    }
+
+    .image-actions {
+        position: absolute;
+        bottom: 18px;
+        right: 18px;
+        display: flex;
+        gap: 10px;
+    }
+
+    .icon-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(255,255,255,0.92);
+        font-size: 1.1rem;
+        cursor: pointer;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        transition: transform 0.2s ease;
+    }
+
+    .icon-btn:hover { transform: scale(1.1); }
+
+    .detail-info {
+        position: sticky;
+        top: 24px;
+        background: #fff;
+        border-radius: 20px;
+        padding: 32px;
+        box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+    }
+
+    .detail-category {
+        display: inline-block;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #ff6b6b;
+        margin-bottom: 10px;
+    }
+
+    .detail-info h1 {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-bottom: 14px;
+    }
+
+    .detail-rating {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+        color: #f5a623;
+        font-size: 1rem;
+    }
+
+    .detail-rating .rating-value {
+        font-weight: 700;
+        color: #1f2937;
+        font-size: 0.95rem;
+    }
+
+    .detail-rating .rating-count {
+        color: #888;
+        font-size: 0.88rem;
+    }
+
+    .detail-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 18px;
+    }
+
+    .detail-tags .tag {
+        background: #f5f5f5;
+        color: #444;
+        padding: 6px 14px;
+        border-radius: 16px;
+        font-size: 0.83rem;
+        font-weight: 600;
+    }
+
+    .detail-tags .tag.spice {
+        background: #fff0e6;
+        color: #e63946;
+    }
+
+    .detail-description {
+        color: #555;
+        font-size: 1rem;
+        line-height: 1.7;
+        margin-bottom: 24px;
+    }
+
+    .detail-price-row {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+    }
+
+    .detail-price {
+        font-size: 2.1rem;
+        font-weight: 800;
+        color: #e63946;
+    }
+
+    .original-price {
+        font-size: 1.1rem;
+        color: #aaa;
+        text-decoration: line-through;
+    }
+
+    .availability-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 700;
+    }
+
+    .availability-badge.available {
+        background: #e8f9ee;
+        color: #16a34a;
+    }
+
+    .availability-badge.unavailable {
+        background: #fdecec;
+        color: #dc2626;
+    }
+
+    .quantity-row {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .quantity-row label {
+        font-weight: 700;
+        color: #1f2937;
+        font-size: 0.95rem;
+    }
+
+    .quantity-stepper {
+        display: flex;
+        align-items: center;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 30px;
+        overflow: hidden;
+    }
+
+    .quantity-stepper button {
+        width: 38px;
+        height: 38px;
+        border: none;
+        background: #f9fafb;
+        color: #1f2937;
+        font-size: 1.1rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .quantity-stepper button:hover {
+        background: #ffe0d6;
+        color: #ff6b6b;
+    }
+
+    .quantity-stepper input {
+        width: 46px;
+        text-align: center;
+        border: none;
+        font-size: 1rem;
+        font-weight: 700;
+        -moz-appearance: textfield;
+    }
+
+    .quantity-stepper input::-webkit-outer-spin-button,
+    .quantity-stepper input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+
+    .detail-actions {
+        display: flex;
+        gap: 14px;
+        margin-bottom: 8px;
+    }
+
+    .btn-primary-large {
+        flex: 1;
+        text-align: center;
+        padding: 15px 20px;
+        border-radius: 30px;
+        background-color: #1f2937;
+        color: #fff;
+        font-weight: 700;
+        font-size: 1rem;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background-color 0.2s, transform 0.2s;
+    }
+
+    .btn-primary-large:hover {
+        background-color: #ff6b6b;
+        transform: translateY(-2px);
+        text-decoration: none;
+        color: #fff;
+    }
+
+    .btn-outline-large {
+        flex: 1;
+        text-align: center;
+        padding: 15px 20px;
+        border-radius: 30px;
+        background: #fff;
+        color: #1f2937;
+        font-weight: 700;
+        font-size: 1rem;
+        border: 1.5px solid #1f2937;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background-color 0.2s;
+    }
+
+    .btn-outline-large:hover {
+        background-color: #f3f4f6;
+        text-decoration: none;
+        color: #1f2937;
+    }
+
+    .review-link {
+        display: inline-block;
+        margin-top: 18px;
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #ff6b6b;
+        text-decoration: none;
+    }
+
+    .review-link:hover {
+        text-decoration: underline;
+    }
+
+    .reviews-section {
+        margin-top: 56px;
+    }
+
+    .reviews-section h2 {
+        font-size: 1.5rem;
+        color: #1f2937;
+        margin-bottom: 24px;
+        padding-left: 16px;
+        border-left: 5px solid #ff6b6b;
+    }
+
+    .review-card {
+        background: #fff;
+        border-radius: 14px;
+        padding: 20px 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.05);
+    }
+
+    .review-card-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+    .review-author {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .review-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: #1f2937;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+    }
+
+    .review-name {
+        font-weight: 700;
+        color: #1f2937;
+        font-size: 0.95rem;
+    }
+
+    .review-date {
+        color: #999;
+        font-size: 0.82rem;
+    }
+
+    .review-stars {
+        color: #f5a623;
+        font-size: 0.9rem;
+    }
+
+    .review-text {
+        color: #555;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+
+    .no-reviews {
+        text-align: center;
+        background: #fff;
+        padding: 32px 20px;
+        border-radius: 14px;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.05);
+        color: #888;
+    }
+
+    .pagination-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 20px;
+    }
+
+    .pagination-bar a, .pagination-bar span {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+        color: #1f2937;
+        background: #f5f5f5;
+    }
+
+    .pagination-bar a:hover {
+        background: #ffe0d6;
+        color: #ff6b6b;
+    }
+
+    .pagination-bar .current-page {
+        background: #1f2937;
+        color: #fff;
+    }
+
+    .related-section {
+        margin-top: 56px;
+    }
+
+    .related-section h2 {
+        font-size: 1.5rem;
+        color: #1f2937;
+        margin-bottom: 24px;
+        padding-left: 16px;
+        border-left: 5px solid #ff6b6b;
+    }
+
+    .related-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 20px;
+    }
+
+    .related-card {
+        background: #fff;
+        border-radius: 14px;
+        overflow: hidden;
+        box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+        transition: transform 0.2s ease;
+    }
+
+    .related-card:hover { transform: translateY(-4px); }
+
+    .related-card img {
+        width: 100%;
+        height: 130px;
+        object-fit: cover;
+    }
+
+    .related-card-body {
+        padding: 12px 14px;
+    }
+
+    .related-card h3 {
+        font-size: 0.95rem;
+        margin-bottom: 6px;
+        color: #1f2937;
+    }
+
+    .related-card .price {
+        color: #e63946;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    /* Sticky mobile bar */
+    .sticky-order-bar { display: none; }
+
+    @media (max-width: 768px) {
+        .sticky-order-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #fff;
+            padding: 14px 20px;
+            box-shadow: 0 -4px 14px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        .sticky-order-bar .sticky-price {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #e63946;
+        }
+        .sticky-order-bar button {
+            padding: 12px 26px;
+            border-radius: 30px;
+            border: none;
+            background: #1f2937;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        body { padding-bottom: 70px; }
+    }
+</style>
+
+<div class="breadcrumb-bar">
+    <a href="{% url 'home' %}">Home</a> &raquo;
+    <a href="{% url 'menu_list' %}">Menu</a> &raquo;
+    {{ item.name }}
+</div>
+
+<div class="detail-wrap">
+
+    <div class="detail-image-wrap">
+        {% if item.image %}
+            <img src="{{ item.image.url }}" alt="{{ item.name }}">
+        {% endif %}
+        {% if item.is_veg %}
+            <span class="veg-badge veg">🟢 Veg</span>
+        {% else %}
+            <span class="veg-badge non-veg">🔴 Non-Veg</span>
+        {% endif %}
+        {% if item.discount_percent %}
+            <span class="discount-badge">{{ item.discount_percent }}% OFF</span>
+        {% endif %}
+        <div class="image-actions">
+            <button class="icon-btn" onclick="toggleWishlist(this)">🤍</button>
+            <button class="icon-btn" onclick="shareItem()">🔗</button>
+        </div>
+    </div>
+
+    <div class="detail-info">
+        <span class="detail-category">{{ item.category.name }}</span>
+        <h1>{{ item.name }}</h1>
+
+        <div class="detail-rating">
+            {% if review_count %}
+                <span>{% for i in "12345" %}{% if forloop.counter <= avg_rating %}★{% else %}☆{% endif %}{% endfor %}</span>
+                <span class="rating-value">{{ avg_rating }}</span>
+                <span class="rating-count">({{ review_count }} review{{ review_count|pluralize }})</span>
+            {% else %}
+                <span class="rating-count">No reviews yet</span>
+            {% endif %}
+        </div>
+
+        <div class="detail-tags">
+            {% if item.spice_level %}
+                <span class="tag spice">
+                    {% if item.spice_level == 'mild' %}🌶️ Mild
+                    {% elif item.spice_level == 'medium' %}🌶️🌶️ Medium
+                    {% else %}🌶️🌶️🌶️ Spicy{% endif %}
+                </span>
+            {% endif %}
+            <span class="tag">⏱️ 30-40 mins</span>
+            {% if item.calories %}
+                <span class="tag">🔥 {{ item.calories }} kcal</span>
+            {% endif %}
+        </div>
+
+        <p class="detail-description">
+            {{ item.description|default:"Freshly prepared with quality ingredients, made to order in our kitchen." }}
+        </p>
+
+        <div class="detail-price-row">
+            <span class="detail-price">₹{{ item.price }}</span>
+            {% if item.original_price %}
+                <span class="original-price">₹{{ item.original_price }}</span>
+            {% endif %}
+            {% if item.is_available %}
+                <span class="availability-badge available">✅ Available Now</span>
+            {% else %}
+                <span class="availability-badge unavailable">⛔ Not Available</span>
+            {% endif %}
+        </div>
+
+        <form method="post" action="{% url 'orders:add_to_order' item.id %}" {% if not user.is_authenticated %}onsubmit="return checkLoginBeforeOrder(event)"{% endif %}>
+            {% csrf_token %}
+            <div class="quantity-row">
+                <label>Quantity:</label>
+                <div class="quantity-stepper">
+                    <button type="button" onclick="stepQty(-1)">−</button>
+                    <input type="number" id="qtyInput" name="quantity" value="1" min="1" max="20" readonly>
+                    <button type="button" onclick="stepQty(1)">+</button>
+                </div>
+            </div>
+
+            <div class="detail-actions">
+                <button type="submit" class="btn-primary-large" {% if not item.is_available %}disabled{% endif %}>
+                    Add to Order
+                </button>
+                <a href="{% url 'book_table' %}" class="btn-outline-large">Book Table</a>
+            </div>
+        </form>
+
+        <a href="{% url 'add_review' item.id %}" class="review-link">✏️ Write a Review</a>
+    </div>
+</div>
+
+<div class="reviews-section">
+    <h2>Customer Reviews {% if review_count %}({{ review_count }}){% endif %}</h2>
+
+    {% for review in page_obj %}
+        <div class="review-card">
+            <div class="review-card-top">
+                <div class="review-author">
+                    <div class="review-avatar">{{ review.user.username|slice:":1" }}</div>
+                    <div>
+                        <div class="review-name">{{ review.user.username }}</div>
+                        <div class="review-date">{{ review.created_at|date:"d M Y" }}</div>
+                    </div>
+                </div>
+                <div class="review-stars">
+                    {% with rating=review.rating|default:5 %}
+                        {% for i in "12345" %}{% if forloop.counter <= rating %}★{% else %}☆{% endif %}{% endfor %}
+                    {% endwith %}
+                </div>
+            </div>
+            <p class="review-text">{{ review.comment }}</p>
+        </div>
+    {% empty %}
+        <div class="no-reviews">No reviews yet. Be the first to review this dish!</div>
+    {% endfor %}
+
+    {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-bar">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}">← Prev</a>
+            {% endif %}
+            <span class="current-page">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}">Next →</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+
+{% if related_items %}
+<div class="related-section">
+    <h2>You Might Also Like</h2>
+    <div class="related-grid">
+        {% for related in related_items %}
+        <div class="related-card">
+            {% if related.image %}
+                <img src="{{ related.image.url }}" alt="{{ related.name }}">
+            {% endif %}
+            <div class="related-card-body">
+                <h3>{{ related.name }}</h3>
+                <p class="price">₹{{ related.price }}</p>
+                <a href="{% url 'item_detail' related.id %}" class="btn-outline-large" style="display:block; padding:8px;">View</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="sticky-order-bar">
+    <span class="sticky-price">₹{{ item.price }}</span>
+    <button onclick="document.querySelector('.detail-actions button[type=submit]').click()">Add to Order</button>
+</div>
+
+<script>
+    function stepQty(delta) {
+        const input = document.getElementById('qtyInput');
+        let val = parseInt(input.value, 10) || 1;
+        val = Math.min(20, Math.max(1, val + delta));
+        input.value = val;
+    }
+
+    function toggleWishlist(btn) {
+        btn.textContent = btn.textContent === '🤍' ? '❤️' : '🤍';
+    }
+
+    function shareItem() {
+        if (navigator.share) {
+            navigator.share({ title: '{{ item.name }}', url: window.location.href });
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+            alert('Link copied!');
+        }
+    }
+
+    {% if not user.is_authenticated %}
+    function checkLoginBeforeOrder(event) {
+        event.preventDefault();
+        const qty = document.getElementById('qtyInput').value;
+        sessionStorage.setItem('pendingOrder', JSON.stringify({
+            itemId: '{{ item.id }}',
+            quantity: qty
+        }));
+        window.location.href = "{% url 'accounts:login' %}?next={{ request.path }}";
+        return false;
+    }
+    {% endif %}
+
+    {% if user.is_authenticated %}
+    document.addEventListener('DOMContentLoaded', function () {
+        const pending = sessionStorage.getItem('pendingOrder');
+        if (pending) {
+            const data = JSON.parse(pending);
+            if (data.itemId === '{{ item.id }}') {
+                sessionStorage.removeItem('pendingOrder');
+                document.getElementById('qtyInput').value = data.quantity;
+                document.querySelector('.detail-actions button[type=submit]').click();
+            } else {
+                sessionStorage.removeItem('pendingOrder');
+            }
+        }
+    });
+    {% endif %}
+</script>
+
+{% endblock %}

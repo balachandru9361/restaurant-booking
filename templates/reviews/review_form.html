@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}Review {{ item.name }} - My Restaurant{% endblock %}
+
+{% block content %}
+<style>
+  .review-page {
+    max-width: 700px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+
+  .review-hero {
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  .review-hero h1 {
+    font-size: 28px;
+    color: #1a1a2e;
+    font-weight: 800;
+  }
+  .review-hero h1 .item-name {
+    color: #F63A3A;
+  }
+
+  .review-form-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px 30px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    margin-bottom: 35px;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+
+  .form-group select,
+  .form-group textarea,
+  .form-group input[type="text"] {
+    width: 100%;
+    border: 1.5px solid #eee;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14.5px;
+    font-family: inherit;
+    transition: border-color 0.2s ease;
+    background: #fafafa;
+  }
+  .form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+  }
+  .form-group select:focus,
+  .form-group textarea:focus,
+  .form-group input:focus {
+    outline: none;
+    border-color: #F63A3A;
+    background: #fff;
+  }
+
+  .error {
+    color: #e74c3c;
+    font-size: 12.5px;
+    margin-top: 6px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #F63A3A, #e02020);
+    color: #fff;
+    border: none;
+    padding: 13px 32px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+    box-shadow: 0 6px 18px rgba(246,58,58,0.35);
+    transition: transform 0.2s ease;
+  }
+  .btn-primary:hover {
+    transform: translateY(-2px);
+  }
+
+  .reviews-section h2 {
+    font-size: 20px;
+    color: #1a1a2e;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #f0f0f0;
+  }
+
+  .review-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px 20px;
+    margin-bottom: 14px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.05);
+  }
+  .review-card .review-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .review-card .reviewer {
+    font-weight: 700;
+    color: #1a1a2e;
+    font-size: 14.5px;
+  }
+  .review-card .stars {
+    color: #f5a623;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .review-card .comment-text {
+    color: #555;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .review-card .review-date {
+    color: #aaa;
+    font-size: 11.5px;
+    margin-top: 8px;
+  }
+
+  .empty-reviews {
+    text-align: center;
+    padding: 40px 20px;
+    background: #fff;
+    border-radius: 12px;
+    color: #999;
+    font-size: 14.5px;
+  }
+  .empty-reviews .icon {
+    font-size: 34px;
+    display: block;
+    margin-bottom: 10px;
+  }
+</style>
+
+<div class="review-page">
+  <div class="review-hero">
+    <h1>Review: <span class="item-name">{{ item.name }}</span></h1>
+  </div>
+
+  <div class="review-form-card">
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+      <div class="form-group">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}
+          <p class="error">{{ field.errors|join:", " }}</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+      <button type="submit" class="btn btn-primary">Submit Review</button>
+    </form>
+  </div>
+
+  <div class="reviews-section">
+    <h2>All Reviews</h2>
+    {% for review in reviews %}
+    <div class="review-card">
+      <div class="review-top">
+        <span class="reviewer">{{ review.user.username }}</span>
+        <span class="stars">{{ review.rating }}★</span>
+      </div>
+      <p class="comment-text">{{ review.comment }}</p>
+      <small class="review-date">{{ review.created_at|date:"d M Y" }}</small>
+    </div>
+    {% empty %}
+    <div class="empty-reviews">
+      <span class="icon">🍽️</span>
+      No reviews yet. Be the first to review!
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,633 @@
+{% extends 'base.html' %}
+{% block title %}Payment - My Restaurant{% endblock %}
+
+{% block content %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+.pay-page {
+    min-height: 100vh;
+    background:
+        radial-gradient(circle at 10% 0%, rgba(51,149,255,0.10), transparent 45%),
+        radial-gradient(circle at 90% 100%, rgba(7,38,84,0.08), transparent 45%),
+        #f4f6fb;
+    font-family: 'Inter', sans-serif;
+    color: #1a2036;
+    padding: 48px 16px;
+}
+
+.pay-topbar {
+    max-width: 920px;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    font-size: 0.78rem;
+    color: #6b7280;
+}
+
+.pay-topbar .badge-item { display: flex; align-items: center; gap: 5px; }
+.pay-topbar .dot { width: 3px; height: 3px; border-radius: 50%; background: #cfd3da; }
+
+.pay-wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 20px;
+}
+
+.order-panel {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e6e9f2;
+    padding: 28px 26px;
+    box-shadow: 0 20px 45px -30px rgba(16,24,39,0.25);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: riseIn 0.5s ease forwards;
+}
+
+@keyframes riseIn { to { opacity: 1; transform: translateY(0); } }
+
+.merchant-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #f0f1f4;
+}
+
+.merchant-logo {
+    width: 46px; height: 46px;
+    background: linear-gradient(155deg, #fff1e0, #ffe1c2);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+}
+
+.merchant-name { font-weight: 800; font-size: 1.08rem; }
+.merchant-sub { font-size: 0.75rem; color: #8a90a3; margin-top: 2px; }
+
+.order-id-badge {
+    margin-left: auto;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #3395ff;
+    background: #eaf4ff;
+    padding: 4px 10px;
+    border-radius: 999px;
+}
+
+.order-items-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #9aa0ab;
+    margin-bottom: 10px;
+}
+
+.order-items { margin-bottom: 20px; }
+
+.order-item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    font-size: 0.88rem;
+    border-bottom: 1px dashed #edeff5;
+}
+
+.order-item-row .item-dot { width: 6px; height: 6px; border-radius: 50%; background: #3395ff; flex-shrink: 0; }
+.order-item-row .item-name { flex: 1; font-weight: 600; }
+.order-item-row .qty { color: #8a90a3; font-size: 0.78rem; margin-left: 4px; font-weight: 400; }
+.order-item-row .item-price { font-weight: 700; color: #1a2036; }
+
+.order-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 16px 16px;
+    margin-top: 4px;
+    background: linear-gradient(155deg, #0d1b34, #16294f);
+    border-radius: 10px;
+    color: #fff;
+}
+
+.order-total-row .lab { font-size: 0.82rem; color: #a9b4c9; font-weight: 600; }
+.order-total-row .amt { font-size: 1.55rem; font-weight: 800; }
+
+.secure-note { display: flex; align-items: center; gap: 6px; margin-top: 18px; font-size: 0.75rem; color: #8a90a3; }
+
+.trust-badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+
+.trust-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #5b6070;
+    background: #f4f6fb;
+    border: 1px solid #e6e9f2;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.pay-panel {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid #e6e9f2;
+    overflow: hidden;
+    box-shadow: 0 20px 45px -30px rgba(16,24,39,0.25);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: riseIn 0.5s ease 0.08s forwards;
+}
+
+.pay-header {
+    background: linear-gradient(155deg, #0d1b34, #072654);
+    color: #fff;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pay-header .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 0.95rem; }
+
+.pay-header .lock-icon {
+    width: 22px; height: 22px;
+    background: rgba(51,149,255,0.2);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+}
+
+.pay-header .lock { font-size: 0.75rem; color: #8fd0ff; font-weight: 600; }
+
+.method-tabs { display: flex; border-bottom: 1px solid #e6e9f2; background: #fbfcfe; }
+
+.method-tab {
+    flex: 1;
+    text-align: center;
+    padding: 14px 4px 12px;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: #8a90a3;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+
+.method-tab .tab-icon { font-size: 1rem; }
+.method-tab.active { color: #3395ff; border-bottom-color: #3395ff; background: #fff; }
+.method-tab:hover:not(.active) { color: #5b6070; }
+
+.method-body { padding: 24px; min-height: 250px; }
+
+.method-pane { display: none; }
+.method-pane.active { display: block; animation: fadeIn 0.25s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.qr-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 0 4px; }
+
+.qr-image {
+    width: 190px; height: 190px;
+    border: 1px solid #e6e9f2;
+    border-radius: 10px;
+    padding: 12px;
+    background: #fff;
+    box-shadow: 0 10px 24px -16px rgba(16,24,39,0.3);
+}
+
+.qr-amount { font-size: 1.25rem; font-weight: 800; margin: 14px 0 16px; }
+
+.qr-steps {
+    width: 100%;
+    text-align: left;
+    background: #fbfcfe;
+    border: 1px solid #e6e9f2;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.qr-step { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #5b6070; padding: 5px 0; }
+
+.qs-num {
+    width: 18px; height: 18px;
+    background: #3395ff;
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+
+.qr-timer { margin-top: 14px; font-size: 0.75rem; color: #8a90a3; }
+.qr-timer span { font-weight: 700; color: #e5484d; }
+
+.pay-field { margin-bottom: 16px; }
+
+.pay-field label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #8a90a3;
+    margin-bottom: 7px;
+}
+
+.input-with-icon { position: relative; }
+
+.pay-field input, .pay-field select {
+    width: 100%;
+    border: 1px solid #dfe3ee;
+    border-radius: 8px;
+    padding: 11px 13px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: #1a2036;
+    background: #fbfcfe;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pay-field input:focus, .pay-field select:focus {
+    outline: none;
+    border-color: #3395ff;
+    box-shadow: 0 0 0 3px rgba(51,149,255,0.15);
+    background: #fff;
+}
+
+.card-type-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 1.1rem; }
+
+.pay-row-double { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.card-brands { display: flex; gap: 6px; margin-top: 6px; font-size: 1.1rem; }
+
+.upi-apps { display: flex; gap: 8px; margin-bottom: 18px; }
+
+.upi-app {
+    flex: 1;
+    border: 1.5px solid #dfe3ee;
+    border-radius: 8px;
+    padding: 12px 4px;
+    text-align: center;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #5b6070;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.upi-app.active { border-color: #3395ff; background: #eaf4ff; color: #3395ff; }
+.upi-app:hover:not(.active) { border-color: #b9c2d6; }
+.upi-app .uicon { font-size: 1.35rem; display: block; margin-bottom: 5px; }
+
+.bank-select-note { font-size: 0.78rem; color: #8a90a3; margin-bottom: 14px; }
+
+.wallet-list { display: flex; flex-direction: column; gap: 8px; }
+
+.wallet-row {
+    display: flex; align-items: center; justify-content: space-between;
+    border: 1.5px solid #dfe3ee;
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.wallet-row.active { border-color: #3395ff; background: #eaf4ff; }
+.wallet-row:hover:not(.active) { border-color: #b9c2d6; }
+.wallet-row .wlab { font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.wallet-row .arrow { color: #b9c2d6; }
+
+.pay-footer { padding: 20px 24px; border-top: 1px solid #e6e9f2; background: #fbfcfe; }
+
+.pay-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #3395ff, #1c7ce0);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 15px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: transform 0.12s ease, box-shadow 0.18s ease;
+    box-shadow: 0 12px 24px -12px rgba(51,149,255,0.55);
+}
+.pay-btn:hover { transform: translateY(-1px); box-shadow: 0 16px 30px -12px rgba(51,149,255,0.6); }
+.pay-btn:active { transform: scale(0.98); }
+.pay-btn.processing { pointer-events: none; opacity: 0.85; }
+
+.spinner {
+    width: 15px; height: 15px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    display: none;
+    animation: spin 0.7s linear infinite;
+}
+.pay-btn.processing .spinner { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.powered-row { text-align: center; font-size: 0.68rem; color: #b3b8c8; margin-top: 12px; }
+
+.success-overlay {
+    position: fixed; inset: 0;
+    background: rgba(7,38,84,0.6);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+}
+.success-overlay.show { display: flex; }
+
+.success-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 42px 46px;
+    text-align: center;
+    max-width: 320px;
+    animation: popIn 0.3s ease;
+}
+@keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+.success-tick {
+    width: 64px; height: 64px;
+    background: #eafaf0;
+    border: 3px solid #1f9d55;
+    color: #1f9d55;
+    font-size: 1.9rem;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 18px;
+}
+
+.success-card h3 { font-size: 1.15rem; font-weight: 800; margin-bottom: 6px; }
+.success-card p { font-size: 0.84rem; color: #8a90a3; }
+
+@media (max-width: 760px) {
+    .pay-wrap { grid-template-columns: 1fr; }
+    .pay-topbar { flex-wrap: wrap; gap: 8px 14px; }
+}
+</style>
+
+<div class="pay-page">
+
+    <div class="pay-topbar">
+        <span class="badge-item">🔒 256-bit SSL</span>
+        <span class="dot"></span>
+        <span class="badge-item">⚡ Instant confirmation</span>
+        <span class="dot"></span>
+        <span class="badge-item">🛡️ PCI DSS compliant</span>
+    </div>
+
+    <div class="pay-wrap">
+
+        <!-- Order summary -->
+        <div class="order-panel">
+            <div class="merchant-row">
+                <div class="merchant-logo">🍽️</div>
+                <div>
+                    <div class="merchant-name"> CHANDRU RESTAURANT</div>
+                    <div class="merchant-sub">Chettinad &amp; South Indian</div>
+                </div>
+                <span class="order-id-badge">Order #{{ order.id|default:"65" }}</span>
+            </div>
+
+            <div class="order-items-label">Order Summary</div>
+            <div class="order-items">
+                {% for item in order.items.all %}
+                <div class="order-item-row">
+                    <span class="item-dot"></span>
+                    <span class="item-name">{{ item.food_item.name }}<span class="qty">x {{ item.quantity }}</span></span>
+                    <span class="item-price">₹{{ item.subtotal }}</span>
+                </div>
+                {% empty %}
+                <div class="order-item-row"><span class="item-dot"></span><span class="item-name">Chettinad Chicken Biryani<span class="qty">x 1</span></span><span class="item-price">₹6500.00</span></div>
+                {% endfor %}
+            </div>
+
+            <div class="order-total-row">
+                <span class="lab">Amount payable</span>
+                <span class="amt">₹{{ order.total_amount }}</span>
+            </div>
+
+            <div class="secure-note">🔒 Payments are encrypted and 100% secure</div>
+
+            <div class="trust-badges">
+                <span class="trust-badge">✓ Verified Merchant</span>
+                <span class="trust-badge">✓ No Hidden Charges</span>
+            </div>
+        </div>
+
+        <!-- Payment panel -->
+        <div class="pay-panel">
+            <div class="pay-header">
+                <div class="brand"><span class="lock-icon">🔒</span> Secure Checkout</div>
+                <div class="lock">Razorpay Mock</div>
+            </div>
+
+            <div class="method-tabs">
+                <div class="method-tab" data-pane="qr"><span class="tab-icon">▦</span>QR Code</div>
+                <div class="method-tab active" data-pane="card"><span class="tab-icon">💳</span>Card</div>
+                <div class="method-tab" data-pane="upi"><span class="tab-icon">📱</span>UPI</div>
+                <div class="method-tab" data-pane="netbanking"><span class="tab-icon">🏦</span>Netbanking</div>
+                <div class="method-tab" data-pane="wallet"><span class="tab-icon">👛</span>Wallet</div>
+            </div>
+
+            <form id="payForm" method="post" action="{% url 'orders:payment_success' order.id %}">
+                {% csrf_token %}
+                <div class="method-body">
+
+                    <div class="method-pane" id="pane-qr">
+                        <div class="qr-wrap">
+                            <img class="qr-image" id="qrImage" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=upi%3A%2F%2Fpay%3Fpa%3Dmyrestaurant%40upi%26pn%3DMyRestaurant%26am%3D{{ order.total_amount }}%26cu%3DINR" alt="Scan to pay QR code">
+                            <div class="qr-amount">₹{{ order.total_amount }}</div>
+                            <div class="qr-steps">
+                                <div class="qr-step"><span class="qs-num">1</span>Open any UPI app (GPay, PhonePe, Paytm)</div>
+                                <div class="qr-step"><span class="qs-num">2</span>Scan this QR code</div>
+                                <div class="qr-step"><span class="qs-num">3</span>Confirm the payment in your app</div>
+                            </div>
+                            <div class="qr-timer">⏱ QR valid for <span id="qrTimer">04:59</span></div>
+                        </div>
+                    </div>
+
+                    <div class="method-pane active" id="pane-card">
+                        <div class="pay-field">
+                            <label>Card Number</label>
+                            <div class="input-with-icon">
+                                <input type="text" placeholder="1234 5678 9012 3456" maxlength="19" id="cardNumber">
+                                <span class="card-type-icon" id="cardTypeIcon">💳</span>
+                            </div>
+                            <div class="card-brands">🅥 🅜 🅐</div>
+                        </div>
+                        <div class="pay-row-double">
+                            <div class="pay-field">
+                                <label>Expiry</label>
+                                <input type="text" placeholder="MM / YY" maxlength="7">
+                            </div>
+                            <div class="pay-field">
+                                <label>CVV</label>
+                                <input type="password" placeholder="•••" maxlength="3">
+                            </div>
+                        </div>
+                        <div class="pay-field">
+                            <label>Name on Card</label>
+                            <input type="text" placeholder="Full name as on card">
+                        </div>
+                    </div>
+
+                    <div class="method-pane" id="pane-upi">
+                        <div class="upi-apps">
+                            <div class="upi-app active" data-app="gpay"><span class="uicon">🟢</span>GPay</div>
+                            <div class="upi-app" data-app="phonepe"><span class="uicon">🟣</span>PhonePe</div>
+                            <div class="upi-app" data-app="paytm"><span class="uicon">🔵</span>Paytm</div>
+                            <div class="upi-app" data-app="other"><span class="uicon">➕</span>Other</div>
+                        </div>
+                        <div class="pay-field">
+                            <label>UPI ID</label>
+                            <input type="text" placeholder="yourname@upi">
+                        </div>
+                    </div>
+
+                    <div class="method-pane" id="pane-netbanking">
+                        <div class="bank-select-note">Select your bank to continue securely</div>
+                        <div class="pay-field">
+                            <label>Bank</label>
+                            <select>
+                                <option>State Bank of India</option>
+                                <option>HDFC Bank</option>
+                                <option>ICICI Bank</option>
+                                <option>Axis Bank</option>
+                                <option>Kotak Mahindra Bank</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="method-pane" id="pane-wallet">
+                        <div class="wallet-list">
+                            <div class="wallet-row active" data-wallet="paytm"><span class="wlab">🔵 Paytm Wallet</span><span class="arrow">›</span></div>
+                            <div class="wallet-row" data-wallet="amazonpay"><span class="wlab">🟠 Amazon Pay</span><span class="arrow">›</span></div>
+                            <div class="wallet-row" data-wallet="mobikwik"><span class="wlab">🔴 MobiKwik</span><span class="arrow">›</span></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="pay-footer">
+                    <button type="submit" class="pay-btn" id="payBtn">
+                        <span class="spinner"></span>
+                        <span id="payBtnLabel">Pay ₹{{ order.total_amount }}</span>
+                    </button>
+                    <div class="powered-row">This is a mock checkout for demo purposes — no real payment is processed</div>
+                </div>
+            </form>
+        </div>
+
+    </div>
+</div>
+
+<div class="success-overlay" id="successOverlay">
+    <div class="success-card">
+        <div class="success-tick">✓</div>
+        <h3>Payment Successful</h3>
+        <p>Redirecting to your order...</p>
+    </div>
+</div>
+
+<script>
+    // Tab switching
+    const payAmount = "{{ order.total_amount }}";
+    document.querySelectorAll('.method-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.method-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.method-pane').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('pane-' + tab.dataset.pane).classList.add('active');
+
+            const label = document.getElementById('payBtnLabel');
+            if (tab.dataset.pane === 'qr') {
+                label.textContent = "I've completed the payment";
+            } else {
+                label.textContent = 'Pay ₹' + payAmount;
+            }
+        });
+    });
+
+    // QR expiry countdown (visual only)
+    let qrSeconds = 299;
+    const qrTimerEl = document.getElementById('qrTimer');
+    if (qrTimerEl) {
+        setInterval(() => {
+            if (qrSeconds <= 0) return;
+            qrSeconds--;
+            const m = Math.floor(qrSeconds / 60).toString().padStart(2, '0');
+            const s = (qrSeconds % 60).toString().padStart(2, '0');
+            qrTimerEl.textContent = `${m}:${s}`;
+        }, 1000);
+    }
+
+    // UPI app selector
+    document.querySelectorAll('.upi-app').forEach(app => {
+        app.addEventListener('click', () => {
+            document.querySelectorAll('.upi-app').forEach(a => a.classList.remove('active'));
+            app.classList.add('active');
+        });
+    });
+
+    // Wallet selector
+    document.querySelectorAll('.wallet-row').forEach(row => {
+        row.addEventListener('click', () => {
+            document.querySelectorAll('.wallet-row').forEach(r => r.classList.remove('active'));
+            row.classList.add('active');
+        });
+    });
+
+    // Card number auto-spacing + brand detection
+    const cardInput = document.getElementById('cardNumber');
+    const cardTypeIcon = document.getElementById('cardTypeIcon');
+    if (cardInput) {
+        cardInput.addEventListener('input', () => {
+            let v = cardInput.value.replace(/\D/g, '').slice(0, 16);
+            cardInput.value = v.replace(/(.{4})/g, '$1 ').trim();
+
+            if (v.startsWith('4')) cardTypeIcon.textContent = '🅥';
+            else if (/^5[1-5]/.test(v)) cardTypeIcon.textContent = '🅜';
+            else if (/^3[47]/.test(v)) cardTypeIcon.textContent = '🅐';
+            else cardTypeIcon.textContent = '💳';
+        });
+    }
+
+    // Mock payment flow: show processing -> success -> submit form
+    const payForm = document.getElementById('payForm');
+    const payBtn = document.getElementById('payBtn');
+    payForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        payBtn.classList.add('processing');
+        document.getElementById('payBtnLabel').textContent = 'Processing…';
+
+        setTimeout(() => {
+            document.getElementById('successOverlay').classList.add('show');
+            setTimeout(() => {
+                payForm.submit(); // actually submits to the Django view now
+            }, 1200);
+        }, 1400);
+    });
+</script>
+
+{% endblock %}

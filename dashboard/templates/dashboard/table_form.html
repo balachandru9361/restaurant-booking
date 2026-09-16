@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}Table Form{% endblock %}
+
+{% block content %}
+<div style="max-width: 500px; margin: 40px auto; background: #fff; padding: 30px; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+    <h2 style="color: #1f2937; margin-bottom: 20px;">Table Details</h2>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" style="background: #1f2937; color: #fff; padding: 12px 28px; border: none; border-radius: 30px; font-weight: 700; cursor: pointer;">
+            Save Table
+        </button>
+        <a href="{% url 'dashboard:manage_tables' %}" style="margin-left: 12px; color: #666; text-decoration: none;">Cancel</a>
+    </form>
+</div>
+{% endblock %}

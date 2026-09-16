@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Home - My Restaurant{% endblock %}
+
+{% block content %}
+
+<style>
+/* ===== HERO ===== */
+.home-hero {
+    text-align: center;
+    color: #fff;
+    padding: 90px 20px;
+    border-radius: 0;
+    margin-bottom: 50px;
+    box-shadow: none;
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    min-height: 525px;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+}
+
+.hero-slide {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+    z-index: -2;
+}
+
+.hero-slide.active {
+    opacity: 1;
+}
+
+.hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(31,41,55,0.75), rgba(0,0,0,0.6));
+    z-index: -1;
+}
+
+.home-hero .hero-content {
+    position: relative;
+    z-index: 2;
+}
+
+.home-hero span.emoji {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 10px;
+}
+
+.home-hero h1 {
+    font-size: 2.8rem;
+    margin-bottom: 15px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.5);
+}
+
+.home-hero p {
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+    opacity: 0.95;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.4);
+}
+
+.home-hero .btn {
+    padding: 14px 32px;
+    font-size: 1.05rem;
+    border-radius: 30px;
+    background-color: #fff;
+    color: #e63946;
+    font-weight: 700;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: inline-block;
+    text-decoration: none;
+}
+
+.home-hero .btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px rgba(0,0,0,0.2);
+    text-decoration: none;
+}
+
+/* ===== OFFER STRIP ===== */
+.offer-strip {
+    background: linear-gradient(90deg, #1f2937, #374151, #1f2937);
+    overflow: hidden;
+    padding: 12px 0;
+    position: relative;
+    margin-bottom: 50px;
+    width: 100vw;
+    height:55px;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+}
+
+.offer-strip .offer-track {
+    display: flex;
+    white-space: nowrap;
+    animation: scrollOffers 18s linear infinite;
+    width: max-content;
+}
+
+.offer-strip .offer-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 0 40px;
+}
+
+.offer-strip .offer-item .badge {
+    background: #ff6b6b;
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    animation: pulseBadge 1.4s ease-in-out infinite;
+}
+
+@keyframes scrollOffers {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+@keyframes pulseBadge {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,107,107,0.6); }
+    50%      { transform: scale(1.08); box-shadow: 0 0 0 6px rgba(255,107,107,0); }
+}
+
+/* ===== FEATURES ===== */
+.home-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 25px;
+    margin-bottom: 50px;
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.feature-card {
+    background: #fff;
+    padding: 30px 20px;
+    border-radius: 14px;
+    text-align: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.feature-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 10px 24px rgba(0,0,0,0.1);
+}
+
+.feature-card .icon {
+    font-size: 2.2rem;
+    margin-bottom: 12px;
+}
+
+.feature-card h3 {
+    margin-bottom: 8px;
+    font-size: 1.15rem;
+    color: #1f2937;
+}
+
+.feature-card p {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+/* ===== CTA ===== */
+.home-cta {
+    text-align: center;
+    background: #1f2937;
+    color: #fff;
+    padding: 50px 20px;
+    border-radius: 16px;
+}
+
+.home-cta h2 {
+    font-size: 1.8rem;
+    margin-bottom: 12px;
+}
+
+.home-cta p {
+    color: #d1d5db;
+    margin-bottom: 24px;
+}
+
+.home-cta .btn {
+    background-color: #ff6b6b;
+    color: #fff;
+    padding: 12px 28px;
+    border-radius: 30px;
+    font-weight: 700;
+    display: inline-block;
+    transition: transform 0.2s;
+    text-decoration: none;
+}
+
+.home-cta .btn:hover {
+    transform: translateY(-3px);
+    text-decoration: none;
+}
+</style>
+
+<section class="home-hero">
+    <div class="hero-slide active" style="background-image: url('{% static 'images/done.jpg' %}');"></div>
+    <div class="hero-slide" style="background-image: url('{% static 'images/mutton.jpg' %}');"></div>
+    <div class="hero-slide" style="background-image: url('{% static 'images/kk.png' %}');"></div>
+
+    <div class="hero-overlay"></div>
+
+    <div class="hero-content">
+        <span class="emoji">🍽️</span>
+        <h1>CHANDRU  RESTAURANT</h1>
+        <p>Fresh food, delivered with love. Browse our menu, book a table, and order online — all in one place.</p>
+        <a href="{% url 'menu_list' %}" class="btn">View Full Menu</a>
+    </div>
+</section>
+
+<div class="offer-strip">
+    <div class="offer-track">
+        <span class="offer-item"><span class="badge">NEW</span> 🎉 Flat 20% OFF on orders above ₹499</span>
+        <span class="offer-item"><span class="badge">HOT</span> 🍕 Buy 1 Get 1 on Pizzas — Weekends only</span>
+        <span class="offer-item"><span class="badge">TODAY</span> 🥗 Free dessert with every table booking</span>
+        <span class="offer-item"><span class="badge">NEW</span> 🎉 Flat 20% OFF on orders above ₹499</span>
+        <span class="offer-item"><span class="badge">HOT</span> 🍕 Buy 1 Get 1 on Pizzas — Weekends only</span>
+        <span class="offer-item"><span class="badge">TODAY</span> 🥗 Free dessert with every table booking</span>
+    </div>
+</div>
+
+<div class="home-features">
+    <div class="feature-card">
+        <div class="icon">🥘</div>
+        <h3>Fresh & Tasty</h3>
+        <p>Made with the finest ingredients, cooked fresh every single day.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">⚡</div>
+        <h3>Fast Ordering</h3>
+        <p>Browse the menu, add to cart, and order online in seconds.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">📅</div>
+        <h3>Easy Table Booking</h3>
+        <p>Reserve your table in advance and skip the wait.</p>
+    </div>
+    <div class="feature-card">
+        <div class="icon">⭐</div>
+        <h3>Loved by Customers</h3>
+        <p>Real reviews from real food lovers, just like you.</p>
+    </div>
+</div>
+
+<div class="home-cta">
+    <h2>Hungry already?</h2>
+    <p>Explore our full menu and get your favorite dish delivered.</p>
+    <a href="{% url 'menu_list' %}" class="btn">Order Now</a>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // Hero image slideshow
+    const slides = document.querySelectorAll('.hero-slide');
+    let currentSlide = 0;
+
+    function showNextSlide() {
+        slides[currentSlide].classList.remove('active');
+        currentSlide = (currentSlide + 1) % slides.length;
+        slides[currentSlide].classList.add('active');
+    }
+
+    if (slides.length > 1) {
+        setInterval(showNextSlide, 1000); // 1 second-ku maarum
+    }
+});
+</script>
+
+{% endblock %}

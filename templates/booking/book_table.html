@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}Book a Table - My Restaurant{% endblock %}
+
+{% block content %}
+
+<div class="booking-form">
+    <h1>Book a Table</h1>
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% for field in form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}
+                    <p class="error">{{ field.errors|join:", " }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <button type="submit" class="btn btn-primary">Confirm Booking</button>
+    </form>
+</div>
+
+{% endblock %}

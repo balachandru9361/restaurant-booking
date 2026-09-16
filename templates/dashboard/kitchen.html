@@ -1,0 +1,518 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .kitchen-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .kitchen-header h1 {
+    font-family: 'Sora', sans-serif;
+    font-size: 26px;
+    color: #0d1b2a;
+    margin-bottom: 4px;
+  }
+  .kitchen-header p {
+    font-family: 'Inter', sans-serif;
+    color: #6b7280;
+    font-size: 14px;
+  }
+  .kitchen-clock {
+    font-family: 'Sora', sans-serif;
+    background: #0d1b2a;
+    color: #d4af37;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .kitchen-clock .dot {
+    width: 8px; height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+    animation: pulse-dot 1.5s infinite;
+  }
+  @keyframes pulse-dot {
+    0%,100% { opacity: 1; } 50% { opacity: 0.3; }
+  }
+
+  .kitchen-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .stat-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    border-left: 4px solid #0f766e;
+    transition: transform 0.2s ease;
+  }
+  .stat-box:hover { transform: translateY(-3px); }
+  .stat-box .stat-num {
+    font-family: 'Sora', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #0d1b2a;
+  }
+  .stat-box .stat-label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+
+  .kitchen-toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  .kitchen-search {
+    flex: 1;
+    min-width: 220px;
+    position: relative;
+  }
+  .kitchen-search input {
+    width: 100%;
+    padding: 10px 14px 10px 36px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    outline: none;
+    transition: border 0.2s ease;
+  }
+  .kitchen-search input:focus { border-color: #0f766e; }
+  .kitchen-search::before {
+    content: "🔍";
+    position: absolute;
+    left: 12px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+  }
+  .refresh-btn {
+    background: #0d1b2a;
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s ease;
+  }
+  .refresh-btn:hover { background: #F63A3A; }
+  .refresh-timer { font-size: 11px; color: #9ca3af; align-self: center; }
+
+  .kitchen-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .kitchen-column {
+    background: #f4f6f9;
+    border-radius: 14px;
+    padding: 16px;
+    min-height: 320px;
+  }
+
+  .kitchen-column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid;
+  }
+
+  .col-confirmed .kitchen-column-header { border-color: #F63A3A; }
+  .col-preparing .kitchen-column-header { border-color: #d4af37; }
+  .col-ready .kitchen-column-header { border-color: #0f766e; }
+
+  .kitchen-column-header h3 {
+    font-family: 'Sora', sans-serif;
+    font-size: 15px;
+    color: #0d1b2a;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .kitchen-count {
+    background: #fff;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0d1b2a;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+
+  .order-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    animation: fadeRise 0.3s ease;
+    border-left: 4px solid #d1d5db;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .order-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+  }
+
+  .order-card.urgency-ok { border-left-color: #22c55e; }
+  .order-card.urgency-warn { border-left-color: #eab308; }
+  .order-card.urgency-late {
+    border-left-color: #ef4444;
+    animation: fadeRise 0.3s ease, lateGlow 1.6s infinite;
+  }
+  @keyframes lateGlow {
+    0%,100% { box-shadow: 0 2px 10px rgba(239,68,68,0.15); }
+    50% { box-shadow: 0 2px 18px rgba(239,68,68,0.45); }
+  }
+
+  @keyframes fadeRise {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .order-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .order-id {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    color: #0d1b2a;
+    font-size: 14px;
+  }
+
+  .order-time-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+  .urgency-ok .order-time-badge { background: #dcfce7; color: #166534; }
+  .urgency-warn .order-time-badge { background: #fef9c3; color: #854d0e; }
+  .urgency-late .order-time-badge { background: #fee2e2; color: #991b1b; }
+
+  .order-user {
+    font-size: 13px;
+    color: #374151;
+    margin-bottom: 6px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* --- Table badge --- */
+  .order-table-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, #fff4d6, #ffe8a3);
+    color: #92650a;
+    font-size: 11.5px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid #d4af37;
+    white-space: nowrap;
+  }
+  .order-table-badge.takeaway {
+    background: #eef1f5;
+    color: #6b7280;
+    border-color: #d1d5db;
+  }
+
+  .order-items {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 10px 0;
+    font-size: 12.5px;
+    color: #4b5563;
+  }
+
+  .order-items li {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+  }
+
+  .order-total {
+    text-align: right;
+    font-weight: 700;
+    color: #0d1b2a;
+    font-size: 13.5px;
+    margin-bottom: 12px;
+    border-top: 1px dashed #e5e7eb;
+    padding-top: 8px;
+  }
+
+  .order-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .order-action-btn {
+    flex: 1;
+    text-align: center;
+    padding: 9px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  .btn-to-preparing { background: #fff4d6; color: #92650a; }
+  .btn-to-preparing:hover { background: #d4af37; color: #fff; }
+
+  .btn-to-ready { background: #e0f2f1; color: #0f766e; }
+  .btn-to-ready:hover { background: #0f766e; color: #fff; }
+
+  .btn-to-delivered { background: #e6f9ed; color: #147a3d; }
+  .btn-to-delivered:hover { background: #147a3d; color: #fff; }
+
+  .btn-print {
+    background: #eef2ff;
+    color: #3730a3;
+    flex: 0 0 40px;
+  }
+  .btn-print:hover { background: #3730a3; color: #fff; }
+
+  .empty-col {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 13px;
+    padding: 40px 0;
+  }
+  .empty-col .empty-icon { font-size: 30px; display: block; margin-bottom: 8px; opacity: 0.5; }
+
+  @media print {
+    .kitchen-header, .kitchen-stats, .kitchen-toolbar, .order-actions, .admin-sidebar { display: none !important; }
+  }
+</style>
+
+<div class="kitchen-header">
+  <div>
+    <h1>👨‍🍳 Kitchen Dashboard</h1>
+    <p>Live order tracking — move orders through the workflow as they're prepared.</p>
+  </div>
+  <div class="kitchen-clock"><span class="dot"></span> <span id="liveClock"></span></div>
+</div>
+
+<div class="kitchen-stats">
+  <div class="stat-box" style="border-left-color:#F63A3A;">
+    <div class="stat-num">{{ confirmed_orders|length }}</div>
+    <div class="stat-label">🧾 Confirmed</div>
+  </div>
+  <div class="stat-box" style="border-left-color:#d4af37;">
+    <div class="stat-num">{{ preparing_orders|length }}</div>
+    <div class="stat-label">🔥 Preparing</div>
+  </div>
+  <div class="stat-box" style="border-left-color:#0f766e;">
+    <div class="stat-num">{{ ready_orders|length }}</div>
+    <div class="stat-label">✅ Ready</div>
+  </div>
+  <div class="stat-box" style="border-left-color:#0d1b2a;">
+    <div class="stat-num">{{ confirmed_orders|length|add:preparing_orders|length|add:ready_orders|length }}</div>
+    <div class="stat-label">📦 Total Active</div>
+  </div>
+</div>
+
+<div class="kitchen-toolbar">
+  <div class="kitchen-search">
+    <input type="text" id="orderSearch" placeholder="Search by Order # or customer name..." onkeyup="filterOrders()">
+  </div>
+  <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Now</button>
+  <span class="refresh-timer">Auto-refresh in <span id="countdown">30</span>s</span>
+</div>
+
+<div class="kitchen-board">
+
+  <div class="kitchen-column col-confirmed">
+    <div class="kitchen-column-header">
+      <h3>🧾 Confirmed</h3>
+      <span class="kitchen-count">{{ confirmed_orders|length }}</span>
+    </div>
+    {% for order in confirmed_orders %}
+      <div class="order-card" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
+        <div class="order-card-top">
+          <span class="order-id">Order #{{ order.id }}</span>
+          <span class="order-time-badge time-ago">just now</span>
+        </div>
+        <div class="order-user">
+          <span>👤 {{ order.user.username }}</span>
+          {% if order.table %}
+            <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
+          {% else %}
+            <span class="order-table-badge takeaway">🥡 Takeaway</span>
+          {% endif %}
+        </div>
+        <ul class="order-items">
+          {% for item in order.items.all %}
+            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+          {% endfor %}
+        </ul>
+        <div class="order-total">₹{{ order.total_amount }}</div>
+        <div class="order-actions">
+          <a href="{% url 'dashboard:update_order_status' order.id 'preparing' %}" class="order-action-btn btn-to-preparing">Start Preparing →</a>
+          <a href="javascript:window.print()" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
+        </div>
+      </div>
+    {% empty %}
+      <div class="empty-col"><span class="empty-icon">🧊</span>No confirmed orders</div>
+    {% endfor %}
+  </div>
+
+  <div class="kitchen-column col-preparing">
+    <div class="kitchen-column-header">
+      <h3>🔥 Preparing</h3>
+      <span class="kitchen-count">{{ preparing_orders|length }}</span>
+    </div>
+    {% for order in preparing_orders %}
+      <div class="order-card" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
+        <div class="order-card-top">
+          <span class="order-id">Order #{{ order.id }}</span>
+          <span class="order-time-badge time-ago">just now</span>
+        </div>
+        <div class="order-user">
+          <span>👤 {{ order.user.username }}</span>
+          {% if order.table %}
+            <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
+          {% else %}
+            <span class="order-table-badge takeaway">🥡 Takeaway</span>
+          {% endif %}
+        </div>
+        <ul class="order-items">
+          {% for item in order.items.all %}
+            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+          {% endfor %}
+        </ul>
+        <div class="order-total">₹{{ order.total_amount }}</div>
+        <div class="order-actions">
+          <a href="{% url 'dashboard:update_order_status' order.id 'ready' %}" class="order-action-btn btn-to-ready">Mark Ready →</a>
+          <a href="javascript:window.print()" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
+        </div>
+      </div>
+    {% empty %}
+      <div class="empty-col"><span class="empty-icon">🍳</span>No orders being prepared</div>
+    {% endfor %}
+  </div>
+
+  <div class="kitchen-column col-ready">
+    <div class="kitchen-column-header">
+      <h3>✅ Ready</h3>
+      <span class="kitchen-count">{{ ready_orders|length }}</span>
+    </div>
+    {% for order in ready_orders %}
+      <div class="order-card" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
+        <div class="order-card-top">
+          <span class="order-id">Order #{{ order.id }}</span>
+          <span class="order-time-badge time-ago">just now</span>
+        </div>
+        <div class="order-user">
+          <span>👤 {{ order.user.username }}</span>
+          {% if order.table %}
+            <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
+          {% else %}
+            <span class="order-table-badge takeaway">🥡 Takeaway</span>
+          {% endif %}
+        </div>
+        <ul class="order-items">
+          {% for item in order.items.all %}
+            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+          {% endfor %}
+        </ul>
+        <div class="order-total">₹{{ order.total_amount }}</div>
+        <div class="order-actions">
+          <a href="{% url 'dashboard:update_order_status' order.id 'delivered' %}" class="order-action-btn btn-to-delivered">Mark Delivered →</a>
+          <a href="javascript:window.print()" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
+        </div>
+      </div>
+    {% empty %}
+      <div class="empty-col"><span class="empty-icon">🛎️</span>No orders ready yet</div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<script>
+  // Live clock
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('liveClock').textContent = now.toLocaleTimeString();
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Time-ago + urgency coloring
+  function updateTimeAgo() {
+    document.querySelectorAll('.order-card').forEach(card => {
+      const created = new Date(card.getAttribute('data-time'));
+      const diffMin = Math.floor((new Date() - created) / 60000);
+      const badge = card.querySelector('.time-ago');
+
+      card.classList.remove('urgency-ok', 'urgency-warn', 'urgency-late');
+      if (diffMin < 10) {
+        card.classList.add('urgency-ok');
+      } else if (diffMin < 20) {
+        card.classList.add('urgency-warn');
+      } else {
+        card.classList.add('urgency-late');
+      }
+
+      if (badge) {
+        badge.textContent = diffMin <= 0 ? 'just now' : diffMin + ' min ago';
+      }
+    });
+  }
+  updateTimeAgo();
+  setInterval(updateTimeAgo, 15000);
+
+  // Search filter
+  function filterOrders() {
+    const q = document.getElementById('orderSearch').value.toLowerCase();
+    document.querySelectorAll('.order-card').forEach(card => {
+      const match = card.getAttribute('data-search').includes(q);
+      card.style.display = match ? '' : 'none';
+    });
+  }
+
+  // Auto refresh countdown
+  let seconds = 30;
+  const countdownEl = document.getElementById('countdown');
+  setInterval(() => {
+    seconds--;
+    if (seconds <= 0) {
+      location.reload();
+    } else {
+      countdownEl.textContent = seconds;
+    }
+  }, 1000);
+</script>
+{% endblock %}

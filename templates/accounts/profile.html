@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+
+{% block title %}My Profile - My Restaurant{% endblock %}
+
+{% block content %}
+
+<style>
+    .profile-hero {
+        max-width: 700px;
+        margin: 0 auto 30px;
+        text-align: center;
+    }
+
+    .profile-avatar {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #ff9f43, #e63946);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.2rem;
+        font-weight: 800;
+        margin: 0 auto 16px;
+        text-transform: uppercase;
+        box-shadow: 0 8px 24px rgba(230,57,70,0.25);
+    }
+
+    .profile-hero h1 {
+        font-size: 1.7rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-bottom: 4px;
+    }
+
+    .profile-hero .email-line {
+        color: #888;
+        font-size: 0.92rem;
+    }
+
+    .profile-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 16px;
+        max-width: 700px;
+        margin: 0 auto 30px;
+    }
+
+    .profile-stat-box {
+        background: #fff;
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    .profile-stat-box .icon {
+        font-size: 1.6rem;
+        margin-bottom: 8px;
+    }
+
+    .profile-stat-box .num {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #1f2937;
+    }
+
+    .profile-stat-box .lbl {
+        font-size: 0.78rem;
+        color: #999;
+        margin-top: 2px;
+    }
+
+    .profile-info-card {
+        max-width: 700px;
+        margin: 0 auto 24px;
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.07);
+        padding: 26px;
+    }
+
+    .profile-info-card h3 {
+        font-size: 1.05rem;
+        color: #1f2937;
+        margin-bottom: 18px;
+        padding-bottom: 14px;
+        border-bottom: 1px dashed #e5e7eb;
+    }
+
+    .profile-detail-row {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 16px;
+    }
+
+    .profile-detail-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .profile-detail-row .d-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: #fff3e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .profile-detail-row .d-label {
+        font-size: 0.78rem;
+        color: #999;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-bottom: 2px;
+    }
+
+    .profile-detail-row .d-value {
+        font-size: 0.98rem;
+        color: #1f2937;
+        font-weight: 700;
+    }
+
+    .profile-actions {
+        max-width: 700px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+    }
+
+    @media (max-width: 500px) {
+        .profile-actions {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .profile-action-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        text-decoration: none;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .profile-action-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 24px rgba(0,0,0,0.1);
+        text-decoration: none;
+    }
+
+    .profile-action-card .a-icon {
+        font-size: 1.8rem;
+        margin-bottom: 8px;
+    }
+
+    .profile-action-card .a-title {
+        font-weight: 700;
+        color: #1f2937;
+        font-size: 0.95rem;
+    }
+
+    .profile-action-card .a-sub {
+        font-size: 0.78rem;
+        color: #999;
+        margin-top: 2px;
+    }
+</style>
+
+<div class="profile-hero">
+    <div class="profile-avatar">{{ user.username|slice:":1" }}</div>
+    <h1>{{ user.username }}</h1>
+    <p class="email-line">{{ user.email|default:"No email added" }}</p>
+</div>
+
+<div class="profile-stats">
+    <div class="profile-stat-box">
+        <div class="icon">🧾</div>
+        <div class="num">{{ orders_count }}</div>
+        <div class="lbl">Orders Placed</div>
+    </div>
+    <div class="profile-stat-box">
+        <div class="icon">📅</div>
+        <div class="num">{{ bookings_count }}</div>
+        <div class="lbl">Tables Booked</div>
+    </div>
+    <div class="profile-stat-box">
+        <div class="icon">⭐</div>
+        <div class="num">{{ user.date_joined|date:"Y" }}</div>
+        <div class="lbl">Member Since</div>
+    </div>
+</div>
+
+<div class="profile-info-card">
+    <h3>👤 Account Details</h3>
+
+    <div class="profile-detail-row">
+        <div class="d-icon">🙍</div>
+        <div>
+            <div class="d-label">Username</div>
+            <div class="d-value">{{ user.username }}</div>
+        </div>
+    </div>
+
+    <div class="profile-detail-row">
+        <div class="d-icon">✉️</div>
+        <div>
+            <div class="d-label">Email</div>
+            <div class="d-value">{{ user.email|default:"Not provided" }}</div>
+        </div>
+    </div>
+
+    <div class="profile-detail-row">
+        <div class="d-icon">🗓️</div>
+        <div>
+            <div class="d-label">Joined</div>
+            <div class="d-value">{{ user.date_joined|date:"F Y" }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="profile-actions">
+    <a href="{% url 'orders:order_history' %}" class="profile-action-card">
+        <div class="a-icon">🧾</div>
+        <div class="a-title">My Orders</div>
+        <div class="a-sub">View your order history</div>
+    </a>
+    <a href="{% url 'book_table' %}" class="profile-action-card">
+        <div class="a-icon">📅</div>
+        <div class="a-title">Book a Table</div>
+        <div class="a-sub">Reserve your next visit</div>
+    </a>
+</div>
+
+{% endblock %}

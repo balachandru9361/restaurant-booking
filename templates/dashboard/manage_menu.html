@@ -1,0 +1,328 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .page-header h2 {
+    font-size: 24px;
+    color: #1a1a2e;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .page-header p {
+    font-size: 13px;
+    color: #999;
+    margin-top: 3px;
+  }
+
+  .btn-add {
+    background: linear-gradient(135deg, #F63A3A, #ff6b4a);
+    color: #fff;
+    padding: 11px 22px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 6px 16px rgba(246,58,58,0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    white-space: nowrap;
+  }
+  .btn-add:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(246,58,58,0.38);
+  }
+
+  /* Quick stats strip */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .mini-stat {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-left: 4px solid #F63A3A;
+  }
+  .mini-stat:nth-child(2) { border-left-color: #2ecc71; }
+  .mini-stat:nth-child(3) { border-left-color: #f39c12; }
+  .mini-stat .emoji { font-size: 22px; }
+  .mini-stat .num { font-size: 19px; font-weight: 800; color: #1a1a2e; line-height: 1; }
+  .mini-stat .lbl { font-size: 11.5px; color: #999; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* Search / filter bar */
+  .toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  .search-box {
+    flex: 1;
+    min-width: 220px;
+    position: relative;
+  }
+  .search-box input {
+    width: 100%;
+    padding: 11px 16px 11px 40px;
+    border: 1.5px solid #e6e6ee;
+    border-radius: 10px;
+    font-size: 14px;
+    background: #fff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .search-box input:focus {
+    outline: none;
+    border-color: #F63A3A;
+    box-shadow: 0 0 0 4px rgba(246,58,58,0.08);
+  }
+  .search-box::before {
+    content: "🔍";
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0.5;
+  }
+  .filter-select {
+    padding: 11px 14px;
+    border: 1.5px solid #e6e6ee;
+    border-radius: 10px;
+    font-size: 14px;
+    background: #fff;
+    color: #555;
+    cursor: pointer;
+  }
+
+  /* Table card */
+  .menu-table-wrap {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  table.menu-table { width: 100%; border-collapse: collapse; }
+  table.menu-table thead th {
+    background: #1a1a2e;
+    color: #fff;
+    text-align: left;
+    padding: 15px 16px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  table.menu-table tbody tr {
+    transition: background 0.15s ease;
+    animation: fadeSlide 0.3s ease backwards;
+  }
+  table.menu-table tbody tr:nth-child(1) { animation-delay: 0.02s; }
+  table.menu-table tbody tr:nth-child(2) { animation-delay: 0.05s; }
+  table.menu-table tbody tr:nth-child(3) { animation-delay: 0.08s; }
+  table.menu-table tbody tr:nth-child(4) { animation-delay: 0.11s; }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  table.menu-table tbody tr:hover { background: #fafafb; }
+  table.menu-table td {
+    padding: 13px 16px;
+    border-top: 1px solid #f2f2f5;
+    font-size: 14.5px;
+    vertical-align: middle;
+    color: #333;
+  }
+
+  .item-img-wrap {
+    width: 52px; height: 52px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #f0f0f5, #e6e6ee);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+  .item-img-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform 0.25s ease;
+  }
+  .item-img-wrap:hover img { transform: scale(1.15); }
+
+  .item-name strong { color: #1a1a2e; font-size: 14.5px; }
+  .item-name .cat-tag {
+    display: inline-block;
+    margin-top: 3px;
+    font-size: 11px;
+    color: #888;
+    background: #f5f5f8;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  .price-tag { color: #2ecc71; font-weight: 800; font-size: 15px; }
+
+  .status-badge {
+    padding: 5px 13px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .status-yes { background: #e3f9ec; color: #2ecc71; }
+  .status-no { background: #ffe5e5; color: #e74c3c; }
+  .status-badge::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .action-links { display: flex; gap: 8px; }
+  .action-links a {
+    text-decoration: none;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 7px;
+    transition: transform 0.15s ease;
+  }
+  .action-links a:hover { transform: translateY(-1px); }
+  .edit-link { color: #3498db; background: #e3f2fd; }
+  .delete-link { color: #e74c3c; background: #ffe5e5; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #aaa;
+  }
+  .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
+  .empty-state p { font-size: 14.5px; margin-bottom: 16px; }
+
+  @media (max-width: 700px) {
+    .menu-table-wrap { overflow-x: auto; }
+    table.menu-table { min-width: 650px; }
+  }
+</style>
+
+<div class="page-header">
+  <div>
+    <h2>🍽️ Manage Menu</h2>
+    <p>Add, edit or remove dishes from your restaurant menu</p>
+  </div>
+  <a href="{% url 'dashboard:add_menu_item' %}" class="btn-add">+ Add New Item</a>
+</div>
+
+<div class="stats-strip">
+  <div class="mini-stat">
+    <div class="emoji">🍽️</div>
+    <div><div class="num">{{ items.count }}</div><div class="lbl">Total Items</div></div>
+  </div>
+  <div class="mini-stat">
+    <div class="emoji">✅</div>
+    <div><div class="num">{{ items|length }}</div><div class="lbl">Available</div></div>
+  </div>
+  <div class="mini-stat">
+    <div class="emoji">🏷️</div>
+    <div><div class="num">--</div><div class="lbl">Categories</div></div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="search-box">
+    <input type="text" id="menuSearch" placeholder="Search dish by name...">
+  </div>
+  <select class="filter-select" id="statusFilter">
+    <option value="">All Status</option>
+    <option value="yes">Available Only</option>
+    <option value="no">Unavailable Only</option>
+  </select>
+</div>
+
+<div class="menu-table-wrap">
+  <table class="menu-table">
+    <thead>
+      <tr>
+        <th>Image</th>
+        <th>Item</th>
+        <th>Price</th>
+        <th>Available</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="menuTableBody">
+      {% for item in items %}
+      <tr data-name="{{ item.name|lower }}" data-status="{% if item.is_available %}yes{% else %}no{% endif %}">
+        <td>
+          <div class="item-img-wrap">
+            {% if item.image %}
+              <img src="{{ item.image.url }}" alt="{{ item.name }}">
+            {% else %}
+              🍲
+            {% endif %}
+          </div>
+        </td>
+        <td class="item-name">
+          <strong>{{ item.name }}</strong><br>
+          <span class="cat-tag">{{ item.category.name }}</span>
+        </td>
+        <td class="price-tag">₹{{ item.price }}</td>
+        <td>
+          {% if item.is_available %}
+            <span class="status-badge status-yes">Yes</span>
+          {% else %}
+            <span class="status-badge status-no">No</span>
+          {% endif %}
+        </td>
+        <td class="action-links">
+          <a href="{% url 'dashboard:edit_menu_item' item.pk %}" class="edit-link">Edit</a>
+          <a href="{% url 'dashboard:delete_menu_item' item.pk %}" class="delete-link" onclick="return confirm('Delete {{ item.name }}?')">Delete</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5">
+        <div class="empty-state">
+          <div class="big-emoji">🍽️</div>
+          <p>No menu items yet.</p>
+          <a href="{% url 'dashboard:add_menu_item' %}" class="btn-add">+ Add Your First Item</a>
+        </div>
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  const searchInput = document.getElementById('menuSearch');
+  const statusFilter = document.getElementById('statusFilter');
+  const rows = document.querySelectorAll('#menuTableBody tr[data-name]');
+
+  function filterRows() {
+    const q = searchInput.value.toLowerCase();
+    const status = statusFilter.value;
+    rows.forEach(row => {
+      const nameMatch = row.dataset.name.includes(q);
+      const statusMatch = !status || row.dataset.status === status;
+      row.style.display = (nameMatch && statusMatch) ? '' : 'none';
+    });
+  }
+
+  if (searchInput) searchInput.addEventListener('input', filterRows);
+  if (statusFilter) statusFilter.addEventListener('change', filterRows);
+</script>
+{% endblock %}

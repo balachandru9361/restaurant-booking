@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}Table Form{% endblock %}
+
+{% block content %}
+<style>
+    .table-form-wrapper {
+        min-height: 70vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        background: linear-gradient(135deg, #fff5f5, #f8f9fa);
+    }
+
+    .table-form-card {
+        max-width: 460px;
+        width: 100%;
+        background: #fff;
+        padding: 40px 36px;
+        border-radius: 20px;
+        box-shadow: 0 14px 40px rgba(0,0,0,0.1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .table-form-card::before {
+        content: "🍽️";
+        position: absolute;
+        top: -20px;
+        right: -10px;
+        font-size: 6rem;
+        opacity: 0.08;
+        transform: rotate(-10deg);
+    }
+
+    .table-form-header {
+        text-align: center;
+        margin-bottom: 30px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .table-form-header .icon {
+        font-size: 2.2rem;
+        margin-bottom: 8px;
+        display: block;
+    }
+
+    .table-form-header h2 {
+        color: #1f2937;
+        font-size: 1.5rem;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+
+    .table-form-header p {
+        color: #888;
+        font-size: 0.9rem;
+    }
+
+    .table-form-card form p {
+        margin-bottom: 20px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .table-form-card form label {
+        display: block;
+        font-weight: 700;
+        font-size: 0.85rem;
+        color: #1f2937;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+    }
+
+    .table-form-card form input {
+        width: 100%;
+        padding: 14px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        font-size: 1rem;
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        box-sizing: border-box;
+    }
+
+    .table-form-card form input:focus {
+        border-color: #ff6b6b;
+        box-shadow: 0 0 0 4px rgba(255,107,107,0.12);
+    }
+
+    .table-form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 28px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .btn-save-table {
+        flex: 1;
+        background: #1f2937;
+        color: #fff;
+        padding: 14px 0;
+        border: none;
+        border-radius: 30px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: background 0.2s, transform 0.2s;
+    }
+
+    .btn-save-table:hover {
+        background: #ff6b6b;
+        transform: translateY(-2px);
+    }
+
+    .btn-cancel-table {
+        flex: 1;
+        text-align: center;
+        padding: 14px 0;
+        border-radius: 30px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: #1f2937;
+        border: 2px solid #e5e7eb;
+        text-decoration: none;
+        transition: background 0.2s;
+    }
+
+    .btn-cancel-table:hover {
+        background: #f3f4f6;
+        text-decoration: none;
+        color: #1f2937;
+    }
+</style>
+
+<div class="table-form-wrapper">
+    <div class="table-form-card">
+        <div class="table-form-header">
+            <span class="icon">🪑</span>
+            <h2>Table Details</h2>
+            <p>Add or update table information</p>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+
+            <div class="table-form-actions">
+                <button type="submit" class="btn-save-table">Save Table</button>
+                <a href="{% url 'dashboard:manage_tables' %}" class="btn-cancel-table">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,214 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .qr-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .qr-header h1 {
+    font-family: 'Sora', sans-serif;
+    font-size: 26px;
+    color: #0d1b2a;
+    margin-bottom: 4px;
+  }
+  .qr-header p {
+    font-family: 'Inter', sans-serif;
+    color: #6b7280;
+    font-size: 14px;
+  }
+
+  .print-all-btn {
+    background: #0d1b2a;
+    color: #d4af37;
+    border: none;
+    padding: 12px 22px;
+    border-radius: 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+  .print-all-btn:hover { background: #F63A3A; color: #fff; transform: translateY(-2px); }
+
+  .qr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 22px;
+  }
+
+  .qr-card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 24px 20px 20px;
+    text-align: center;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.07);
+    border: 1px solid #f0f0f0;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .qr-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 26px rgba(0,0,0,0.12);
+  }
+
+  .qr-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, #d4af37, #F63A3A);
+  }
+
+  .qr-table-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #0d1b2a;
+    color: #d4af37;
+    font-family: 'Sora', sans-serif;
+    font-weight: 800;
+    font-size: 14px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+  }
+
+  .qr-image-wrap {
+    background: #fff;
+    border: 2px dashed #e5e7eb;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+    display: inline-block;
+  }
+  .qr-image-wrap img {
+    width: 200px;
+    height: 200px;
+    display: block;
+    border-radius: 4px;
+  }
+
+  .qr-capacity {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  .qr-scan-hint {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .qr-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .qr-action-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 700;
+    text-decoration: none;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    border: none;
+  }
+  .btn-print-one { background: #eef2ff; color: #3730a3; }
+  .btn-print-one:hover { background: #3730a3; color: #fff; }
+  .btn-open-link { background: #e0f2f1; color: #0f766e; }
+  .btn-open-link:hover { background: #0f766e; color: #fff; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #aaa;
+  }
+  .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
+
+  @media print {
+    .qr-header, .print-all-btn, .qr-card-actions, .admin-sidebar, .qr-scan-hint { display: none !important; }
+    .qr-grid {
+      display: block !important;
+    }
+    .qr-card {
+      box-shadow: none !important;
+      border: 2px solid #0d1b2a !important;
+      page-break-after: always;
+      margin: 40px auto;
+      max-width: 320px;
+    }
+    .qr-image-wrap img { width: 260px; height: 260px; }
+  }
+</style>
+
+<div class="qr-header">
+  <div>
+    <h1>📱 Table QR Codes</h1>
+    <p>Print and place these on each table — customers scan to order directly from that table.</p>
+  </div>
+  <button class="print-all-btn" onclick="window.print()">🖨️ Print All</button>
+</div>
+
+{% if tables %}
+  <div class="qr-grid">
+    {% for table in tables %}
+      <div class="qr-card">
+        <span class="qr-table-badge">🪑 Table #{{ table.number }}</span>
+
+        <div class="qr-image-wrap">
+          <img
+            src="https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data={{ request.scheme }}://{{ request.get_host }}{% url 'orders:select_table' table.id %}"
+            alt="QR code for Table {{ table.number }}"
+          >
+        </div>
+
+        {% if table.capacity %}
+          <div class="qr-capacity">👥 Seats {{ table.capacity }}</div>
+        {% endif %}
+
+        <div class="qr-scan-hint">📷 Scan to view menu &amp; order</div>
+
+        <div class="qr-card-actions">
+          <button class="qr-action-btn btn-print-one" onclick="printSingle(this)">🖨️ Print</button>
+          <a href="{% url 'orders:select_table' table.id %}" target="_blank" class="qr-action-btn btn-open-link">🔗 Test Link</a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty-state">
+    <div class="big-emoji">🪑</div>
+    <p>No tables added yet. Add tables in "Manage Tables" first.</p>
+  </div>
+{% endif %}
+
+<script>
+  function printSingle(btn) {
+    const card = btn.closest('.qr-card');
+    const allCards = document.querySelectorAll('.qr-card');
+    allCards.forEach(c => { if (c !== card) c.style.display = 'none'; });
+    window.print();
+    allCards.forEach(c => { c.style.display = ''; });
+  }
+</script>
+{% endblock %}

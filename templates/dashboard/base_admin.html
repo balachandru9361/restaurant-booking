@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .admin-wrapper {
+    display: flex;
+    min-height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+    background: #f4f6f9;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    margin-right: calc(-50vw + 50%);
+  }
+
+  .admin-sidebar {
+    width: 260px;
+    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff;
+    padding: 25px 18px;
+    box-shadow: 4px 0 15px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .admin-sidebar h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 5px;
+    letter-spacing: 0.5px;
+  }
+
+  .admin-sidebar .subtitle {
+    font-size: 12px;
+    color: #a0a0c0;
+    margin-bottom: 25px;
+  }
+
+  .admin-user-card {
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .admin-user-card .avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: #F63A3A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 16px;
+  }
+
+  .admin-user-card .info small {
+    color: #a0a0c0;
+    display: block;
+    font-size: 11px;
+  }
+
+  .admin-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .admin-nav a {
+    color: #d0d0e0;
+    text-decoration: none;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s ease;
+  }
+
+  .admin-nav a:hover {
+    background: rgba(246,58,58,0.15);
+    color: #fff;
+    transform: translateX(3px);
+  }
+
+  .admin-nav a.active {
+    background: #F63A3A;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 4px 10px rgba(246,58,58,0.4);
+  }
+
+  .admin-logout {
+    margin-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 15px;
+  }
+
+  .admin-logout a {
+    color: #ff8080;
+    text-decoration: none;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s ease;
+  }
+
+  .admin-logout a:hover {
+    background: rgba(255,80,80,0.15);
+  }
+
+  .admin-main {
+    flex: 1;
+    padding: 30px 35px;
+    min-width: 0;
+  }
+</style>
+
+<div class="admin-wrapper">
+  <nav class="admin-sidebar">
+    <h2>🍽️ Restaurant Admin</h2>
+    <div class="subtitle">Management Panel</div>
+
+    <div class="admin-user-card">
+      <div class="avatar">{{ request.user.username|slice:":1"|upper }}</div>
+      <div class="info">
+        {{ request.user.username }}
+        <small>Administrator</small>
+      </div>
+    </div>
+
+    <div class="admin-nav">
+      <a href="{% url 'dashboard:admin_home' %}" class="{% if request.resolver_match.url_name == 'admin_home' %}active{% endif %}">📊 Dashboard</a>
+      <a href="{% url 'dashboard:manage_menu' %}" class="{% if request.resolver_match.url_name == 'manage_menu' %}active{% endif %}">🍽️ Manage Menu</a>
+      <a href="{% url 'dashboard:manage_tables' %}" class="{% if request.resolver_match.url_name == 'manage_tables' %}active{% endif %}">🪑 Manage Tables</a>
+      <a href="{% url 'dashboard:table_qr_codes' %}" class="{% if request.resolver_match.url_name == 'table_qr_codes' %}active{% endif %}">📱 QR Codes</a>
+      <a href="{% url 'dashboard:manage_bookings' %}" class="{% if request.resolver_match.url_name == 'manage_bookings' %}active{% endif %}">📅 Manage Bookings</a>
+      <a href="{% url 'dashboard:manage_users' %}" class="{% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}">👥 Manage Users</a>
+      <a href="{% url 'dashboard:manage_orders' %}" class="{% if request.resolver_match.url_name == 'manage_orders' %}active{% endif %}">🧾 Manage Orders</a>
+      <a href="{% url 'dashboard:kitchen_dashboard' %}" class="{% if request.resolver_match.url_name == 'kitchen_dashboard' %}active{% endif %}">👨‍🍳 Kitchen</a>
+      <a href="{% url 'dashboard:sales_reports' %}" class="{% if request.resolver_match.url_name == 'sales_reports' %}active{% endif %}">📈 Sales / Reports</a>
+    </div>
+
+    <div class="admin-logout">
+      <a href="{% url 'accounts:logout' %}">🚪 Logout</a>
+    </div>
+  </nav>
+
+  <main class="admin-main">
+    {% block admin_content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}

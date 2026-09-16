@@ -1,0 +1,85 @@
+<style>
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(90deg, #1f2937, #111827);
+    padding: 16px 30px;
+    flex-wrap: wrap;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.navbar a {
+    text-decoration: none;
+}
+
+.navbar .brand {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #ffb703;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.nav-links a {
+    color: #e5e7eb;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 8px 14px;
+    border-radius: 20px;
+    text-decoration: none;
+    transition: background-color 0.2s, color 0.2s;
+    white-space: nowrap;
+}
+
+.nav-links a:hover {
+    background-color: rgba(255, 183, 3, 0.15);
+    color: #ffb703;
+    text-decoration: none;
+}
+
+.nav-links a.nav-cta {
+    background-color: #ff6b6b;
+    color: #fff;
+}
+
+.nav-links a.nav-cta:hover {
+    background-color: #e63946;
+    color: #fff;
+    text-decoration: none;
+}
+
+.nav-links a.nav-profile {
+    background-color: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+</style>
+
+<nav class="navbar">
+    <a href="{% url 'home' %}" class="brand">🍽️ CHANDRU RESTAURANT</a>
+
+    <div class="nav-links">
+        <a href="{% url 'home' %}">Home</a>
+        <a href="{% url 'menu_list' %}">Menu</a>
+
+        {% if user.is_authenticated %}
+            <a href="{% url 'orders:order_history' %}">My Orders</a>
+            <a href="{% url 'book_table' %}">Book Table</a>
+            <a href="{% url 'accounts:profile' %}" class="nav-profile">
+                👤 {{ user.get_full_name|default:user.username }}
+            </a>
+            <a href="{% url 'accounts:logout' %}" class="nav-cta">Logout</a>
+        {% else %}
+            <a href="{% url 'accounts:login' %}">Login</a>
+            <a href="{% url 'accounts:signup' %}" class="nav-cta">Signup</a>
+        {% endif %}
+    </div>
+</nav>

@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+
+{% block title %}My Orders - My Restaurant{% endblock %}
+
+{% block content %}
+
+<style>
+    .orders-hero {
+        text-align: center;
+        margin-bottom: 36px;
+    }
+
+    .orders-hero .icon {
+        font-size: 2.2rem;
+        margin-bottom: 10px;
+    }
+
+    .orders-hero h1 {
+        font-size: 2.1rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-bottom: 6px;
+    }
+
+    .orders-hero p {
+        color: #777;
+        font-size: 1rem;
+    }
+
+    .orders-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 16px;
+        max-width: 700px;
+        margin: 0 auto 36px;
+    }
+
+    .stat-box {
+        background: #fff;
+        border-radius: 14px;
+        padding: 18px;
+        text-align: center;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+    }
+
+    .stat-box .stat-num {
+        font-size: 1.5rem;
+        font-weight: 800;
+        color: #1f2937;
+    }
+
+    .stat-box .stat-lbl {
+        font-size: 0.78rem;
+        color: #999;
+        margin-top: 2px;
+    }
+
+    .order-filter-tabs {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+    }
+
+    .order-filter-tab {
+        padding: 8px 18px;
+        border-radius: 24px;
+        border: 1.5px solid #e5e7eb;
+        background: #fff;
+        color: #1f2937;
+        font-weight: 600;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .order-filter-tab:hover {
+        border-color: #ff6b6b;
+    }
+
+    .order-filter-tab.active {
+        background-color: #1f2937;
+        color: #fff;
+        border-color: #1f2937;
+    }
+
+    .orders-list {
+        max-width: 720px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .order-card {
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 4px 18px rgba(0,0,0,0.07);
+        padding: 24px;
+        transition: box-shadow 0.2s;
+    }
+
+    .order-card:hover {
+        box-shadow: 0 10px 26px rgba(0,0,0,0.1);
+    }
+
+    .order-card-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 6px;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .order-card-top h3 {
+        font-size: 1.1rem;
+        color: #1f2937;
+        font-weight: 800;
+    }
+
+    .order-status-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 5px 14px;
+        border-radius: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    .order-status-badge.pending {
+        background: #fff3e0;
+        color: #d97706;
+    }
+
+    .order-status-badge.confirmed {
+        background: #e8f9ee;
+        color: #16a34a;
+    }
+
+    .order-status-badge.delivered {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+
+    .order-status-badge.cancelled {
+        background: #fdecec;
+        color: #dc2626;
+    }
+
+    .order-date {
+        color: #999;
+        font-size: 0.83rem;
+        margin-bottom: 16px;
+    }
+
+    .order-items-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 16px;
+        border-top: 1px dashed #eee;
+        padding-top: 14px;
+    }
+
+    .order-items-list li {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+        color: #555;
+        padding: 5px 0;
+    }
+
+    .order-items-list li .item-qty {
+        color: #999;
+        font-size: 0.82rem;
+    }
+
+    .order-total-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 14px;
+        border-top: 1px solid #f0f0f0;
+    }
+
+    .order-total-row .total-label {
+        font-size: 0.85rem;
+        color: #777;
+        font-weight: 600;
+    }
+
+    .order-total-row .total-value {
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #e63946;
+    }
+
+    .empty-orders {
+        text-align: center;
+        background: #fff;
+        padding: 60px 20px;
+        border-radius: 18px;
+        box-shadow: 0 6px 22px rgba(0,0,0,0.06);
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .empty-orders .icon {
+        font-size: 3.2rem;
+        margin-bottom: 16px;
+    }
+
+    .empty-orders h3 {
+        font-size: 1.25rem;
+        color: #1f2937;
+        margin-bottom: 8px;
+    }
+
+    .empty-orders p {
+        color: #888;
+        margin-bottom: 22px;
+    }
+
+    .empty-orders .btn-browse {
+        display: inline-block;
+        padding: 12px 28px;
+        border-radius: 30px;
+        background-color: #1f2937;
+        color: #fff;
+        font-weight: 700;
+        text-decoration: none;
+        transition: background-color 0.2s;
+    }
+
+    .empty-orders .btn-browse:hover {
+        background-color: #ff6b6b;
+        text-decoration: none;
+        color: #fff;
+    }
+
+    .order-card.hidden-order {
+        display: none;
+    }
+</style>
+
+<div class="orders-hero">
+    <div class="icon">🧾</div>
+    <h1>My Orders</h1>
+    <p>Track and review all your past orders.</p>
+</div>
+
+{% if orders %}
+    <div class="orders-stats">
+        <div class="stat-box">
+            <div class="stat-num">{{ orders|length }}</div>
+            <div class="stat-lbl">Total Orders</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-num">{{ orders.0.created_at|date:"M Y" }}</div>
+            <div class="stat-lbl">Latest Order</div>
+        </div>
+    </div>
+
+    <div class="order-filter-tabs">
+        <button class="order-filter-tab active" data-status="all" onclick="filterOrders(this, 'all')">All</button>
+        <button class="order-filter-tab" data-status="pending" onclick="filterOrders(this, 'pending')">Pending</button>
+        <button class="order-filter-tab" data-status="confirmed" onclick="filterOrders(this, 'confirmed')">Confirmed</button>
+        <button class="order-filter-tab" data-status="delivered" onclick="filterOrders(this, 'delivered')">Delivered</button>
+        <button class="order-filter-tab" data-status="cancelled" onclick="filterOrders(this, 'cancelled')">Cancelled</button>
+    </div>
+
+    <div class="orders-list" id="ordersList">
+        {% for order in orders %}
+            <div class="order-card" data-status="{{ order.status }}">
+                <div class="order-card-top">
+                    <h3>Order #{{ order.id }}</h3>
+                    <span class="order-status-badge {{ order.status }}">{{ order.status }}</span>
+                </div>
+                <p class="order-date">Placed on {{ order.created_at|date:"d M Y, h:i A" }}</p>
+
+                <ul class="order-items-list">
+                    {% for item in order.items.all %}
+                        <li>
+                            <span>{{ item.food_item.name }} <span class="item-qty">x {{ item.quantity }}</span></span>
+                            <span>₹{{ item.subtotal }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                <div class="order-total-row">
+                    <span class="total-label">Total</span>
+                    <span class="total-value">₹{{ order.total_amount }}</span>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-orders">
+        <div class="icon">🧾</div>
+        <h3>No orders yet</h3>
+        <p>You haven't placed any orders yet.</p>
+        <a href="{% url 'menu_list' %}" class="btn-browse">Browse Menu</a>
+    </div>
+{% endif %}
+
+<script>
+    function filterOrders(btn, status) {
+        document.querySelectorAll('.order-filter-tab').forEach(tab => tab.classList.remove('active'));
+        btn.classList.add('active');
+
+        document.querySelectorAll('.order-card').forEach(card => {
+            const cardStatus = card.getAttribute('data-status');
+            if (status === 'all' || cardStatus === status) {
+                card.classList.remove('hidden-order');
+            } else {
+                card.classList.add('hidden-order');
+            }
+        });
+    }
+</script>
+
+{% endblock %}

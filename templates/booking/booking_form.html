@@ -1,0 +1,809 @@
+{% extends 'base.html' %}
+{% block title %}Book a Table{% endblock %}
+
+{% block content %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+.booking-page {
+    min-height: 100vh;
+    padding: 56px 16px;
+    background: #f5f6f8;
+    font-family: 'Inter', sans-serif;
+    color: #1f2430;
+}
+
+.booking-flex-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    max-width: 980px;
+    margin: 0 auto;
+}
+
+.booking-wrap { flex: 1; min-width: 0; max-width: 640px; }
+
+.booking-eyebrow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.booking-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: #eafaf0;
+    color: #1f9d55;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.trust-strip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 6px;
+    font-size: 0.78rem;
+    color: #6b7280;
+}
+
+.trust-strip .stars { color: #f5a623; letter-spacing: 1px; }
+.trust-strip .dot { width: 3px; height: 3px; border-radius: 50%; background: #cfd3da; }
+
+.booking-title {
+    text-align: center;
+    font-size: 1.9rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 4px 0 6px;
+}
+
+.booking-subtitle { text-align: center; color: #6b7280; font-size: 0.95rem; margin-bottom: 26px; }
+
+.progress-card {
+    background: #101827;
+    border-radius: 18px;
+    padding: 22px 24px;
+    margin-bottom: 22px;
+    color: #fff;
+}
+
+.progress-label { font-size: 0.82rem; color: #9aa4b2; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+
+.progress-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+
+.progress-steps .step { background: #1a2436; border-radius: 12px; padding: 12px 6px; text-align: center; transition: background 0.2s ease; }
+.progress-steps .step.active { background: #3a2a12; }
+.progress-steps .num { font-size: 1.3rem; font-weight: 800; color: #4b5768; }
+.progress-steps .step.active .num { color: #f5a623; }
+.progress-steps .lab { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7686; margin-top: 2px; }
+
+.booking-card {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 20px 45px -25px rgba(16,24,39,0.25);
+    overflow: hidden;
+}
+
+.card-section-title { display: flex; align-items: center; justify-content: space-between; padding: 22px 26px 6px; }
+.card-section-title h3 { font-size: 1rem; font-weight: 700; margin: 0; }
+
+.status-pill { font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #fff4e0; color: #b9740a; transition: all 0.2s ease; }
+
+.booking-form-body { padding: 10px 26px 26px; }
+
+.field-row-badge { display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f0f1f4; }
+.field-row-badge:last-of-type { border-bottom: none; }
+
+.badge { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.15rem; flex-shrink: 0; }
+.badge.blue { background: #e3f0ff; }
+.badge.orange { background: #fff1e0; }
+.badge.red { background: #ffe6e4; }
+.badge.green { background: #e3f8ea; }
+.badge.purple { background: #f1e8ff; }
+.badge.teal { background: #e1f7f5; }
+
+.field-content { flex: 1; }
+
+.field-content label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #9aa0ab; margin-bottom: 6px; }
+
+.input-with-icon { position: relative; }
+
+.field-content input,
+.field-content select,
+.field-content textarea {
+    width: 100%;
+    border: 1px solid #e7e9ee;
+    border-radius: 10px;
+    padding: 10px 13px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1f2430;
+    background: #fbfbfd;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field-content textarea { resize: vertical; font-weight: 500; }
+
+.field-content input:focus,
+.field-content select:focus,
+.field-content textarea:focus {
+    outline: none;
+    border-color: #f5a623;
+    box-shadow: 0 0 0 3px rgba(245,166,35,0.15);
+    background: #fff;
+}
+
+.field-content input.valid { border-color: #1f9d55; padding-right: 34px; }
+.field-content input.invalid { border-color: #e0392b; }
+
+.valid-tick {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #1f9d55;
+    font-size: 0.9rem;
+    display: none;
+}
+.valid-tick.show { display: block; }
+
+.field-error {
+    font-size: 0.75rem;
+    color: #e0392b;
+    font-weight: 600;
+    margin-top: 5px;
+    display: none;
+}
+.field-error.show { display: block; }
+
+.field-content input::placeholder,
+.field-content textarea::placeholder { color: #b3b8c2; font-weight: 400; }
+
+.field-row-double { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.zone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 2px; }
+
+.zone-card {
+    border: 1.5px solid #e7e9ee;
+    border-radius: 12px;
+    padding: 10px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: #fbfbfd;
+}
+.zone-card .zicon { font-size: 1.2rem; display: block; margin-bottom: 4px; }
+.zone-card .zlab { font-size: 0.68rem; font-weight: 600; color: #6b7280; }
+.zone-card:hover { border-color: #f5a623; }
+.zone-card.active { border-color: #f5a623; background: #fff8ec; }
+.zone-card.active .zlab { color: #b9740a; }
+
+.guest-stepper { display: flex; align-items: center; border: 1px solid #e7e9ee; border-radius: 10px; background: #fbfbfd; overflow: hidden; }
+.guest-stepper button { width: 38px; height: 40px; border: none; background: #f0f1f5; font-size: 1.1rem; font-weight: 700; color: #1f2430; cursor: pointer; }
+.guest-stepper button:hover { background: #e7e9ee; }
+.guest-stepper input { border: none !important; background: transparent !important; text-align: center; flex: 1; box-shadow: none !important; }
+
+.char-count { text-align: right; font-size: 0.68rem; color: #b3b8c2; margin-top: 4px; }
+
+.availability-msg {
+    margin-top: 10px;
+    padding: 9px 13px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    display: none;
+}
+.availability-msg.show { display: block; }
+.availability-msg.ok { background: #eafaf0; color: #1f9d55; }
+.availability-msg.bad { background: #ffe6e4; color: #c0392b; }
+.availability-msg.checking { background: #f0f1f5; color: #6b7280; }
+
+.preview-card {
+    margin: 22px 26px 0;
+    background: #fafbfc;
+    border: 1px solid #eef0f3;
+    border-radius: 14px;
+    padding: 16px 18px;
+}
+
+.preview-title { font-size: 0.78rem; font-weight: 700; color: #6b7280; margin-bottom: 10px; }
+
+.preview-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 0.85rem; transition: transform 0.15s ease; }
+.preview-row span:first-child { color: #9aa0ab; }
+.preview-row span:last-child { font-weight: 700; color: #1f2430; }
+.preview-row.pulse { animation: pulseRow 0.35s ease; }
+@keyframes pulseRow { 0% { transform: scale(1); } 40% { transform: scale(1.03); color: #b9740a; } 100% { transform: scale(1); } }
+
+.submit-area { padding: 22px 26px 26px; }
+
+.submit-btn {
+    width: 100%;
+    background: #101827;
+    color: #ffffff;
+    border: none;
+    border-radius: 999px;
+    padding: 15px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.18s ease, transform 0.1s ease, opacity 0.18s ease;
+}
+
+.submit-btn:hover { background: #f5a623; }
+.submit-btn:active { transform: scale(0.98); }
+.submit-btn.loading { pointer-events: none; opacity: 0.85; }
+.submit-btn:disabled { background: #cfd3da; cursor: not-allowed; }
+
+.spinner {
+    width: 15px; height: 15px;
+    border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    display: none;
+    animation: spin 0.7s linear infinite;
+}
+.submit-btn.loading .spinner { display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.booking-note { text-align: center; font-size: 0.78rem; color: #9aa0ab; margin-top: 12px; }
+
+/* Bookings sidebar */
+.bookings-sidebar {
+    width: 300px;
+    flex-shrink: 0;
+    background: #ffffff;
+    border-radius: 18px;
+    box-shadow: 0 20px 45px -25px rgba(16,24,39,0.25);
+    padding: 20px 20px 22px;
+    position: sticky;
+    top: 24px;
+}
+
+.sidebar-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sidebar-subtitle {
+    font-size: 0.75rem;
+    color: #9aa0ab;
+    margin-bottom: 14px;
+}
+
+.sidebar-capacity {
+    background: #f5f6f8;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #1f2430;
+    margin-bottom: 14px;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sidebar-capacity .cap-row { display: flex; justify-content: space-between; }
+.sidebar-capacity .cap-total { color: #1f2430; }
+.sidebar-capacity .cap-booked { color: #b9740a; }
+.sidebar-capacity .cap-remaining { color: #1f9d55; }
+
+.capacity-bar-track {
+    width: 100%;
+    height: 6px;
+    border-radius: 999px;
+    background: #e7e9ee;
+    overflow: hidden;
+    margin-top: 2px;
+}
+
+.capacity-bar-fill {
+    height: 100%;
+    background: #f5a623;
+    border-radius: 999px;
+    transition: width 0.25s ease;
+}
+
+.sidebar-booking-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 0;
+    border-bottom: 1px solid #f0f1f4;
+    font-size: 0.82rem;
+}
+
+.sidebar-booking-item:last-child { border-bottom: none; }
+
+.sidebar-booking-time { font-weight: 700; color: #1f2430; }
+
+.sidebar-booking-guests {
+    background: #fff1e0;
+    color: #b9740a;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+}
+
+.sidebar-empty {
+    text-align: center;
+    color: #b3b8c2;
+    font-size: 0.82rem;
+    padding: 20px 0;
+}
+
+@media (max-width: 900px) {
+    .booking-flex-layout { flex-direction: column; }
+    .bookings-sidebar { width: 100%; position: static; }
+}
+
+@media (max-width: 520px) {
+    .field-row-double { grid-template-columns: 1fr; }
+    .zone-grid { grid-template-columns: repeat(2, 1fr); }
+    .progress-steps { grid-template-columns: repeat(2, 1fr); }
+    .card-section-title, .booking-form-body, .submit-area { padding-left: 18px; padding-right: 18px; }
+    .preview-card { margin-left: 18px; margin-right: 18px; }
+}
+</style>
+
+<div class="booking-page">
+    <div class="booking-flex-layout">
+        <div class="booking-wrap">
+
+            <div class="booking-eyebrow-row">
+                <span class="booking-pill">🍽️ My Restaurant</span>
+            </div>
+            <div class="trust-strip">
+                <span><span class="stars">★★★★★</span> 4.8</span>
+                <span class="dot"></span>
+                <span>500+ reservations this month</span>
+            </div>
+            <h1 class="booking-title">Book a Table</h1>
+            <p class="booking-subtitle">Reserve your spot in under a minute</p>
+
+            <div class="progress-card">
+                <div class="progress-label">📝 Your Reservation Progress</div>
+                <div class="progress-steps">
+                    <div class="step active"><div class="num" id="stepGuestsNum">1</div><div class="lab">Guest</div></div>
+                    <div class="step" id="stepPartyBox"><div class="num" id="stepParty">1</div><div class="lab">People</div></div>
+                    <div class="step" id="stepDateBox"><div class="num" id="stepDate">—</div><div class="lab">Date</div></div>
+                    <div class="step" id="stepTimeBox"><div class="num" id="stepTimeNum">—</div><div class="lab">Time</div></div>
+                </div>
+            </div>
+
+            <div class="booking-card">
+                <div class="card-section-title">
+                    <h3>Your Details</h3>
+                    <span class="status-pill" id="formStatusPill">DRAFT</span>
+                </div>
+
+                <div class="booking-form-body">
+                    <form method="post" id="bookingForm">
+                        {% csrf_token %}
+
+                        <div class="field-row-badge">
+                            <div class="badge blue">👤</div>
+                            <div class="field-content">
+                                <label>Name</label>
+                                <input type="text" name="name" id="fName" placeholder="Your full name" required>
+                            </div>
+                        </div>
+
+                        <div class="field-row-badge">
+                            <div class="badge orange">📞</div>
+                            <div class="field-content">
+                                <label>Phone</label>
+                                <div class="input-with-icon">
+                                    <input
+                                        type="tel"
+                                        name="phone"
+                                        id="fPhone"
+                                        placeholder="10-digit mobile number"
+                                        maxlength="10"
+                                        inputmode="numeric"
+                                        pattern="[6-9][0-9]{9}"
+                                        autocomplete="tel"
+                                        required
+                                    >
+                                    <span class="valid-tick" id="phoneTick">✅</span>
+                                </div>
+                                <div class="field-error" id="phoneError">Enter a valid 10-digit Indian mobile number.</div>
+                            </div>
+                        </div>
+
+                        <div class="field-row-badge">
+                            <div class="badge purple">👥</div>
+                            <div class="field-content">
+                                <div class="field-row-double">
+                                    <div>
+                                        <label>Guests</label>
+                                        <div class="guest-stepper">
+                                            <button type="button" id="decreaseGuests">&minus;</button>
+                                            <input type="number" name="guests" id="guestsInput" min="1" max="6" value="1" required>
+                                            <button type="button" id="increaseGuests">&plus;</button>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label>Occasion</label>
+                                        <select name="occasion" id="fOccasion">
+                                            <option value="none">No specific occasion</option>
+                                            <option value="birthday">🎂 Birthday</option>
+                                            <option value="anniversary">💍 Anniversary</option>
+                                            <option value="family">👨‍👩‍👧 Family gathering</option>
+                                            <option value="business">💼 Business meeting</option>
+                                            <option value="date">❤️ Date night</option>
+                                            <option value="other">✨ Other</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field-row-badge">
+                            <div class="badge teal">🪑</div>
+                            <div class="field-content">
+                                <label>Seating preference</label>
+                                <input type="hidden" name="table_zone" id="fZone" value="indoor">
+                                <div class="zone-grid">
+                                    <div class="zone-card active" data-zone="indoor"><span class="zicon">🏠</span><span class="zlab">Indoor</span></div>
+                                    <div class="zone-card" data-zone="outdoor"><span class="zicon">🌿</span><span class="zlab">Outdoor</span></div>
+                                    <div class="zone-card" data-zone="window"><span class="zicon">🪟</span><span class="zlab">Window</span></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field-row-badge">
+                            <div class="badge red">📅</div>
+                            <div class="field-content">
+                                <div class="field-row-double">
+                                    <div>
+                                        <label>Date</label>
+                                        <input type="date" name="booking_date" id="fDate" required>
+                                    </div>
+                                    <div>
+                                        <label>Time</label>
+                                        <input type="time" name="booking_time" id="fTime" required>
+                                    </div>
+                                </div>
+                                <div class="availability-msg" id="availabilityMsg"></div>
+                            </div>
+                        </div>
+
+                        <div class="field-row-badge">
+                            <div class="badge green">📝</div>
+                            <div class="field-content">
+                                <label>Special request</label>
+                                <textarea name="special_request" id="fNote" rows="2" maxlength="200" placeholder="Optional — allergies, seating preference, anything else"></textarea>
+                                <div class="char-count"><span id="noteCount">0</span>/200</div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="preview-card">
+                    <div class="preview-title">📋 Live Preview</div>
+                    <div class="preview-row" id="rowName"><span>Name</span><span id="sumName">—</span></div>
+                    <div class="preview-row" id="rowPhone"><span>Phone</span><span id="sumPhone">—</span></div>
+                    <div class="preview-row" id="rowDateTime"><span>Date &amp; time</span><span id="sumDateTime">—</span></div>
+                    <div class="preview-row" id="rowGuests"><span>Guests</span><span id="sumGuests">1 people</span></div>
+                    <div class="preview-row" id="rowZone"><span>Seating</span><span id="sumZone">Indoor</span></div>
+                    <div class="preview-row" id="rowOccasion"><span>Occasion</span><span id="sumOccasion">—</span></div>
+                </div>
+
+                <div class="submit-area">
+                    <button type="submit" form="bookingForm" class="submit-btn" id="submitBtn">
+                        <span class="spinner"></span>
+                        <span id="submitLabel">Confirm Booking</span>
+                    </button>
+                    <p class="booking-note">No payment required now</p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="bookings-sidebar">
+            <div class="sidebar-title">📋 Bookings</div>
+            <p class="sidebar-subtitle" id="sidebarDateLabel">Loading today's bookings…</p>
+            <div class="sidebar-capacity" id="sidebarCapacity">
+                <div class="cap-row">
+                    <span>Total seats</span>
+                    <span class="cap-total" id="sidebarTotal">—</span>
+                </div>
+                <div class="cap-row">
+                    <span>Booked</span>
+                    <span class="cap-booked" id="sidebarBooked">—</span>
+                </div>
+                <div class="cap-row">
+                    <span>Free</span>
+                    <span class="cap-remaining" id="sidebarRemaining">—</span>
+                </div>
+                <div class="capacity-bar-track">
+                    <div class="capacity-bar-fill" id="sidebarBarFill" style="width: 0%;"></div>
+                </div>
+            </div>
+            <div id="sidebarBookingsList">
+                <p class="sidebar-empty">Pick a date above to see bookings.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const guestsInput = document.getElementById('guestsInput');
+    document.getElementById('increaseGuests').addEventListener('click', () => {
+        guestsInput.value = parseInt(guestsInput.value || 1) + 1;
+        updateSummary('rowGuests');
+        checkAvailability();
+    });
+    document.getElementById('decreaseGuests').addEventListener('click', () => {
+        const current = parseInt(guestsInput.value || 1);
+        if (current > 1) guestsInput.value = current - 1;
+        updateSummary('rowGuests');
+        checkAvailability();
+    });
+
+    document.getElementById('fDate').min = new Date().toISOString().split('T')[0];
+
+    const timeInput = document.getElementById('fTime');
+
+    const zoneInput = document.getElementById('fZone');
+    document.querySelectorAll('.zone-card').forEach(card => {
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.zone-card').forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            zoneInput.value = card.dataset.zone;
+            updateSummary('rowZone');
+        });
+    });
+
+    const noteInput = document.getElementById('fNote');
+    const noteCount = document.getElementById('noteCount');
+    noteInput.addEventListener('input', () => noteCount.textContent = noteInput.value.length);
+
+    // ---- Indian 10-digit mobile number validation ----
+    const phoneInput = document.getElementById('fPhone');
+    const phoneTick = document.getElementById('phoneTick');
+    const phoneError = document.getElementById('phoneError');
+    const submitBtnRef = document.getElementById('submitBtn');
+
+    function isValidIndianPhone(digits) {
+        return /^[6-9][0-9]{9}$/.test(digits);
+    }
+
+    phoneInput.addEventListener('input', () => {
+        // strip non-digits and cap at 10 characters as the user types
+        let digits = phoneInput.value.replace(/\D/g, '').slice(0, 10);
+        phoneInput.value = digits;
+
+        const ok = isValidIndianPhone(digits);
+        phoneInput.classList.toggle('valid', ok);
+        phoneInput.classList.toggle('invalid', digits.length === 10 && !ok);
+        phoneTick.classList.toggle('show', ok);
+        phoneError.classList.toggle('show', digits.length === 10 && !ok);
+
+        updateSummary('rowPhone');
+    });
+
+    phoneInput.addEventListener('blur', () => {
+        const digits = phoneInput.value.replace(/\D/g, '');
+        if (digits.length > 0 && !isValidIndianPhone(digits)) {
+            phoneError.classList.add('show');
+            phoneInput.classList.add('invalid');
+        }
+    });
+
+    function formatTime12(t) {
+        if (!t) return '—';
+        let [h, m] = t.split(':').map(Number);
+        const suffix = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return `${h}:${m.toString().padStart(2,'0')} ${suffix}`;
+    }
+    function formatDateShort(d) {
+        if (!d) return '—';
+        const dt = new Date(d + 'T00:00:00');
+        return dt.toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
+    }
+    function formatDateTimeLong(d, t) {
+        if (!d && !t) return '—';
+        const dt = d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+        return `${dt}${t ? ' at ' + formatTime12(t) : ''}`;
+    }
+    const zoneLabels = { indoor: 'Indoor', outdoor: 'Outdoor', window: 'Window' };
+
+    function pulse(id) {
+        const el = document.getElementById(id);
+        el.classList.remove('pulse');
+        void el.offsetWidth;
+        el.classList.add('pulse');
+    }
+
+    function updateSummary(changedRow) {
+        const name = document.getElementById('fName').value;
+        const phone = phoneInput.value;
+        const date = document.getElementById('fDate').value;
+        const time = timeInput.value;
+        const g = parseInt(guestsInput.value || 1);
+        const occSelect = document.getElementById('fOccasion');
+
+        document.getElementById('sumName').textContent = name || '—';
+        document.getElementById('sumPhone').textContent = phone || '—';
+        document.getElementById('sumDateTime').textContent = formatDateTimeLong(date, time);
+        document.getElementById('sumGuests').textContent = g + ' people';
+        document.getElementById('sumZone').textContent = zoneLabels[zoneInput.value] || 'Indoor';
+        document.getElementById('sumOccasion').textContent = occSelect.value === 'none' ? '—' : occSelect.options[occSelect.selectedIndex].text;
+
+        document.getElementById('stepGuestsNum').textContent = name ? '✓' : '1';
+        document.getElementById('stepParty').textContent = g;
+        document.getElementById('stepDate').textContent = formatDateShort(date);
+        document.getElementById('stepTimeNum').textContent = time ? formatTime12(time) : '—';
+
+        ['stepPartyBox','stepDateBox','stepTimeBox'].forEach(id => document.getElementById(id).classList.remove('active'));
+        if (g > 0) document.getElementById('stepPartyBox').classList.add('active');
+        if (date) document.getElementById('stepDateBox').classList.add('active');
+        if (time) document.getElementById('stepTimeBox').classList.add('active');
+
+        const phoneDigits = phone.replace(/\D/g, '');
+        const phoneOk = isValidIndianPhone(phoneDigits);
+
+        const pill = document.getElementById('formStatusPill');
+        if (name && phoneOk && date && time) {
+            pill.textContent = 'READY';
+            pill.style.background = '#eafaf0';
+            pill.style.color = '#1f9d55';
+        } else {
+            pill.textContent = 'DRAFT';
+            pill.style.background = '#fff4e0';
+            pill.style.color = '#b9740a';
+        }
+
+        if (changedRow) pulse(changedRow);
+    }
+
+    document.getElementById('fName').addEventListener('input', () => updateSummary('rowName'));
+    document.getElementById('fOccasion').addEventListener('change', () => updateSummary('rowOccasion'));
+    document.getElementById('fDate').addEventListener('change', function () {
+        updateSummary('rowDateTime');
+        checkAvailability();
+        loadBookingsForDate(this.value);
+    });
+    document.getElementById('fTime').addEventListener('change', () => { updateSummary('rowDateTime'); checkAvailability(); });
+    guestsInput.addEventListener('input', checkAvailability);
+    guestsInput.addEventListener('change', checkAvailability);
+
+    document.getElementById('bookingForm').addEventListener('submit', function (e) {
+        const submitBtn = document.getElementById('submitBtn');
+
+        const phoneDigits = phoneInput.value.replace(/\D/g, '');
+        if (!isValidIndianPhone(phoneDigits)) {
+            e.preventDefault();
+            phoneError.classList.add('show');
+            phoneInput.classList.add('invalid');
+            phoneInput.focus();
+            return;
+        }
+
+        if (submitBtn.disabled) {
+            e.preventDefault();
+            return;
+        }
+        submitBtn.classList.add('loading');
+        document.getElementById('submitLabel').textContent = 'Confirming…';
+    });
+
+    let availabilityTimer = null;
+
+    function checkAvailability() {
+        const date = document.getElementById('fDate').value;
+        const time = timeInput.value;
+        const guests = parseInt(guestsInput.value || 1);
+        const msgBox = document.getElementById('availabilityMsg');
+        const submitBtn = document.getElementById('submitBtn');
+
+        if (guests > 6) {
+            msgBox.className = 'availability-msg show bad';
+            msgBox.textContent = '⚠️ Max 6 guests allowed per table. Please choose 6 or fewer, or split into multiple bookings.';
+            submitBtn.disabled = true;
+            return;
+        }
+
+        if (!date || !time) {
+            msgBox.className = 'availability-msg';
+            msgBox.textContent = '';
+            submitBtn.disabled = false;
+            return;
+        }
+
+        msgBox.className = 'availability-msg show checking';
+        msgBox.textContent = 'Checking availability…';
+
+        clearTimeout(availabilityTimer);
+        availabilityTimer = setTimeout(() => {
+            fetch(`/booking/check-availability/?date=${date}&time=${time}&guests=${guests}`)
+                .then(res => res.json())
+                .then(data => {
+                    msgBox.className = 'availability-msg show ' + (data.available ? 'ok' : 'bad');
+                    msgBox.textContent = data.message;
+                    submitBtn.disabled = !data.available;
+                })
+                .catch(() => {
+                    msgBox.className = 'availability-msg show bad';
+                    msgBox.textContent = '⚠️ Could not check availability. Try again.';
+                    submitBtn.disabled = false;
+                });
+        }, 300);
+    }
+
+    function loadBookingsForDate(date) {
+        const listBox = document.getElementById('sidebarBookingsList');
+        const capBox = document.getElementById('sidebarCapacity');
+        const dateLabel = document.getElementById('sidebarDateLabel');
+
+        if (!date) {
+            listBox.innerHTML = '<p class="sidebar-empty">Pick a date above to see bookings.</p>';
+            capBox.style.display = 'none';
+            dateLabel.textContent = 'Select a date to view';
+            return;
+        }
+
+        const dt = new Date(date + 'T00:00:00');
+        dateLabel.textContent = dt.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short' });
+
+        fetch(`/booking/bookings-for-date/?date=${date}`)
+            .then(res => res.json())
+            .then(data => {
+                capBox.style.display = 'flex';
+
+                const total = data.total_capacity || 0;
+                const booked = data.booked_guests || 0;
+                const remaining = data.remaining;
+
+                document.getElementById('sidebarTotal').textContent = `${total} seats`;
+                document.getElementById('sidebarBooked').textContent = `${booked} seats`;
+                document.getElementById('sidebarRemaining').textContent = `${remaining} seats`;
+
+                const pctFilled = total > 0 ? Math.min(100, (booked / total) * 100) : 0;
+                document.getElementById('sidebarBarFill').style.width = `${pctFilled}%`;
+
+                if (data.bookings.length === 0) {
+                    listBox.innerHTML = '<p class="sidebar-empty">No bookings yet for this date. 🎉</p>';
+                    return;
+                }
+
+                listBox.innerHTML = data.bookings.map(b => `
+                    <div class="sidebar-booking-item">
+                        <span class="sidebar-booking-time">${b.time}</span>
+                        <span class="sidebar-booking-guests">${b.guests} 👥</span>
+                    </div>
+                `).join('');
+            })
+            .catch(() => {
+                listBox.innerHTML = '<p class="sidebar-empty">Could not load bookings.</p>';
+            });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        loadBookingsForDate(todayStr);
+    });
+</script>
+
+{% endblock %}

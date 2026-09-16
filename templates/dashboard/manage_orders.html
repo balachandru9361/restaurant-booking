@@ -1,0 +1,243 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .page-header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 14px; margin-bottom: 22px;
+  }
+  .page-header h2 { font-size: 24px; color: #1a1a2e; display: flex; align-items: center; gap: 10px; }
+  .page-header p { font-size: 13px; color: #999; margin-top: 3px; }
+
+  .stats-strip {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px; margin-bottom: 26px;
+  }
+  .mini-stat {
+    background: #fff; border-radius: 12px; padding: 16px 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 12px;
+    border-left: 4px solid #2ecc71; cursor: pointer; transition: transform 0.15s ease;
+  }
+  .mini-stat:hover { transform: translateY(-2px); }
+  .mini-stat:nth-child(2) { border-left-color: #f39c12; }
+  .mini-stat:nth-child(3) { border-left-color: #3498db; }
+  .mini-stat:nth-child(4) { border-left-color: #F63A3A; }
+  .mini-stat .emoji { font-size: 22px; }
+  .mini-stat .num { font-size: 19px; font-weight: 800; color: #1a1a2e; line-height: 1; }
+  .mini-stat .lbl { font-size: 11.5px; color: #999; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  .toolbar { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+  .search-box { flex: 1; min-width: 220px; position: relative; }
+  .search-box input {
+    width: 100%; padding: 11px 16px 11px 40px; border: 1.5px solid #e6e6ee;
+    border-radius: 10px; font-size: 14px; background: #fff;
+  }
+  .search-box input:focus { outline: none; border-color: #F63A3A; box-shadow: 0 0 0 4px rgba(246,58,58,0.08); }
+  .search-box::before {
+    content: "🔍"; position: absolute; left: 14px; top: 50%;
+    transform: translateY(-50%); font-size: 14px; opacity: 0.5;
+  }
+  .filter-chip {
+    padding: 9px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
+    background: #f5f5f8; color: #666; cursor: pointer; border: 1.5px solid transparent;
+    transition: all 0.15s ease; white-space: nowrap;
+  }
+  .filter-chip.active { background: #1a1a2e; color: #fff; }
+  .filter-chip:hover:not(.active) { border-color: #ddd; }
+
+  .orders-table-wrap {
+    background: #fff; border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); overflow: hidden;
+  }
+  table.orders-table { width: 100%; border-collapse: collapse; }
+  table.orders-table thead th {
+    background: #1a1a2e; color: #fff; text-align: left; padding: 15px 16px;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  table.orders-table tbody tr {
+    transition: background 0.15s ease; animation: fadeSlide 0.3s ease backwards;
+  }
+  @keyframes fadeSlide { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+  table.orders-table tbody tr:hover { background: #fafafb; }
+  table.orders-table td {
+    padding: 13px 16px; border-top: 1px solid #f2f2f5; font-size: 14.5px;
+    vertical-align: middle; color: #333;
+  }
+
+  .order-id { font-weight: 800; color: #1a1a2e; }
+  .order-items { font-size: 12.5px; color: #888; max-width: 220px; }
+
+  .status-badge {
+    padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .status-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .status-pending  { background: #fff3cd; color: #f39c12; }
+  .status-preparing{ background: #e3f0ff; color: #3498db; }
+  .status-ready    { background: #f3e5f9; color: #9b59b6; }
+  .status-delivered,
+  .status-completed{ background: #e3f9ec; color: #2ecc71; }
+  .status-cancelled{ background: #ffe5e5; color: #e74c3c; }
+
+  select.status-select {
+    padding: 7px 10px; border-radius: 8px; border: 1.5px solid #e6e6ee;
+    font-size: 12.5px; font-weight: 700; background: #fafafa; cursor: pointer;
+  }
+
+  .amount { font-weight: 800; color: #1a1a2e; }
+
+  /* --- Table badge --- */
+  .table-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px; border-radius: 20px; font-size: 12.5px; font-weight: 700;
+    background: #eef2ff; color: #4f46e5; white-space: nowrap;
+  }
+  .table-tag.takeaway {
+    background: #f5f5f8; color: #888;
+  }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
+  .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
+
+  @media (max-width: 760px) {
+    .orders-table-wrap { overflow-x: auto; }
+    table.orders-table { min-width: 820px; }
+  }
+</style>
+
+<div class="page-header">
+  <div>
+    <h2>🧾 Orders</h2>
+    <p>Track and manage all customer orders</p>
+  </div>
+</div>
+
+<div class="stats-strip">
+  <div class="mini-stat" onclick="setFilter('all')">
+    <div class="emoji">📦</div>
+    <div><div class="num">{{ orders|length }}</div><div class="lbl">Total Orders</div></div>
+  </div>
+  <div class="mini-stat" onclick="setFilter('pending')">
+    <div class="emoji">⏳</div>
+    <div><div class="num" id="pendingCount">0</div><div class="lbl">Pending</div></div>
+  </div>
+  <div class="mini-stat" onclick="setFilter('preparing')">
+    <div class="emoji">👨‍🍳</div>
+    <div><div class="num" id="preparingCount">0</div><div class="lbl">Preparing</div></div>
+  </div>
+  <div class="mini-stat" onclick="setFilter('delivered')">
+    <div class="emoji">✅</div>
+    <div><div class="num" id="deliveredCount">0</div><div class="lbl">Delivered</div></div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="search-box">
+    <input type="text" id="orderSearch" placeholder="Search by order ID or customer...">
+  </div>
+  <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">All</div>
+  <div class="filter-chip" data-filter="pending" onclick="setFilter('pending')">Pending</div>
+  <div class="filter-chip" data-filter="preparing" onclick="setFilter('preparing')">Preparing</div>
+  <div class="filter-chip" data-filter="delivered" onclick="setFilter('delivered')">Delivered</div>
+  <div class="filter-chip" data-filter="cancelled" onclick="setFilter('cancelled')">Cancelled</div>
+</div>
+
+<div class="orders-table-wrap">
+  <table class="orders-table">
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Customer</th>
+        <th>Table</th>
+        <th>Items</th>
+        <th>Amount</th>
+        <th>Status</th>
+        <th>Placed On</th>
+      </tr>
+    </thead>
+    <tbody id="ordersTableBody">
+      {% for order in orders %}
+      <tr data-status="{{ order.status|lower }}"
+          data-search="{{ order.id }}-{{ order.user.username|default:order.user.get_full_name|lower }}">
+        <td class="order-id">#{{ order.id }}</td>
+        <td>{{ order.user.get_full_name|default:order.user.username }}</td>
+        <td>
+          {% if order.table %}
+            <span class="table-tag">🪑 #{{ order.table.number }}</span>
+          {% else %}
+            <span class="table-tag takeaway">🥡 Takeaway</span>
+          {% endif %}
+        </td>
+        <td class="order-items">
+          {% for item in order.items.all %}{{ item.quantity }}× {{ item.food_item.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        </td>
+        <td class="amount">₹{{ order.total_amount }}</td>
+        <td>
+          <select class="status-select status-{{ order.status|lower }}" onchange="updateStatus(this, {{ order.id }})">
+            <option value="pending" {% if order.status|lower == "pending" %}selected{% endif %}>⏳ Pending</option>
+            <option value="preparing" {% if order.status|lower == "preparing" %}selected{% endif %}>👨‍🍳 Preparing</option>
+            <option value="ready" {% if order.status|lower == "ready" %}selected{% endif %}>🔔 Ready</option>
+            <option value="delivered" {% if order.status|lower == "delivered" %}selected{% endif %}>✅ Delivered</option>
+            <option value="cancelled" {% if order.status|lower == "cancelled" %}selected{% endif %}>❌ Cancelled</option>
+          </select>
+        </td>
+        <td>{{ order.created_at|date:"d M Y, g:i A" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7">
+        <div class="empty-state">
+          <div class="big-emoji">🧾</div>
+          <p>No orders placed yet.</p>
+        </div>
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  const rows = document.querySelectorAll('#ordersTableBody tr[data-status]');
+  let currentFilter = 'all';
+
+  function computeCounts() {
+    let pending = 0, preparing = 0, delivered = 0;
+    rows.forEach(r => {
+      if (r.dataset.status === 'pending') pending++;
+      if (r.dataset.status === 'preparing') preparing++;
+      if (r.dataset.status === 'delivered' || r.dataset.status === 'completed') delivered++;
+    });
+    document.getElementById('pendingCount').textContent = pending;
+    document.getElementById('preparingCount').textContent = preparing;
+    document.getElementById('deliveredCount').textContent = delivered;
+  }
+  computeCounts();
+
+  const searchInput = document.getElementById('orderSearch');
+
+  function applyFilters() {
+    const q = searchInput.value.toLowerCase();
+    rows.forEach(row => {
+      const textMatch = row.dataset.search.includes(q);
+      const filterMatch = currentFilter === 'all' || row.dataset.status === currentFilter;
+      row.style.display = (textMatch && filterMatch) ? '' : 'none';
+    });
+  }
+  searchInput.addEventListener('input', applyFilters);
+
+  function setFilter(f) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    applyFilters();
+  }
+
+  function updateStatus(select, orderId) {
+    select.className = 'status-select status-' + select.value;
+    fetch(`/dashboard/orders/${orderId}/update-status/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ''
+      },
+      body: JSON.stringify({ status: select.value })
+    }).catch(() => console.log('Hook this up to your update-status view'));
+  }
+</script>
+{% endblock %}

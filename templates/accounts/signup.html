@@ -1,0 +1,364 @@
+{% extends 'base.html' %}
+
+{% block title %}Sign Up - My Restaurant{% endblock %}
+
+{% block content %}
+
+<style>
+    .auth-wrapper {
+        min-height: 85vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 20px;
+        background: linear-gradient(135deg, #fdf7f2 0%, #f9fafb 60%, #fff0e8 100%);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .auth-wrapper::before,
+    .auth-wrapper::after {
+        content: "";
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(10px);
+        animation: floatBlob 8s ease-in-out infinite;
+    }
+
+    .auth-wrapper::before {
+        width: 260px;
+        height: 260px;
+        background: radial-gradient(circle, rgba(255,107,53,0.18), transparent 70%);
+        top: -60px;
+        left: -60px;
+    }
+
+    .auth-wrapper::after {
+        width: 320px;
+        height: 320px;
+        background: radial-gradient(circle, rgba(31,41,55,0.08), transparent 70%);
+        bottom: -100px;
+        right: -80px;
+        animation-delay: 2s;
+    }
+
+    @keyframes floatBlob {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(20px, -20px); }
+    }
+
+    .auth-form {
+        width: 100%;
+        max-width: 440px;
+        background: #fff;
+        border-radius: 22px;
+        box-shadow: 0 16px 40px rgba(0,0,0,0.1);
+        padding: 42px 32px;
+        position: relative;
+        overflow: hidden;
+        z-index: 1;
+        animation: cardIn 0.5s ease;
+    }
+
+    @keyframes cardIn {
+        from { opacity: 0; transform: translateY(16px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .auth-form::before {
+        content: "";
+        position: absolute;
+        top: -60px;
+        right: -60px;
+        width: 180px;
+        height: 180px;
+        background: radial-gradient(circle, rgba(255,107,53,0.15), transparent 70%);
+        border-radius: 50%;
+    }
+
+    .auth-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #1f2937, #3b2f2f);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.7rem;
+        margin: 0 auto 18px;
+        position: relative;
+        z-index: 1;
+        animation: iconFloat 3s ease-in-out infinite;
+        box-shadow: 0 8px 20px rgba(31,41,55,0.25);
+    }
+
+    @keyframes iconFloat {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-6px); }
+    }
+
+    .auth-form h1 {
+        text-align: center;
+        font-size: 1.65rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-bottom: 6px;
+        position: relative;
+        z-index: 1;
+        letter-spacing: -0.3px;
+    }
+
+    .auth-subtitle {
+        text-align: center;
+        color: #8b8f99;
+        font-size: 0.9rem;
+        margin-bottom: 28px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .auth-form form {
+        position: relative;
+        z-index: 1;
+    }
+
+    .form-group {
+        margin-bottom: 18px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #1f2937;
+        margin-bottom: 6px;
+    }
+
+    .input-wrap {
+        position: relative;
+    }
+
+    .form-group input {
+        width: 100%;
+        padding: 13px 16px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 12px;
+        font-size: 0.95rem;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        background: #fdf7f2;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .input-wrap input[type="password"],
+    .input-wrap input[type="text"].pw-visible {
+        padding-right: 44px;
+    }
+
+    .form-group input:focus {
+        border-color: #ff6b35;
+        box-shadow: 0 0 0 3px rgba(255,107,53,0.15);
+        background: #fff;
+    }
+
+    .toggle-pw {
+        position: absolute;
+        right: 6px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 1.1rem;
+        padding: 8px;
+        line-height: 1;
+        color: #8b8f99;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    .toggle-pw:hover {
+        color: #1f2937;
+    }
+
+    .help-text ul {
+        list-style: none;
+        padding: 0;
+        margin: 8px 0 0;
+    }
+
+    .help-text li {
+        font-size: 0.76rem;
+        color: #8b8f99;
+        padding-left: 16px;
+        position: relative;
+        line-height: 1.5;
+    }
+
+    .help-text li::before {
+        content: "•";
+        position: absolute;
+        left: 4px;
+        color: #ff6b35;
+    }
+
+    .error {
+        color: #e04e1c;
+        font-size: 0.8rem;
+        margin-top: 6px;
+        font-weight: 600;
+    }
+
+    .btn-primary {
+        width: 100%;
+        padding: 14px 0;
+        border: none;
+        border-radius: 30px;
+        background: #ff6b35;
+        color: #fff;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        margin-top: 8px;
+        transition: background 0.2s ease, transform 0.15s ease;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background: #e04e1c;
+    }
+
+    .btn-primary:active {
+        transform: scale(0.98);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.75;
+        cursor: not-allowed;
+    }
+
+    .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2.5px solid rgba(255,255,255,0.4);
+        border-top-color: #fff;
+        border-radius: 50%;
+        display: none;
+        animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .auth-form > p {
+        text-align: center;
+        margin-top: 22px;
+        font-size: 0.88rem;
+        color: #666;
+        position: relative;
+        z-index: 1;
+    }
+
+    .auth-form > p a {
+        color: #ff6b35;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .auth-form > p a:hover {
+        text-decoration: underline;
+    }
+
+    /* Touch-friendly bigger tap targets */
+    @media (hover: none) and (pointer: coarse) {
+        .form-group input {
+            padding: 15px 16px;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            padding: 16px 0;
+        }
+
+        .toggle-pw {
+            padding: 10px;
+        }
+    }
+</style>
+
+<div class="auth-wrapper">
+    <div class="auth-form">
+        <div class="auth-icon">🧾</div>
+        <h1>Create Account</h1>
+        <p class="auth-subtitle">Sign up to start ordering from My Restaurant</p>
+
+        <form method="post" id="signupForm">
+            {% csrf_token %}
+
+            {% for field in form %}
+                <div class="form-group">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <div class="input-wrap">
+                        {{ field }}
+                        {% if field.field.widget.input_type == "password" %}
+                            <button type="button" class="toggle-pw" data-target="{{ field.id_for_label }}" aria-label="Show password">👁️</button>
+                        {% endif %}
+                    </div>
+                    {% if field.help_text %}
+                        <div class="help-text">{{ field.help_text|safe }}</div>
+                    {% endif %}
+                    {% if field.errors %}
+                        <p class="error">{{ field.errors|join:", " }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <button type="submit" class="btn btn-primary" id="signupBtn">
+                <span class="spinner" id="signupSpinner"></span>
+                <span id="signupBtnText">Sign Up</span>
+            </button>
+        </form>
+
+        <p>Already have an account? <a href="{% url 'accounts:login' %}">Login</a></p>
+    </div>
+</div>
+
+<script>
+    document.querySelectorAll('.toggle-pw').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var input = document.getElementById(this.dataset.target);
+            if (!input) return;
+            if (input.type === 'password') {
+                input.type = 'text';
+                input.classList.add('pw-visible');
+                this.textContent = '🙈';
+                this.setAttribute('aria-label', 'Hide password');
+            } else {
+                input.type = 'password';
+                input.classList.remove('pw-visible');
+                this.textContent = '👁️';
+                this.setAttribute('aria-label', 'Show password');
+            }
+        });
+    });
+
+    var signupForm = document.getElementById('signupForm');
+    if (signupForm) {
+        signupForm.addEventListener('submit', function () {
+            var btn = document.getElementById('signupBtn');
+            var spinner = document.getElementById('signupSpinner');
+            var text = document.getElementById('signupBtnText');
+            btn.disabled = true;
+            spinner.style.display = 'inline-block';
+            text.textContent = 'Creating account...';
+        });
+    }
+</script>
+
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+    .form-wrap {
+        max-width: 600px;
+        margin: 30px auto;
+        background: #fff;
+        padding: 32px;
+        border-radius: 14px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+    }
+    .form-wrap h2 {
+        font-size: 22px;
+        color: #1a1a2e;
+        margin-bottom: 22px;
+    }
+    .form-wrap form p {
+        margin-bottom: 18px;
+    }
+    .form-wrap form label {
+        display: block;
+        font-weight: 600;
+        font-size: 13px;
+        color: #1a1a2e;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+    }
+    .form-wrap form input,
+    .form-wrap form select,
+    .form-wrap form textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+        box-sizing: border-box;
+    }
+    .form-wrap form input:focus,
+    .form-wrap form select:focus,
+    .form-wrap form textarea:focus {
+        outline: none;
+        border-color: #F63A3A;
+    }
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+    }
+    .btn-save {
+        background: #F63A3A;
+        color: #fff;
+        padding: 12px 26px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 4px 10px rgba(246,58,58,0.3);
+    }
+    .btn-save:hover { transform: translateY(-2px); }
+    .btn-cancel {
+        padding: 12px 26px;
+        color: #666;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+    }
+</style>
+
+<div class="form-wrap">
+    <h2>🍽️ Menu Item Details</h2>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+
+        <p>
+            <label>ADDITIONAL IMAGES (optional, select 2-3):</label>
+            <input type="file" name="extra_images" multiple accept="image/*">
+        </p>
+
+        <p>
+            <label>ADDITIONAL IMAGES (optional, select 2-3):</label>
+            <input type="file" name="extra_images" multiple accept="image/*">
+        </p>
+
+       
+
+        <div class="form-actions">
+            <button type="submit" class="btn-save">Save Item</button>
+            <a href="{% url 'dashboard:manage_menu' %}" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

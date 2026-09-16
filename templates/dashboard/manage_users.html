@@ -1,0 +1,470 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .page-header h2 {
+    font-size: 24px;
+    color: #1a1a2e;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .page-header p { font-size: 13px; color: #999; margin-top: 3px; }
+
+  .btn-export {
+    background: #fff;
+    border: 1.5px solid #e6e6ee;
+    color: #555;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+  .btn-export:hover { border-color: #2ecc71; color: #2ecc71; }
+
+  /* Stats strip */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 26px;
+  }
+  .mini-stat {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-left: 4px solid #2ecc71;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .mini-stat:hover { transform: translateY(-2px); }
+  .mini-stat:nth-child(2) { border-left-color: #9b59b6; }
+  .mini-stat:nth-child(3) { border-left-color: #F63A3A; }
+  .mini-stat:nth-child(4) { border-left-color: #f39c12; }
+  .mini-stat .emoji { font-size: 22px; }
+  .mini-stat .num { font-size: 19px; font-weight: 800; color: #1a1a2e; line-height: 1; }
+  .mini-stat .lbl { font-size: 11.5px; color: #999; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .search-box { flex: 1; min-width: 220px; position: relative; }
+  .search-box input {
+    width: 100%;
+    padding: 11px 16px 11px 40px;
+    border: 1.5px solid #e6e6ee;
+    border-radius: 10px;
+    font-size: 14px;
+    background: #fff;
+  }
+  .search-box input:focus {
+    outline: none;
+    border-color: #2ecc71;
+    box-shadow: 0 0 0 4px rgba(46,204,113,0.08);
+  }
+  .search-box::before {
+    content: "🔍";
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0.5;
+  }
+  .filter-chip {
+    padding: 9px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    background: #f5f5f8;
+    color: #666;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+  }
+  .filter-chip.active { background: #1a1a2e; color: #fff; }
+  .filter-chip:hover:not(.active) { border-color: #ddd; }
+
+  /* Bulk action bar */
+  .bulk-bar {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    background: #1a1a2e;
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 12px;
+    margin-bottom: 14px;
+    font-size: 13.5px;
+    animation: slideDown 0.2s ease;
+  }
+  .bulk-bar.show { display: flex; }
+  @keyframes slideDown { from { opacity:0; transform: translateY(-6px);} to {opacity:1; transform:translateY(0);} }
+  .bulk-bar button {
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* Table */
+  .users-table-wrap {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  table.users-table { width: 100%; border-collapse: collapse; }
+  table.users-table thead th {
+    background: #1a1a2e;
+    color: #fff;
+    text-align: left;
+    padding: 15px 16px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    user-select: none;
+  }
+  table.users-table thead th:hover { background: #24243e; }
+  table.users-table thead th .sort-arrow { opacity: 0.4; margin-left: 4px; font-size: 10px; }
+  table.users-table thead th input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
+
+  table.users-table tbody tr {
+    transition: background 0.15s ease;
+    animation: fadeSlide 0.3s ease backwards;
+    cursor: pointer;
+  }
+  @keyframes fadeSlide { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
+  table.users-table tbody tr:hover { background: #fafafb; }
+  table.users-table tbody tr.selected { background: #eafbf1; }
+  table.users-table td {
+    padding: 13px 16px;
+    border-top: 1px solid #f2f2f5;
+    font-size: 14.5px;
+    vertical-align: middle;
+    color: #333;
+  }
+  table.users-table td.checkbox-cell { width: 36px; }
+  table.users-table td input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
+
+  .user-cell { display: flex; align-items: center; gap: 12px; }
+  .avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+  .avatar.staff { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+  .avatar.admin { background: linear-gradient(135deg, #F63A3A, #e74c3c); }
+  .user-name { font-weight: 700; color: #1a1a2e; }
+  .user-username { font-size: 12.5px; color: #999; }
+
+  .role-badge { padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .role-admin { background: #ffe5e5; color: #e74c3c; }
+  .role-staff { background: #f3e5f9; color: #9b59b6; }
+  .role-customer { background: #e3f9ec; color: #2ecc71; }
+
+  .status-badge {
+    padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .status-active { background: #e3f9ec; color: #2ecc71; }
+  .status-inactive { background: #f5f5f8; color: #999; }
+  .status-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .last-login { font-size: 12.5px; color: #999; }
+  .last-login.recent { color: #2ecc71; font-weight: 700; }
+
+  /* Expandable detail row */
+  .detail-row td {
+    background: #fbfbfd;
+    padding: 0;
+    border-top: none;
+  }
+  .detail-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease, padding 0.25s ease;
+    padding: 0 20px;
+  }
+  .detail-panel.open { max-height: 200px; padding: 18px 20px; }
+  .detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+  }
+  .detail-item .k { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 0.3px; }
+  .detail-item .v { font-size: 13.5px; color: #1a1a2e; font-weight: 600; margin-top: 2px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
+  .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
+
+  @media (max-width: 700px) {
+    .users-table-wrap { overflow-x: auto; }
+    table.users-table { min-width: 700px; }
+  }
+</style>
+
+<div class="page-header">
+  <div>
+    <h2>👥 Registered Users</h2>
+    <p>Everyone who has signed up on the platform</p>
+  </div>
+  <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+</div>
+
+<div class="stats-strip">
+  <div class="mini-stat" onclick="setFilter('all')">
+    <div class="emoji">👥</div>
+    <div><div class="num">{{ users|length }}</div><div class="lbl">Total Users</div></div>
+  </div>
+  <div class="mini-stat" onclick="setFilter('staff')">
+    <div class="emoji">🛡️</div>
+    <div><div class="num" id="staffCount">0</div><div class="lbl">Staff</div></div>
+  </div>
+  <div class="mini-stat" onclick="setFilter('admin')">
+    <div class="emoji">👑</div>
+    <div><div class="num" id="adminCount">0</div><div class="lbl">Admins</div></div>
+  </div>
+  <div class="mini-stat" onclick="setFilter('active')">
+    <div class="emoji">✅</div>
+    <div><div class="num" id="activeCount">0</div><div class="lbl">Active</div></div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <div class="search-box">
+    <input type="text" id="userSearch" placeholder="Search by name, username or email...">
+  </div>
+  <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">All</div>
+  <div class="filter-chip" data-filter="admin" onclick="setFilter('admin')">Admins</div>
+  <div class="filter-chip" data-filter="staff" onclick="setFilter('staff')">Staff</div>
+  <div class="filter-chip" data-filter="customer" onclick="setFilter('customer')">Customers</div>
+</div>
+
+<div class="bulk-bar" id="bulkBar">
+  <span id="bulkCount">0 selected</span>
+  <div style="display:flex; gap:8px;">
+    <button onclick="clearSelection()">Clear</button>
+    <button onclick="alert('Hook this up to a bulk-action view')">Deactivate Selected</button>
+  </div>
+</div>
+
+<div class="users-table-wrap">
+  <table class="users-table">
+    <thead>
+      <tr>
+        <th style="width:36px;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
+        <th onclick="sortTable(1)">User <span class="sort-arrow">⇅</span></th>
+        <th onclick="sortTable(2)">Email <span class="sort-arrow">⇅</span></th>
+        <th onclick="sortTable(3)">Role <span class="sort-arrow">⇅</span></th>
+        <th onclick="sortTable(4)">Status <span class="sort-arrow">⇅</span></th>
+        <th onclick="sortTable(5)">Joined <span class="sort-arrow">⇅</span></th>
+      </tr>
+    </thead>
+    <tbody id="usersTableBody">
+      {% for user in users %}
+      <tr class="user-row"
+          data-role="{% if user.is_superuser %}admin{% elif user.is_staff %}staff{% else %}customer{% endif %}"
+          data-active="{{ user.is_active|yesno:'active,inactive' }}"
+          data-name="{{ user.get_full_name|default:user.username|lower }}"
+          data-username="{{ user.username|lower }}"
+          data-email="{{ user.email|lower }}"
+          onclick="toggleDetail(event, {{ forloop.counter }})">
+        <td class="checkbox-cell" onclick="event.stopPropagation()">
+          <input type="checkbox" class="row-check" onchange="updateBulkBar()">
+        </td>
+        <td>
+          <div class="user-cell">
+            <div class="avatar {% if user.is_superuser %}admin{% elif user.is_staff %}staff{% endif %}">
+              {{ user.username|slice:":2"|upper }}
+            </div>
+            <div>
+              <div class="user-name">{{ user.get_full_name|default:user.username }}</div>
+              <div class="user-username">@{{ user.username }}</div>
+            </div>
+          </div>
+        </td>
+        <td>{{ user.email|default:"—" }}</td>
+        <td>
+          {% if user.is_superuser %}
+            <span class="role-badge role-admin">Admin</span>
+          {% elif user.is_staff %}
+            <span class="role-badge role-staff">Staff</span>
+          {% else %}
+            <span class="role-badge role-customer">Customer</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if user.is_active %}
+            <span class="status-badge status-active">Active</span>
+          {% else %}
+            <span class="status-badge status-inactive">Inactive</span>
+          {% endif %}
+        </td>
+        <td>{{ user.date_joined|date:"d M Y" }}</td>
+      </tr>
+      <tr class="detail-row" id="detail-{{ forloop.counter }}">
+        <td colspan="6">
+          <div class="detail-panel" id="panel-{{ forloop.counter }}">
+            <div class="detail-grid">
+              <div class="detail-item"><div class="k">User ID</div><div class="v">#{{ user.id }}</div></div>
+              <div class="detail-item"><div class="k">Last Login</div>
+                <div class="v">{% if user.last_login %}{{ user.last_login|date:"d M Y, g:i A" }}{% else %}Never{% endif %}</div>
+              </div>
+              <div class="detail-item"><div class="k">Date Joined</div><div class="v">{{ user.date_joined|date:"d M Y" }}</div></div>
+              <div class="detail-item"><div class="k">Superuser</div><div class="v">{{ user.is_superuser|yesno:"Yes,No" }}</div></div>
+            </div>
+          </div>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="6">
+        <div class="empty-state">
+          <div class="big-emoji">👥</div>
+          <p>No registered users yet.</p>
+        </div>
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  const searchInput = document.getElementById('userSearch');
+  const rows = document.querySelectorAll('#usersTableBody tr.user-row');
+  let currentFilter = 'all';
+  let sortDir = {};
+
+  function computeCounts() {
+    let staff = 0, admin = 0, active = 0;
+    rows.forEach(r => {
+      if (r.dataset.role === 'staff') staff++;
+      if (r.dataset.role === 'admin') admin++;
+      if (r.dataset.active === 'active') active++;
+    });
+    document.getElementById('staffCount').textContent = staff;
+    document.getElementById('adminCount').textContent = admin;
+    document.getElementById('activeCount').textContent = active;
+  }
+  computeCounts();
+
+  function applyFilters() {
+    const q = searchInput.value.toLowerCase();
+    rows.forEach(row => {
+      const textMatch = row.dataset.name.includes(q) || row.dataset.username.includes(q) || row.dataset.email.includes(q);
+      const filterMatch = currentFilter === 'all' || row.dataset.role === currentFilter || row.dataset.active === currentFilter;
+      const show = textMatch && filterMatch;
+      row.style.display = show ? '' : 'none';
+      const detail = document.getElementById('detail-' + row.rowIndex);
+      if (detail && !show) detail.style.display = 'none';
+    });
+  }
+
+  searchInput.addEventListener('input', applyFilters);
+
+  function setFilter(f) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    applyFilters();
+  }
+
+  function toggleDetail(e, idx) {
+    if (e.target.type === 'checkbox') return;
+    const panel = document.getElementById('panel-' + idx);
+    const isOpen = panel.classList.contains('open');
+    document.querySelectorAll('.detail-panel.open').forEach(p => p.classList.remove('open'));
+    if (!isOpen) panel.classList.add('open');
+  }
+
+  function toggleAll(box) {
+    document.querySelectorAll('.row-check').forEach(c => c.checked = box.checked);
+    updateBulkBar();
+  }
+
+  function updateBulkBar() {
+    const checked = document.querySelectorAll('.row-check:checked');
+    const bar = document.getElementById('bulkBar');
+    document.getElementById('bulkCount').textContent = checked.length + ' selected';
+    bar.classList.toggle('show', checked.length > 0);
+    document.querySelectorAll('.row-check').forEach(c => {
+      c.closest('tr').classList.toggle('selected', c.checked);
+    });
+  }
+
+  function clearSelection() {
+    document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+    document.getElementById('selectAll').checked = false;
+    updateBulkBar();
+  }
+
+  function sortTable(colIndex) {
+    const tbody = document.getElementById('usersTableBody');
+    const rowPairs = [];
+    document.querySelectorAll('.user-row').forEach(r => {
+      const detail = r.nextElementSibling;
+      rowPairs.push([r, detail]);
+    });
+    sortDir[colIndex] = !sortDir[colIndex];
+    rowPairs.sort((a, b) => {
+      const t1 = a[0].children[colIndex].innerText.trim().toLowerCase();
+      const t2 = b[0].children[colIndex].innerText.trim().toLowerCase();
+      return sortDir[colIndex] ? t1.localeCompare(t2) : t2.localeCompare(t1);
+    });
+    rowPairs.forEach(([r, d]) => { tbody.appendChild(r); tbody.appendChild(d); });
+  }
+
+  function exportCSV() {
+    let csv = 'Name,Username,Email,Role,Status,Joined\n';
+    rows.forEach(r => {
+      if (r.style.display === 'none') return;
+      const cells = r.querySelectorAll('td');
+      const name = cells[1].querySelector('.user-name').innerText;
+      const username = r.dataset.username;
+      const email = cells[2].innerText;
+      const role = cells[3].innerText.trim();
+      const status = cells[4].innerText.trim();
+      const joined = cells[5].innerText.trim();
+      csv += `"${name}","${username}","${email}","${role}","${status}","${joined}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'users.csv';
+    link.click();
+  }
+</script>
+{% endblock %}
