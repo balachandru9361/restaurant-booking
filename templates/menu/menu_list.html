@@ -352,26 +352,26 @@
         display: block;
     }
 
-    /* ===== Cross-fade slideshow for item images (same style as home page hero) ===== */
+    /* ===== Slide-in carousel for item images (right-to-left) ===== */
     .menu-slide-wrap {
         position: relative;
         width: 100%;
         height: 160px;
+        overflow: hidden;
+    }
+
+    .menu-slide-track {
+        display: flex;
+        height: 100%;
+        transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .menu-slide-img {
-        position: absolute;
-        inset: 0;
+        flex: 0 0 100%;
         width: 100%;
-        height: 160px;
+        height: 100%;
         object-fit: cover;
-        opacity: 0;
-        transition: opacity 0.6s ease-in-out;
         display: block;
-    }
-
-    .menu-slide-img.active {
-        opacity: 1;
     }
 
     .item-card-body {
@@ -619,7 +619,7 @@
             gap: 16px;
         }
         .item-card img { height: 180px; }
-        .menu-slide-wrap, .menu-slide-img { height: 180px; }
+        .menu-slide-wrap { height: 180px; }
         .item-card-body { padding: 14px; }
         .item-card h3 { font-size: 1rem; }
         .item-card .description { font-size: 0.85rem; margin-bottom: 10px; }
@@ -703,14 +703,16 @@
                     <label for="select-{{ item.id }}" class="select-tick"></label>
 
                     <div class="menu-slide-wrap">
-                        {% if item.image %}
-                            <img src="{{ item.image.url }}" alt="{{ item.name }}" class="menu-slide-img active">
-                        {% else %}
-                            <img src="{% static 'images/no-image.png' %}" alt="No image" class="menu-slide-img active">
-                        {% endif %}
-                        {% for img in item.gallery_images.all %}
-                            <img src="{{ img.image.url }}" alt="{{ item.name }}" class="menu-slide-img">
-                        {% endfor %}
+                        <div class="menu-slide-track">
+                            {% if item.image %}
+                                <img src="{{ item.image.url }}" alt="{{ item.name }}" class="menu-slide-img">
+                            {% else %}
+                                <img src="{% static 'images/no-image.png' %}" alt="No image" class="menu-slide-img">
+                            {% endif %}
+                            {% for img in item.gallery_images.all %}
+                                <img src="{{ img.image.url }}" alt="{{ item.name }}" class="menu-slide-img">
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
                 <div class="item-card-body">
@@ -922,20 +924,40 @@
         });
     });
 
-    // ===== Cross-fade slideshow for item images (same style as home page hero) =====
+    // ===== Auto-play slideshow for item images (seamless circular loop) =====
     document.querySelectorAll('.menu-slide-wrap').forEach(function (wrap) {
-        const slides = wrap.querySelectorAll('.menu-slide-img');
+        const track = wrap.querySelector('.menu-slide-track');
+        if (!track) return;
+
+        let slides = Array.from(track.querySelectorAll('.menu-slide-img'));
         if (slides.length <= 1) return;
+
+        // Clone the first slide and place it at the end so the loop feels seamless
+        const firstClone = slides[0].cloneNode(true);
+        track.appendChild(firstClone);
+        slides = Array.from(track.querySelectorAll('.menu-slide-img'));
+        const total = slides.length; // includes the clone
 
         let current = 0;
 
-        function showNextSlide() {
-            slides[current].classList.remove('active');
-            current = (current + 1) % slides.length;
-            slides[current].classList.add('active');
+        function goToSlide(index, animate) {
+            current = index;
+            track.style.transition = animate ? 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : 'none';
+            track.style.transform = 'translateX(-' + (current * 100) + '%)';
         }
 
-        setInterval(showNextSlide, 1000);
+        // When we finish sliding onto the cloned first image, snap back
+        // instantly (no animation) to the real first image so it loops forever.
+        track.addEventListener('transitionend', function () {
+            if (current === total - 1) {
+                goToSlide(0, false);
+                void track.offsetWidth; // force reflow so the next transition works
+            }
+        });
+
+        setInterval(function () {
+            goToSlide(current + 1, true);
+        }, 1000); // change image every 1 second
     });
 
     // ===== Scroll reveal: sections fade-in + slide-up as they enter viewport =====
