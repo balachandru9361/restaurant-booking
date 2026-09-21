@@ -71,6 +71,7 @@
   }
   .status-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   .status-pending  { background: #fff3cd; color: #f39c12; }
+  .status-confirmed{ background: #fdecec; color: #F63A3A; }
   .status-preparing{ background: #e3f0ff; color: #3498db; }
   .status-ready    { background: #f3e5f9; color: #9b59b6; }
   .status-delivered,
@@ -173,6 +174,7 @@
         <td>
           <select class="status-select status-{{ order.status|lower }}" onchange="updateStatus(this, {{ order.id }})">
             <option value="pending" {% if order.status|lower == "pending" %}selected{% endif %}>⏳ Pending</option>
+            <option value="confirmed" {% if order.status|lower == "confirmed" %}selected{% endif %}>🧾 Confirmed</option>
             <option value="preparing" {% if order.status|lower == "preparing" %}selected{% endif %}>👨‍🍳 Preparing</option>
             <option value="ready" {% if order.status|lower == "ready" %}selected{% endif %}>🔔 Ready</option>
             <option value="delivered" {% if order.status|lower == "delivered" %}selected{% endif %}>✅ Delivered</option>

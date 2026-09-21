@@ -528,7 +528,7 @@
                     <span class="cap-total" id="sidebarTotal">—</span>
                 </div>
                 <div class="cap-row">
-                    <span>Booked</span>
+                    <span>Held (2 hrs)</span>
                     <span class="cap-booked" id="sidebarBooked">—</span>
                 </div>
                 <div class="cap-row">
@@ -685,7 +685,11 @@
         checkAvailability();
         loadBookingsForDate(this.value);
     });
-    document.getElementById('fTime').addEventListener('change', () => { updateSummary('rowDateTime'); checkAvailability(); });
+    document.getElementById('fTime').addEventListener('change', () => {
+        updateSummary('rowDateTime');
+        checkAvailability();
+        loadBookingsForDate(document.getElementById('fDate').value);
+    });
     guestsInput.addEventListener('input', checkAvailability);
     guestsInput.addEventListener('change', checkAvailability);
 
@@ -767,7 +771,8 @@
         const dt = new Date(date + 'T00:00:00');
         dateLabel.textContent = dt.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short' });
 
-        fetch(`/booking/bookings-for-date/?date=${date}`)
+        const timeVal = document.getElementById('fTime').value;
+        fetch(`/booking/bookings-for-date/?date=${date}${timeVal ? '&time=' + timeVal : ''}`)
             .then(res => res.json())
             .then(data => {
                 capBox.style.display = 'flex';
@@ -790,7 +795,7 @@
 
                 listBox.innerHTML = data.bookings.map(b => `
                     <div class="sidebar-booking-item">
-                        <span class="sidebar-booking-time">${b.time}</span>
+                        <span class="sidebar-booking-time">${b.time} – ${b.until}</span>
                         <span class="sidebar-booking-guests">${b.guests} 👥</span>
                     </div>
                 `).join('');

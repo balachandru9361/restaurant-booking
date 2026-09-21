@@ -142,6 +142,27 @@
   .edit-link { color: #3498db; background: #e3f2fd; }
   .delete-link { color: #e74c3c; background: #ffe5e5; }
 
+  /* --- table hold status (2-hour auto hide) --- */
+  .table-card.is-held { border-top-color: #e74c3c !important; background: #fffafa; }
+  .table-card.is-held .table-icon { background: linear-gradient(135deg, #ffe5e5, #ffd3d3); }
+  .hold-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11.5px; font-weight: 800; padding: 4px 12px; border-radius: 20px;
+    margin-bottom: 10px;
+  }
+  .hold-pill.free { background: #e3f9ec; color: #1e8e4e; }
+  .hold-pill.held { background: #ffe5e5; color: #d63031; }
+  .hold-info { font-size: 12px; color: #777; line-height: 1.5; margin-bottom: 14px; min-height: 36px; }
+  .hold-info strong { color: #1a1a2e; }
+  .open-form { margin-bottom: 10px; }
+  .open-btn {
+    width: 100%; border: none; cursor: pointer; font-size: 12.5px; font-weight: 800;
+    padding: 9px 0; border-radius: 8px; color: #fff;
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    box-shadow: 0 4px 12px rgba(46,204,113,0.3); transition: transform 0.15s ease;
+  }
+  .open-btn:hover { transform: translateY(-1px); }
+
   .empty-state {
     grid-column: 1 / -1;
     text-align: center;
@@ -158,7 +179,7 @@
 <div class="page-header">
   <div>
     <h2>🪑 Manage Tables</h2>
-    <p>Set up dine-in tables and their seating capacity</p>
+    <p>Set up dine-in tables. A booked table is hidden for 2 hours, then opens automatically — or open it yourself.</p>
   </div>
   <a href="{% url 'dashboard:add_table' %}" class="btn-add">+ Add New Table</a>
 </div>
@@ -172,21 +193,49 @@
     <div class="emoji">👥</div>
     <div><div class="num">{{ total_capacity|default:"--" }}</div><div class="lbl">Total Seats</div></div>
   </div>
+  <div class="mini-stat" style="border-left-color:#e74c3c;">
+    <div class="emoji">🔒</div>
+    <div><div class="num">{{ booked_count }}</div><div class="lbl">Booked now</div></div>
+  </div>
+  <div class="mini-stat" style="border-left-color:#2ecc71;">
+    <div class="emoji">✅</div>
+    <div><div class="num">{{ free_count }}</div><div class="lbl">Free now</div></div>
+  </div>
 </div>
 
 <div class="tables-grid">
-  {% for table in tables %}
-  <div class="table-card">
+  {% for row in rows %}
+  {% with table=row.table hold=row.hold %}
+  <div class="table-card {% if hold %}is-held{% endif %}">
     <div class="table-icon">🪑</div>
     <div class="table-number">Table {{ table.number }}</div>
     <div class="table-capacity">
       <span class="seat-badge">👥 {{ table.capacity }} seats</span>
     </div>
+
+    {% if hold %}
+      <span class="hold-pill held">🔒 Booked</span>
+      <div class="hold-info">
+        {{ hold.label }}<br>
+        Opens automatically at <strong>{{ hold.end|time:"g:i A" }}</strong>
+        ({{ row.mins_left }} min left)
+      </div>
+      <form method="post" action="{% url 'dashboard:open_table' table.pk %}" class="open-form">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="manage_tables">
+        <button type="submit" class="open-btn" onclick="return confirm('Open Table {{ table.number }} now?')">🔓 Open Table</button>
+      </form>
+    {% else %}
+      <span class="hold-pill free">✅ Free</span>
+      <div class="hold-info">Available for booking</div>
+    {% endif %}
+
     <div class="table-actions">
       <a href="{% url 'dashboard:edit_table' table.pk %}" class="edit-link">Edit</a>
       <a href="{% url 'dashboard:delete_table' table.pk %}" class="delete-link" onclick="return confirm('Delete Table {{ table.number }}?')">Delete</a>
     </div>
   </div>
+  {% endwith %}
   {% empty %}
   <div class="empty-state">
     <div class="big-emoji">🪑</div>

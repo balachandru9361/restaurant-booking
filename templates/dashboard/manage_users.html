@@ -195,7 +195,23 @@
   .role-badge { padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700; }
   .role-admin { background: #ffe5e5; color: #e74c3c; }
   .role-staff { background: #f3e5f9; color: #9b59b6; }
+  .role-server { background: #fff4d6; color: #92650a; }
   .role-customer { background: #e3f9ec; color: #2ecc71; }
+
+  .btn-add-staff {
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 10px;
+  }
+  .btn-add-staff:hover { opacity: 0.9; color: #fff; text-decoration: none; }
 
   .status-badge {
     padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700;
@@ -243,7 +259,10 @@
     <h2>👥 Registered Users</h2>
     <p>Everyone who has signed up on the platform</p>
   </div>
-  <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+  <div>
+    <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+    <a href="{% url 'dashboard:add_staff' %}" class="btn-add-staff">➕ Add Staff Login</a>
+  </div>
 </div>
 
 <div class="stats-strip">
@@ -252,8 +271,12 @@
     <div><div class="num">{{ users|length }}</div><div class="lbl">Total Users</div></div>
   </div>
   <div class="mini-stat" onclick="setFilter('staff')">
-    <div class="emoji">🛡️</div>
-    <div><div class="num" id="staffCount">0</div><div class="lbl">Staff</div></div>
+    <div class="emoji">👨‍🍳</div>
+    <div><div class="num" id="staffCount">0</div><div class="lbl">Kitchen</div></div>
+  </div>
+  <div class="mini-stat" onclick="setFilter('server')">
+    <div class="emoji">🛎️</div>
+    <div><div class="num" id="serverCount">0</div><div class="lbl">Server</div></div>
   </div>
   <div class="mini-stat" onclick="setFilter('admin')">
     <div class="emoji">👑</div>
@@ -271,7 +294,8 @@
   </div>
   <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">All</div>
   <div class="filter-chip" data-filter="admin" onclick="setFilter('admin')">Admins</div>
-  <div class="filter-chip" data-filter="staff" onclick="setFilter('staff')">Staff</div>
+  <div class="filter-chip" data-filter="staff" onclick="setFilter('staff')">Kitchen</div>
+  <div class="filter-chip" data-filter="server" onclick="setFilter('server')">Server</div>
   <div class="filter-chip" data-filter="customer" onclick="setFilter('customer')">Customers</div>
 </div>
 
@@ -298,7 +322,7 @@
     <tbody id="usersTableBody">
       {% for user in users %}
       <tr class="user-row"
-          data-role="{% if user.is_superuser %}admin{% elif user.is_staff %}staff{% else %}customer{% endif %}"
+          data-role="{% if user.is_superuser %}admin{% elif user.profile.role == 'server' %}server{% elif user.is_staff %}staff{% else %}customer{% endif %}"
           data-active="{{ user.is_active|yesno:'active,inactive' }}"
           data-name="{{ user.get_full_name|default:user.username|lower }}"
           data-username="{{ user.username|lower }}"
@@ -322,8 +346,10 @@
         <td>
           {% if user.is_superuser %}
             <span class="role-badge role-admin">Admin</span>
+          {% elif user.profile.role == 'server' %}
+            <span class="role-badge role-server">Server</span>
           {% elif user.is_staff %}
-            <span class="role-badge role-staff">Staff</span>
+            <span class="role-badge role-staff">Kitchen</span>
           {% else %}
             <span class="role-badge role-customer">Customer</span>
           {% endif %}
@@ -370,13 +396,15 @@
   let sortDir = {};
 
   function computeCounts() {
-    let staff = 0, admin = 0, active = 0;
+    let staff = 0, server = 0, admin = 0, active = 0;
     rows.forEach(r => {
       if (r.dataset.role === 'staff') staff++;
+      if (r.dataset.role === 'server') server++;
       if (r.dataset.role === 'admin') admin++;
       if (r.dataset.active === 'active') active++;
     });
     document.getElementById('staffCount').textContent = staff;
+    document.getElementById('serverCount').textContent = server;
     document.getElementById('adminCount').textContent = admin;
     document.getElementById('activeCount').textContent = active;
   }

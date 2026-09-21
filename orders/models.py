@@ -32,7 +32,7 @@ class Order(models.Model):
         ('confirmed', 'Confirmed'),
         ('preparing', 'Preparing'),
         ('ready', 'Ready'),
-        ('delivered', 'Delivered'),
+        ('delivered', 'Delivered'),  # shown as "Served" in the staff dashboards
         ('cancelled', 'Cancelled'),
     ]
 
@@ -43,6 +43,9 @@ class Order(models.Model):
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Admin can open the table early (before the 2-hour hold ends)
+    table_released = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-created_at']

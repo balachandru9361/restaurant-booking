@@ -192,14 +192,14 @@
         border-top: 1px solid rgba(255,255,255,0.15);
     }
 
-    .table-select-block label {
+    .table-select-block > label {
         display: flex;
         align-items: center;
         gap: 8px;
         font-size: 0.95rem;
         font-weight: 700;
         color: #fff;
-        margin-bottom: 12px;
+        margin-bottom: 6px;
     }
 
     .table-select-block .hint {
@@ -208,6 +208,30 @@
         color: #9ca3af;
         margin-left: 4px;
     }
+
+    .table-legend {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 14px;
+    }
+
+    .table-legend span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.76rem;
+        color: #9ca3af;
+    }
+
+    .table-legend .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .table-legend .dot.free { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.7); }
+    .table-legend .dot.booked { background: #f87171; box-shadow: 0 0 6px rgba(248,113,113,0.7); }
 
     .table-options {
         display: grid;
@@ -228,7 +252,12 @@
         cursor: pointer;
     }
 
+    .table-option input[type="radio"]:disabled {
+        cursor: not-allowed;
+    }
+
     .table-option label.table-chip {
+        position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -236,8 +265,8 @@
         gap: 2px;
         padding: 10px 4px;
         border-radius: 12px;
-        background: rgba(255,255,255,0.06);
-        border: 1.5px solid rgba(255,255,255,0.15);
+        background: rgba(74, 222, 128, 0.08);
+        border: 1.5px solid rgba(74, 222, 128, 0.35);
         color: #d1d5db;
         font-size: 0.78rem;
         font-weight: 600;
@@ -250,6 +279,17 @@
         font-size: 1.05rem;
     }
 
+    .table-option label.table-chip .status-dot {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #4ade80;
+        box-shadow: 0 0 5px rgba(74,222,128,0.8);
+    }
+
     .table-option input[type="radio"]:checked + label.table-chip {
         background: #ff6b6b;
         border-color: #ff6b6b;
@@ -258,9 +298,32 @@
         box-shadow: 0 4px 14px rgba(255,107,107,0.4);
     }
 
+    .table-option input[type="radio"]:checked + label.table-chip .status-dot {
+        background: #fff;
+        box-shadow: none;
+    }
+
     .table-option input[type="radio"]:focus-visible + label.table-chip {
         outline: 2px solid #ff6b6b;
         outline-offset: 2px;
+    }
+
+    /* Booked / disabled state */
+    .table-option.booked label.table-chip {
+        background: rgba(248, 113, 113, 0.08);
+        border-color: rgba(248, 113, 113, 0.3);
+        color: #6b7280;
+        cursor: not-allowed;
+        opacity: 0.65;
+    }
+
+    .table-option.booked label.table-chip .status-dot {
+        background: #f87171;
+        box-shadow: 0 0 5px rgba(248,113,113,0.8);
+    }
+
+    .table-option.booked label.table-chip .t-label {
+        text-decoration: line-through;
     }
 
     .no-tables-msg {
@@ -446,13 +509,24 @@
                     <label>🪑 Dining at table? <span class="hint">(optional — skip for takeaway)</span></label>
 
                     {% if tables %}
+                        <div class="table-legend">
+                            <span><span class="dot free"></span> Free</span>
+                            <span><span class="dot booked"></span> Booked (opens automatically after 2 hrs)</span>
+                        </div>
                         <div class="table-options">
                             {% for table in tables %}
-                                <div class="table-option">
-                                    <input type="radio" name="table" value="{{ table.id }}" id="table-{{ table.id }}">
-                                    <label class="table-chip" for="table-{{ table.id }}">
+                                <div class="table-option {% if table.is_booked %}booked{% endif %}">
+                                    <input
+                                        type="radio"
+                                        name="table"
+                                        value="{{ table.id }}"
+                                        id="table-{{ table.id }}"
+                                        {% if table.is_booked %}disabled{% endif %}
+                                    >
+                                    <label class="table-chip" for="table-{{ table.id }}"{% if table.is_booked %} title="Booked - opens again at {{ table.free_at|time:'g:i A' }}"{% endif %}>
+                                        <span class="status-dot"></span>
                                         <span class="t-icon">🪑</span>
-                                        <span>#{{ table.number }}</span>
+                                        <span class="t-label">#{{ table.number }}</span>
                                     </label>
                                 </div>
                             {% endfor %}

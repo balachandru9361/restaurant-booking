@@ -310,6 +310,16 @@
                 </div>
             </div>
 
+            {% if booking.table %}
+            <div class="summary-detail-row">
+                <div class="detail-icon">🪑</div>
+                <div>
+                    <div class="detail-label">Your Table</div>
+                    <div class="detail-value">Table {{ booking.table.number }} &middot; held for 2 hours from your booked time</div>
+                </div>
+            </div>
+            {% endif %}
+
             <div class="summary-detail-row">
                 <div class="detail-icon">👥</div>
                 <div>

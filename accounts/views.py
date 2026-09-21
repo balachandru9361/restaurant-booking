@@ -36,9 +36,16 @@ def login_view(request):
                 login(request, user)
                 messages.success(request, f'Welcome back, {user.username}!')
 
-                # Admin (staff) users -> Admin Dashboard
-                if user.is_staff:
+                # Superuser -> full Admin Dashboard
+                if user.is_superuser:
                     return redirect('dashboard:admin_home')
+
+                # Staff (non-superuser) -> role decides where they land
+                if user.is_staff:
+                    profile = getattr(user, 'profile', None)
+                    if profile and profile.role == 'server':
+                        return redirect('dashboard:server_dashboard')
+                    return redirect('dashboard:kitchen_dashboard')
 
                 # Normal users -> next param irundha adhukku, illana home
                 next_url = request.GET.get('next', 'home')

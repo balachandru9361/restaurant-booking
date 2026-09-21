@@ -288,6 +288,13 @@
     transition: all 0.2s ease;
   }
 
+  .order-actions form { flex: 1; display: flex; margin: 0; }
+  button.order-action-btn { border: 0; cursor: pointer; width: 100%; }
+  .btn-waiting {
+    flex: 1; text-align: center; padding: 9px; border-radius: 8px;
+    background: #eef1f5; color: #6b7280; font-size: 12.5px; font-weight: 700;
+  }
+
   .btn-to-preparing { background: #fff4d6; color: #92650a; }
   .btn-to-preparing:hover { background: #d4af37; color: #fff; }
 
@@ -320,7 +327,7 @@
 <div class="kitchen-header">
   <div>
     <h1>👨‍🍳 Kitchen Dashboard</h1>
-    <p>Live order tracking — move orders through the workflow as they're prepared.</p>
+    <p>Confirm, prepare and complete orders. Once you mark an order Ready it goes to the waiter automatically.</p>
   </div>
   <div class="kitchen-clock"><span class="dot"></span> <span id="liveClock"></span></div>
 </div>
@@ -380,7 +387,10 @@
         </ul>
         <div class="order-total">₹{{ order.total_amount }}</div>
         <div class="order-actions">
-          <a href="{% url 'dashboard:update_order_status' order.id 'preparing' %}" class="order-action-btn btn-to-preparing">Start Preparing →</a>
+          <form method="post" action="{% url 'dashboard:update_order_status' order.id 'preparing' %}">
+            {% csrf_token %}
+            <button type="submit" class="order-action-btn btn-to-preparing">Start Preparing →</button>
+          </form>
           <a href="javascript:window.print()" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
         </div>
       </div>
@@ -415,7 +425,10 @@
         </ul>
         <div class="order-total">₹{{ order.total_amount }}</div>
         <div class="order-actions">
-          <a href="{% url 'dashboard:update_order_status' order.id 'ready' %}" class="order-action-btn btn-to-ready">Mark Ready →</a>
+          <form method="post" action="{% url 'dashboard:update_order_status' order.id 'ready' %}">
+            {% csrf_token %}
+            <button type="submit" class="order-action-btn btn-to-ready">Mark Ready →</button>
+          </form>
           <a href="javascript:window.print()" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
         </div>
       </div>
@@ -450,7 +463,7 @@
         </ul>
         <div class="order-total">₹{{ order.total_amount }}</div>
         <div class="order-actions">
-          <a href="{% url 'dashboard:update_order_status' order.id 'delivered' %}" class="order-action-btn btn-to-delivered">Mark Delivered →</a>
+          <div class="btn-waiting">🛎️ Sent to waiter — waiting to be served</div>
           <a href="javascript:window.print()" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
         </div>
       </div>

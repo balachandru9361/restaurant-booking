@@ -4,8 +4,8 @@ from .models import TableBooking, Table
 
 @admin.register(TableBooking)
 class TableBookingAdmin(admin.ModelAdmin):
-    list_display = ('name', 'phone', 'guests', 'booking_date', 'booking_time', 'table', 'user')
-    list_filter = ('booking_date',)
+    list_display = ('name', 'phone', 'guests', 'booking_date', 'booking_time', 'table', 'released', 'user')
+    list_filter = ('booking_date', 'released')
     search_fields = ('name', 'phone')
 
 

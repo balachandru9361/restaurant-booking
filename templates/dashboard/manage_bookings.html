@@ -169,6 +169,21 @@
     gap: 4px;
   }
 
+  .hold-badge {
+    font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px; white-space: nowrap;
+  }
+  .hold-badge.active   { background: #ffe5e5; color: #d63031; }
+  .hold-badge.upcoming { background: #eaf4ff; color: #3498db; }
+  .hold-badge.completed{ background: #f0f0f3; color: #888; }
+  .hold-badge.opened   { background: #e3f9ec; color: #1e8e4e; }
+  .table-pill { background: #eef2ff; color: #4f46e5; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .open-form { margin: 0; }
+  .open-btn {
+    border: none; cursor: pointer; font-size: 12px; font-weight: 800; padding: 8px 14px;
+    border-radius: 8px; color: #fff; background: linear-gradient(135deg, #2ecc71, #27ae60);
+    box-shadow: 0 4px 12px rgba(46,204,113,0.3); white-space: nowrap;
+  }
+
   .empty-state {
     text-align: center;
     padding: 60px 20px;
@@ -226,8 +241,18 @@
         {% if booking.occasion and booking.occasion != 'none' %}
           <span class="occasion-tag">{{ booking.get_occasion_display }}</span>
         {% endif %}
+        {% if booking.hold_state == 'active' %}
+          <span class="hold-badge active">🔒 Table held until {{ booking.hold_end|time:"g:i A" }}</span>
+        {% elif booking.hold_state == 'upcoming' %}
+          <span class="hold-badge upcoming">⏳ Upcoming</span>
+        {% elif booking.hold_state == 'opened' %}
+          <span class="hold-badge opened">🔓 Opened by admin</span>
+        {% else %}
+          <span class="hold-badge completed">✔ Table open again</span>
+        {% endif %}
       </div>
       <div class="meta">
+        {% if booking.table %}<span class="table-pill">🪑 Table {{ booking.table.number }}</span>{% endif %}
         <span>📞 {{ booking.phone }}</span>
         {% if booking.special_request %}
           <span>📝 Has notes</span>
@@ -239,6 +264,14 @@
     </div>
 
     <div class="guests-badge">👥 {{ booking.guests }}</div>
+
+    {% if booking.hold_state == 'active' and booking.table %}
+    <form method="post" action="{% url 'dashboard:open_table' booking.table.pk %}" class="open-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="manage_bookings">
+      <button type="submit" class="open-btn" onclick="return confirm('Open Table {{ booking.table.number }} now?')">🔓 Open Table</button>
+    </form>
+    {% endif %}
 
     <div class="booking-time-badge">
       <div class="date">{{ booking.booking_date|date:"d M" }}</div>

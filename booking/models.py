@@ -36,6 +36,10 @@ class TableBooking(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Admin can open the table early (before the 2-hour hold ends)
+    released = models.BooleanField(default=False)
+    released_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ['-booking_date', '-booking_time']
 

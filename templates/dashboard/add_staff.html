@@ -1,0 +1,191 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .page-header h2 {
+    font-size: 24px;
+    color: #1a1a2e;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .page-header p { font-size: 13px; color: #999; margin-top: 3px; }
+
+  .btn-back {
+    background: #fff;
+    border: 1.5px solid #e6e6ee;
+    color: #555;
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+  .btn-back:hover { border-color: #1a1a2e; color: #1a1a2e; text-decoration: none; }
+
+  .staff-form-card {
+    max-width: 480px;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+    padding: 30px 32px;
+  }
+
+  .staff-info-banner {
+    background: #f3e5f9;
+    color: #7d3c98;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .staff-info-banner span.icon { font-size: 18px; }
+
+  .staff-form-card form p { margin-bottom: 18px; }
+  .staff-form-card form label {
+    display: block;
+    font-weight: 700;
+    font-size: 12.5px;
+    color: #1a1a2e;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .staff-form-card form input {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1.5px solid #e6e6ee;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .staff-form-card form input:focus {
+    border-color: #9b59b6;
+    box-shadow: 0 0 0 4px rgba(155,89,182,0.1);
+  }
+  .staff-form-card form .helptext {
+    display: block;
+    font-size: 11.5px;
+    color: #999;
+    margin-top: 5px;
+    font-weight: 400;
+    text-transform: none;
+  }
+  .staff-form-card form ul.errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 6px 0 0 0;
+    color: #e74c3c;
+    font-size: 12px;
+  }
+
+  .btn-create-staff {
+    width: 100%;
+    background: linear-gradient(135deg, #9b59b6, #8e44ad);
+    color: #fff;
+    padding: 14px 0;
+    border: none;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 14.5px;
+    cursor: pointer;
+    margin-top: 6px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .btn-create-staff:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(155,89,182,0.35);
+  }
+
+  .role-choice ul { list-style: none; padding: 0; margin: 0; display: flex; gap: 12px; }
+  .role-choice li { flex: 1; }
+  .role-choice label {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    border: 1.5px solid #e6e6ee;
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    font-weight: 600 !important;
+    text-transform: none !important;
+    font-size: 13.5px !important;
+    color: #333 !important;
+    transition: all 0.2s ease;
+  }
+  .role-choice input { width: auto !important; margin: 0; }
+  .role-choice input:checked + span,
+  .role-choice label:has(input:checked) {
+    border-color: #9b59b6;
+    background: #f9f1fc;
+    color: #7d3c98 !important;
+  }
+</style>
+
+<div class="page-header">
+  <div>
+    <h2>👨‍🍳 Add Staff Login</h2>
+    <p>Create a Kitchen or Server login — they'll land straight on their own dashboard.</p>
+  </div>
+  <a href="{% url 'dashboard:manage_users' %}" class="btn-back">← Back to Users</a>
+</div>
+
+<div class="staff-form-card">
+  <div class="staff-info-banner">
+    <span class="icon">ℹ️</span>
+    <span>This account is marked as <strong>Staff</strong> (not Admin). Kitchen logins land on the Kitchen Dashboard, Server logins land on the Server Dashboard — neither sees the full admin panel.</span>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.username.errors }}
+    <p>
+      <label for="{{ form.username.id_for_label }}">Username</label>
+      {{ form.username }}
+    </p>
+    {{ form.email.errors }}
+    <p>
+      <label for="{{ form.email.id_for_label }}">Email <span class="helptext">(optional)</span></label>
+      {{ form.email }}
+    </p>
+    <p class="role-choice">
+      <label>Role</label>
+      {{ form.role.errors }}
+      <ul>
+        {% for radio in form.role %}
+          <li><label>{{ radio.tag }} <span>{{ radio.choice_label }}</span></label></li>
+        {% endfor %}
+      </ul>
+    </p>
+    {{ form.password1.errors }}
+    <p>
+      <label for="{{ form.password1.id_for_label }}">Password</label>
+      {{ form.password1 }}
+      {% if form.password1.help_text %}<span class="helptext">{{ form.password1.help_text|safe }}</span>{% endif %}
+    </p>
+    {{ form.password2.errors }}
+    <p>
+      <label for="{{ form.password2.id_for_label }}">Confirm Password</label>
+      {{ form.password2 }}
+    </p>
+    <button type="submit" class="btn-create-staff">➕ Create Staff Login</button>
+  </form>
+</div>
+{% endblock %}

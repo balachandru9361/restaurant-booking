@@ -1,0 +1,290 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .kitchen-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .kitchen-header h1 {
+    font-family: 'Sora', sans-serif;
+    font-size: 26px;
+    color: #0d1b2a;
+    margin-bottom: 4px;
+  }
+  .kitchen-header p {
+    font-family: 'Inter', sans-serif;
+    color: #6b7280;
+    font-size: 14px;
+  }
+  .kitchen-clock {
+    font-family: 'Sora', sans-serif;
+    background: #0d1b2a;
+    color: #d4af37;
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .kitchen-clock .dot {
+    width: 8px; height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+    animation: pulse-dot 1.5s infinite;
+  }
+  @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .kitchen-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .stat-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    border-left: 4px solid #0f766e;
+  }
+  .stat-box .stat-num { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: #0d1b2a; }
+  .stat-box .stat-label { font-size: 12px; color: #6b7280; margin-top: 2px; }
+
+  .server-board {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 20px;
+  }
+
+  .board-col {
+    background: #f4f6f9;
+    border-radius: 14px;
+    padding: 16px;
+    min-height: 260px;
+  }
+  .board-col-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #0f766e;
+  }
+  .board-col-header h3 { font-family: 'Sora', sans-serif; font-size: 15px; color: #0d1b2a; }
+  .board-count {
+    background: #fff; border-radius: 20px; padding: 2px 10px; font-size: 12px;
+    font-weight: 700; color: #0d1b2a; box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+
+  .order-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    border-left: 4px solid #0f766e;
+  }
+  .order-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .order-id { font-family: 'Sora', sans-serif; font-weight: 700; color: #0d1b2a; font-size: 14px; }
+  .order-user { font-size: 13px; color: #374151; margin-bottom: 6px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
+  .order-table-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: linear-gradient(135deg, #fff4d6, #ffe8a3);
+    color: #92650a; font-size: 11.5px; font-weight: 800;
+    padding: 3px 10px; border-radius: 20px; border: 1px solid #d4af37; white-space: nowrap;
+  }
+  .order-table-badge.takeaway { background: #eef1f5; color: #6b7280; border-color: #d1d5db; }
+  .order-items { list-style: none; padding: 0; margin: 0 0 10px 0; font-size: 12.5px; color: #4b5563; }
+  .order-items li { display: flex; justify-content: space-between; padding: 3px 0; }
+  .order-total {
+    text-align: right; font-weight: 700; color: #0d1b2a; font-size: 13.5px;
+    margin-bottom: 12px; border-top: 1px dashed #e5e7eb; padding-top: 8px;
+  }
+  .order-actions { display: flex; gap: 8px; }
+  .order-actions form { flex: 1; display: flex; margin: 0; }
+  button.btn-to-delivered { border: 0; cursor: pointer; width: 100%; }
+  .order-card.is-new { animation: newGlow 1.4s ease 3; }
+  @keyframes newGlow {
+    0%,100% { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+    50% { box-shadow: 0 0 0 4px rgba(15,118,110,0.35); }
+  }
+  .btn-to-delivered {
+    flex: 1; text-align: center; padding: 9px; border-radius: 8px; text-decoration: none;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+    background: #e6f9ed; color: #147a3d; transition: all 0.2s ease;
+  }
+  .btn-to-delivered:hover { background: #147a3d; color: #fff; }
+
+  .booking-row {
+    background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .booking-name { font-weight: 700; color: #0d1b2a; font-size: 13.5px; }
+  .booking-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+  .booking-time {
+    background: #0d1b2a; color: #d4af37; font-size: 12px; font-weight: 700;
+    padding: 4px 10px; border-radius: 20px; white-space: nowrap;
+  }
+
+  .empty-col { text-align: center; color: #9ca3af; font-size: 13px; padding: 40px 0; }
+  .empty-col .empty-icon { font-size: 30px; display: block; margin-bottom: 8px; opacity: 0.5; }
+</style>
+
+<div class="kitchen-header">
+  <div>
+    <h1>🛎️ Server Dashboard</h1>
+    <p>Orders finished by the kitchen appear here automatically. Serve the table, then mark it served — the admin gets the message.</p>
+  </div>
+  <div class="kitchen-clock"><span class="dot"></span> <span id="liveClock"></span></div>
+</div>
+
+<div id="liveRegion" data-ready-ids="{% for o in ready_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+
+<div class="kitchen-stats">
+  <div class="stat-box" style="border-left-color:#0f766e;">
+    <div class="stat-num">{{ ready_orders|length }}</div>
+    <div class="stat-label">✅ Ready to Serve</div>
+  </div>
+  <div class="stat-box" style="border-left-color:#147a3d;">
+    <div class="stat-num">{{ delivered_today|length }}</div>
+    <div class="stat-label">🍽️ Served Today</div>
+  </div>
+  <div class="stat-box" style="border-left-color:#d4af37;">
+    <div class="stat-num">{{ todays_bookings|length }}</div>
+    <div class="stat-label">📅 Today's Bookings</div>
+  </div>
+</div>
+
+<div class="server-board">
+
+  <div class="board-col">
+    <div class="board-col-header">
+      <h3>✅ Ready to Serve</h3>
+      <span class="board-count">{{ ready_orders|length }}</span>
+    </div>
+    {% for order in ready_orders %}
+      <div class="order-card" data-order-id="{{ order.id }}">
+        <div class="order-card-top">
+          <span class="order-id">Order #{{ order.id }}</span>
+        </div>
+        <div class="order-user">
+          <span>👤 {{ order.user.username }}</span>
+          {% if order.table %}
+            <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
+          {% else %}
+            <span class="order-table-badge takeaway">🥡 Takeaway</span>
+          {% endif %}
+        </div>
+        <ul class="order-items">
+          {% for item in order.items.all %}
+            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+          {% endfor %}
+        </ul>
+        <div class="order-total">₹{{ order.total_amount }}</div>
+        <div class="order-actions">
+          <form method="post" action="{% url 'dashboard:update_order_status' order.id 'delivered' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-to-delivered">🍽️ Mark Served ✓</button>
+          </form>
+        </div>
+      </div>
+    {% empty %}
+      <div class="empty-col"><span class="empty-icon">🛎️</span>No orders ready to serve right now</div>
+    {% endfor %}
+  </div>
+
+  <div>
+    <div class="board-col" style="margin-bottom: 20px;">
+      <div class="board-col-header">
+        <h3>📅 Today's Bookings</h3>
+        <span class="board-count">{{ todays_bookings|length }}</span>
+      </div>
+      {% for booking in todays_bookings %}
+        <div class="booking-row">
+          <div>
+            <div class="booking-name">{{ booking.name }} · {{ booking.guests }} guest{{ booking.guests|pluralize }}</div>
+            <div class="booking-meta">
+              {% if booking.table %}Table {{ booking.table.number }}{% else %}No table assigned{% endif %}
+              {% if booking.phone %} · {{ booking.phone }}{% endif %}
+            </div>
+          </div>
+          <span class="booking-time">{{ booking.booking_time|time:"g:i A" }}</span>
+        </div>
+      {% empty %}
+        <div class="empty-col"><span class="empty-icon">📅</span>No bookings for today</div>
+      {% endfor %}
+    </div>
+
+    <div class="board-col">
+      <div class="board-col-header">
+        <h3>🍽️ Served Today</h3>
+        <span class="board-count">{{ delivered_today|length }}</span>
+      </div>
+      {% for order in delivered_today %}
+        <div class="booking-row">
+          <div>
+            <div class="booking-name">Order #{{ order.id }} · {{ order.user.username }}</div>
+            <div class="booking-meta">
+              {% if order.table %}Table {{ order.table.number }}{% else %}Takeaway{% endif %} · ₹{{ order.total_amount }}
+            </div>
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty-col"><span class="empty-icon">🍽️</span>Nothing served yet today</div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+</div>
+
+<script>
+  function updateClock() {
+    document.getElementById('liveClock').textContent = new Date().toLocaleTimeString();
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ---- Live message when the kitchen marks an order Ready ----
+  (function () {
+    const region = () => document.getElementById('liveRegion');
+    let known = new Set((region().dataset.readyIds || '').split(',').filter(Boolean).map(Number));
+
+    function poll() {
+      fetch("{% url 'dashboard:server_poll' %}", { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+          const current = data.orders;
+          const currentIds = new Set(current.map(o => o.id));
+          const fresh = current.filter(o => !known.has(o.id));
+          const removed = [...known].some(id => !currentIds.has(id));
+
+          if (fresh.length || removed) {
+            fresh.forEach(o => showToast(
+              '🔔 Order #' + o.id + ' is ready!',
+              o.table ? 'Serve to Table ' + o.table : 'Takeaway — hand over at the counter'
+            ));
+            if (fresh.length) beep();
+            known = currentIds;
+            refreshLive().then(() => {
+              fresh.forEach(o => {
+                const card = document.querySelector('[data-order-id="' + o.id + '"]');
+                if (card) card.classList.add('is-new');
+              });
+            });
+          }
+        })
+        .catch(() => {});
+    }
+    setInterval(poll, 6000);
+  })();
+</script>
+{% endblock %}

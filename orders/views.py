@@ -9,6 +9,7 @@ from django.conf import settings
 from django.utils import timezone
 from menu.models import FoodItem
 from booking.models import Table
+from booking.availability import table_status_map, is_table_busy_now
 from .models import Order, OrderItem, Coupon
 
 
@@ -110,6 +111,28 @@ def select_table(request, table_id):
     return redirect('menu_list')
 
 
+def _get_tables_with_status(user=None):
+    """Returns all tables tagged with whether they're currently held.
+
+    A table is hidden/held for 2 hours after it is booked (reservation time or
+    dine-in order) and then opens again automatically. The admin can also open
+    it early. The customer who holds the table can still use it.
+    """
+    holds = table_status_map()
+
+    result = []
+    for table in Table.objects.all().order_by('number'):
+        hold = holds.get(table.id)
+        is_booked = bool(hold) and not (user is not None and user.is_authenticated and hold.user_id == user.id)
+        result.append({
+            'id': table.id,
+            'number': table.number,
+            'is_booked': is_booked,
+            'free_at': hold.end if is_booked else None,
+        })
+    return result
+
+
 def _get_cart_totals(request):
     """Shared helper: computes subtotal, discount and final total for the
     current session cart + any applied coupon. Used by view_cart and confirm_order
@@ -162,7 +185,7 @@ def view_cart(request):
         'coupon': coupon,
         'discount_amount': discount_amount,
         'total': total,
-        'tables': Table.objects.all().order_by('number'),
+        'tables': _get_tables_with_status(request.user),
         'selected_table_id': request.session.get('selected_table'),
     }
     return render(request, 'orders/cart.html', context)
@@ -238,6 +261,11 @@ def confirm_order(request):
     selected_table = None
     if table_id:
         selected_table = Table.objects.filter(id=table_id).first()
+
+        # Guard: if the table got booked between page load and submit, reject it
+        if selected_table and is_table_busy_now(selected_table.id, request.user):
+            messages.error(request, f'Table #{selected_table.number} just got booked. Pick another table.')
+            return redirect('orders:view_cart')
 
     order = Order.objects.create(
         user=request.user,

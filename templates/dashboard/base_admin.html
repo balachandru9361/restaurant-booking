@@ -122,6 +122,49 @@
     padding: 30px 35px;
     min-width: 0;
   }
+
+  /* nav badge for unread admin notifications */
+  .nav-badge {
+    margin-left: auto;
+    background: #F63A3A;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-badge.show { display: inline-flex; animation: badgePop 0.4s ease; }
+  @keyframes badgePop { 0% { transform: scale(0.4); } 70% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+  /* live toast messages (server: order ready, admin: order served) */
+  #liveToasts {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 340px;
+  }
+  .live-toast {
+    background: #0d1b2a;
+    color: #fff;
+    border-left: 5px solid #d4af37;
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.3);
+    animation: toastIn 0.35s ease;
+  }
+  .live-toast small { display: block; font-weight: 400; color: #a0a0c0; margin-top: 2px; }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
 </style>
 
 <div class="admin-wrapper">
@@ -133,20 +176,33 @@
       <div class="avatar">{{ request.user.username|slice:":1"|upper }}</div>
       <div class="info">
         {{ request.user.username }}
-        <small>Administrator</small>
+        <small>
+          {% if request.user.is_superuser %}Administrator
+          {% elif request.user.profile.role == 'server' %}Server
+          {% else %}Chef{% endif %}
+        </small>
       </div>
     </div>
 
     <div class="admin-nav">
-      <a href="{% url 'dashboard:admin_home' %}" class="{% if request.resolver_match.url_name == 'admin_home' %}active{% endif %}">📊 Dashboard</a>
-      <a href="{% url 'dashboard:manage_menu' %}" class="{% if request.resolver_match.url_name == 'manage_menu' %}active{% endif %}">🍽️ Manage Menu</a>
-      <a href="{% url 'dashboard:manage_tables' %}" class="{% if request.resolver_match.url_name == 'manage_tables' %}active{% endif %}">🪑 Manage Tables</a>
-      <a href="{% url 'dashboard:table_qr_codes' %}" class="{% if request.resolver_match.url_name == 'table_qr_codes' %}active{% endif %}">📱 QR Codes</a>
-      <a href="{% url 'dashboard:manage_bookings' %}" class="{% if request.resolver_match.url_name == 'manage_bookings' %}active{% endif %}">📅 Manage Bookings</a>
-      <a href="{% url 'dashboard:manage_users' %}" class="{% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}">👥 Manage Users</a>
-      <a href="{% url 'dashboard:manage_orders' %}" class="{% if request.resolver_match.url_name == 'manage_orders' %}active{% endif %}">🧾 Manage Orders</a>
-      <a href="{% url 'dashboard:kitchen_dashboard' %}" class="{% if request.resolver_match.url_name == 'kitchen_dashboard' %}active{% endif %}">👨‍🍳 Kitchen</a>
-      <a href="{% url 'dashboard:sales_reports' %}" class="{% if request.resolver_match.url_name == 'sales_reports' %}active{% endif %}">📈 Sales / Reports</a>
+      {% if request.user.is_superuser %}
+        <a href="{% url 'dashboard:admin_home' %}" class="{% if request.resolver_match.url_name == 'admin_home' %}active{% endif %}">📊 Dashboard</a>
+        <a href="{% url 'dashboard:admin_home' %}#serviceUpdates">🔔 Service Updates <span class="nav-badge" id="notifBadge">0</span></a>
+        <a href="{% url 'dashboard:manage_menu' %}" class="{% if request.resolver_match.url_name == 'manage_menu' %}active{% endif %}">🍽️ Manage Menu</a>
+        <a href="{% url 'dashboard:manage_tables' %}" class="{% if request.resolver_match.url_name == 'manage_tables' %}active{% endif %}">🪑 Manage Tables</a>
+        <a href="{% url 'dashboard:table_qr_codes' %}" class="{% if request.resolver_match.url_name == 'table_qr_codes' %}active{% endif %}">📱 QR Codes</a>
+        <a href="{% url 'dashboard:manage_bookings' %}" class="{% if request.resolver_match.url_name == 'manage_bookings' %}active{% endif %}">📅 Manage Bookings</a>
+        <a href="{% url 'dashboard:manage_users' %}" class="{% if request.resolver_match.url_name == 'manage_users' %}active{% endif %}">👥 Manage Users</a>
+        <a href="{% url 'dashboard:add_staff' %}" class="{% if request.resolver_match.url_name == 'add_staff' %}active{% endif %}">➕ Add Staff Login</a>
+        <a href="{% url 'dashboard:manage_orders' %}" class="{% if request.resolver_match.url_name == 'manage_orders' %}active{% endif %}">🧾 Manage Orders</a>
+        <a href="{% url 'dashboard:kitchen_dashboard' %}" class="{% if request.resolver_match.url_name == 'kitchen_dashboard' %}active{% endif %}">👨‍🍳 Kitchen</a>
+        <a href="{% url 'dashboard:server_dashboard' %}" class="{% if request.resolver_match.url_name == 'server_dashboard' %}active{% endif %}">🛎️ Server</a>
+        <a href="{% url 'dashboard:sales_reports' %}" class="{% if request.resolver_match.url_name == 'sales_reports' %}active{% endif %}">📈 Sales / Reports</a>
+      {% elif request.user.profile.role == 'server' %}
+        <a href="{% url 'dashboard:server_dashboard' %}" class="{% if request.resolver_match.url_name == 'server_dashboard' %}active{% endif %}">🛎️ Server</a>
+      {% else %}
+        <a href="{% url 'dashboard:kitchen_dashboard' %}" class="{% if request.resolver_match.url_name == 'kitchen_dashboard' %}active{% endif %}">👨‍🍳 Kitchen</a>
+      {% endif %}
     </div>
 
     <div class="admin-logout">
@@ -158,4 +214,83 @@
     {% block admin_content %}{% endblock %}
   </main>
 </div>
+
+<div id="liveToasts"></div>
+
+<script>
+  // ---- shared helpers for live messages ----
+  window.showToast = function (title, sub) {
+    const box = document.getElementById('liveToasts');
+    const el = document.createElement('div');
+    el.className = 'live-toast';
+    el.innerHTML = title + (sub ? '<small>' + sub + '</small>' : '');
+    box.appendChild(el);
+    setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .4s'; }, 7000);
+    setTimeout(() => el.remove(), 7500);
+  };
+
+  window.beep = function () {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [660, 880].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        osc.connect(gain); gain.connect(ctx.destination);
+        const t = ctx.currentTime + i * 0.18;
+        gain.gain.setValueAtTime(0.15, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+        osc.start(t); osc.stop(t + 0.16);
+      });
+    } catch (e) { /* browser blocked audio until first click - toast still shows */ }
+  };
+
+  // Re-fetch this page and swap only the #liveRegion block (no full reload)
+  window.refreshLive = async function () {
+    const el = document.getElementById('liveRegion');
+    if (!el) return;
+    try {
+      const res = await fetch(location.href, { credentials: 'same-origin' });
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const fresh = doc.getElementById('liveRegion');
+      if (fresh) el.innerHTML = fresh.innerHTML;
+    } catch (e) { /* try again on next poll */ }
+  };
+</script>
+
+{% if request.user.is_superuser %}
+<script>
+  // ---- Admin: live "order served" messages from the waiters ----
+  (function () {
+    const KEY = 'lastSeenNotificationId';
+    const badge = document.getElementById('notifBadge');
+
+    function poll() {
+      fetch("{% url 'dashboard:notifications_poll' %}", { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(data => {
+          if (badge) {
+            badge.textContent = data.unread;
+            badge.classList.toggle('show', data.unread > 0);
+          }
+          const stored = localStorage.getItem(KEY);
+          if (stored === null) {
+            localStorage.setItem(KEY, data.latest_id);   // first visit: no toast for old messages
+            return;
+          }
+          if (data.latest_id > parseInt(stored, 10)) {
+            localStorage.setItem(KEY, data.latest_id);
+            showToast('🛎️ Order served', data.latest_message);
+            beep();
+            refreshLive();
+          }
+        })
+        .catch(() => {});
+    }
+    poll();
+    setInterval(poll, 8000);
+  })();
+</script>
+{% endif %}
 {% endblock %}

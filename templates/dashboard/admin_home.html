@@ -133,6 +133,26 @@
   .badge-confirmed { background: #e3f9ec; color: #2ecc71; }
   .badge-pending { background: #fef3e0; color: #f39c12; }
   .badge-cancelled { background: #ffe5e5; color: #e74c3c; }
+  .badge-preparing { background: #e3f0ff; color: #3498db; }
+  .badge-ready { background: #f3e5f9; color: #9b59b6; }
+  .badge-delivered { background: #e3f9ec; color: #1e8e4e; }
+
+  /* service updates (waiter -> admin messages) */
+  .notif-panel { margin-bottom: 20px; }
+  .notif-panel h3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .notif-mark {
+    background: #f4f6f9; border: none; color: #555; font-size: 12px; font-weight: 700;
+    padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  }
+  .notif-mark:hover { background: #1a1a2e; color: #fff; }
+  .notif-list { list-style: none; padding: 0; margin: 0; }
+  .notif-item {
+    display: flex; align-items: center; gap: 12px; padding: 11px 12px;
+    border-radius: 10px; margin-bottom: 8px; background: #fafafb; font-size: 14px; color: #333;
+  }
+  .notif-item.unread { background: #fff7e6; border-left: 4px solid #f39c12; font-weight: 600; }
+  .notif-item .n-icon { font-size: 20px; }
+  .notif-item .n-time { margin-left: auto; font-size: 12px; color: #999; white-space: nowrap; font-weight: 400; }
 
   .empty-row { color: #aaa; text-align: center; padding: 20px 0; }
 
@@ -144,6 +164,31 @@
 <div class="dash-header">
   <h2>📊 Dashboard Overview</h2>
   <p>Welcome back, {{ request.user.username }}! Here's what's happening today.</p>
+</div>
+
+<div id="liveRegion">
+
+<div class="panel notif-panel" id="serviceUpdates">
+  <h3>
+    <span>🔔 Service Updates {% if unread_notifications %}<span class="badge badge-pending">{{ unread_notifications }} new</span>{% endif %}</span>
+    {% if unread_notifications %}
+    <form method="post" action="{% url 'dashboard:notifications_mark_read' %}">
+      {% csrf_token %}
+      <button type="submit" class="notif-mark">Mark all as read</button>
+    </form>
+    {% endif %}
+  </h3>
+  <ul class="notif-list">
+    {% for n in notifications %}
+      <li class="notif-item {% if not n.is_read %}unread{% endif %}">
+        <span class="n-icon">🛎️</span>
+        <span>{{ n.message }}</span>
+        <span class="n-time">{{ n.created_at|timesince }} ago</span>
+      </li>
+    {% empty %}
+      <li class="empty-row">No service updates yet. When a waiter serves an order, it shows up here.</li>
+    {% endfor %}
+  </ul>
 </div>
 
 <div class="stats-grid">
@@ -228,5 +273,7 @@
       {% endfor %}
     </table>
   </div>
+</div>
+
 </div>
 {% endblock %}
