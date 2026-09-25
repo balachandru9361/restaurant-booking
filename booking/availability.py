@@ -1,19 +1,3 @@
-"""
-Table availability rules
-------------------------
-A table is HELD (hidden / not bookable) for 2 hours:
-
-  * from the reserved date+time of a table booking, and
-  * from the moment a dine-in order is placed for that table.
-
-After the 2 hours the table opens again automatically (nothing to run in the
-background - the hold is simply "expired" when we compare with the clock).
-The admin can also open a table early with the "Open Table" button, which sets
-`released` on the booking / `table_released` on the order.
-
-Unpaid (pending) orders only hold a table for PENDING_HOLD, so an abandoned
-checkout doesn't block a table for 2 hours.
-"""
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -22,6 +6,7 @@ from django.utils import timezone
 
 HOLD_DURATION = timedelta(hours=2)
 PENDING_HOLD = timedelta(minutes=15)
+WALKIN_BUFFER = timedelta(minutes=30)
 
 
 @dataclass
@@ -82,15 +67,23 @@ def get_holds():
 
 
 def active_holds(holds=None):
-    """Holds that are in effect right now."""
+    """Holds that are in effect right now (table is physically occupied)."""
     now = timezone.now()
     holds = get_holds() if holds is None else holds
     return [h for h in holds if h.start <= now < h.end]
 
 
+def upcoming_holds(holds=None):
+    """Holds whose window hasn't started yet - confirmed but not occupying the
+    table right now (table is still free to walk in until the start time)."""
+    now = timezone.now()
+    holds = get_holds() if holds is None else holds
+    return [h for h in holds if h.start > now]
+
+
 def table_status_map(holds=None):
-    """{table_id: Hold} - the hold that keeps each table closed right now
-    (if several, the one that ends last)."""
+    """{table_id: Hold} - the ACTIVE hold that keeps each table closed right
+    now (if several, the one that ends last)."""
     result = {}
     for h in active_holds(holds):
         current = result.get(h.table_id)
@@ -99,12 +92,40 @@ def table_status_map(holds=None):
     return result
 
 
-def is_table_busy_now(table_id, user=None):
-    """True if someone other than `user` holds the table right now.
-    (A customer who reserved / ordered at the table can keep using it.)"""
+def upcoming_status_map(holds=None):
+    """{table_id: Hold} - the soonest UPCOMING (not yet started) hold for each
+    table, so admin can see a table is reserved for later even though it's
+    free right now."""
+    result = {}
+    for h in upcoming_holds(holds):
+        current = result.get(h.table_id)
+        if current is None or h.start < current.start:
+            result[h.table_id] = h
+    return result
+
+
+def is_table_busy_now(table_id, user=None, buffer=WALKIN_BUFFER):
+    """True if someone other than `user` holds the table right now, OR if a
+    confirmed booking for this table starts within `buffer` time from now
+    (so walk-ins don't get seated right before a reservation arrives)."""
+    now = timezone.now()
+
+    # 1. Currently active hold (booking window has started, or an order is open)
     for h in active_holds():
         if h.table_id == table_id and not (user is not None and h.user_id == user.id):
             return True
+
+    # 2. Upcoming reservation starting soon - block walk-ins so it doesn't
+    #    clash with the reserved customer arriving.
+    for h in upcoming_holds():
+        if (
+            h.table_id == table_id
+            and h.kind == 'booking'
+            and h.start - now <= buffer
+            and not (user is not None and h.user_id == user.id)
+        ):
+            return True
+
     return False
 
 

@@ -116,6 +116,45 @@
   .refresh-btn:hover { background: #F63A3A; }
   .refresh-timer { font-size: 11px; color: #9ca3af; align-self: center; }
 
+  .live-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: #e6f9ed;
+    color: #147a3d;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .live-badge .live-dot {
+    width: 7px; height: 7px;
+    background: #22c55e;
+    border-radius: 50%;
+    animation: pulse-dot 1.2s infinite;
+  }
+
+  /* --- Sound toggle --- */
+  .sound-toggle {
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #374151;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+  }
+  .sound-toggle.off { color: #9ca3af; }
+  .sound-toggle:hover { border-color: #0f766e; }
+
   .kitchen-board {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -211,10 +250,26 @@
     font-weight: 700;
     padding: 2px 8px;
     border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
   }
   .urgency-ok .order-time-badge { background: #dcfce7; color: #166534; }
   .urgency-warn .order-time-badge { background: #fef9c3; color: #854d0e; }
   .urgency-late .order-time-badge { background: #fee2e2; color: #991b1b; }
+
+  .urgent-flag {
+    display: none;
+    font-size: 10.5px;
+    font-weight: 800;
+    color: #991b1b;
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+  }
+  .urgency-late .urgent-flag { display: inline-flex; align-items: center; gap: 3px; }
 
   .order-user {
     font-size: 13px;
@@ -319,17 +374,83 @@
   }
   .empty-col .empty-icon { font-size: 30px; display: block; margin-bottom: 8px; opacity: 0.5; }
 
+  /* --- Toast notification --- */
+  #toastStack {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .kitchen-toast {
+    background: linear-gradient(135deg, #0d1b2a, #16283d);
+    color: #fff;
+    padding: 16px 20px;
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(212,175,55,0.25), 0 0 24px rgba(212,175,55,0.15);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 260px;
+    border-left: 4px solid #d4af37;
+    animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), toastGlow 1.6s ease-in-out 0.35s 2, toastOut 0.35s ease 4.2s forwards;
+  }
+  .kitchen-toast .toast-bell {
+    font-size: 24px;
+    flex-shrink: 0;
+    animation: bellRing 0.6s ease-in-out 0.3s 2;
+    transform-origin: top center;
+  }
+  .kitchen-toast .toast-text .toast-title {
+    color: #d4af37;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    display: block;
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(40px) scale(0.9); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  @keyframes toastOut {
+    to { opacity: 0; transform: translateX(40px) scale(0.95); }
+  }
+  @keyframes toastGlow {
+    0%,100% { box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(212,175,55,0.25), 0 0 24px rgba(212,175,55,0.15); }
+    50% { box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(212,175,55,0.5), 0 0 36px rgba(212,175,55,0.45); }
+  }
+  @keyframes bellRing {
+    0%, 100% { transform: rotate(0deg); }
+    20% { transform: rotate(-18deg); }
+    40% { transform: rotate(14deg); }
+    60% { transform: rotate(-9deg); }
+    80% { transform: rotate(5deg); }
+  }
+
   @media print {
-    .kitchen-header, .kitchen-stats, .kitchen-toolbar, .order-actions, .admin-sidebar { display: none !important; }
+    .kitchen-header, .kitchen-stats, .kitchen-toolbar, .order-actions, .admin-sidebar, #toastStack { display: none !important; }
   }
 </style>
+
+<div id="toastStack"></div>
 
 <div class="kitchen-header">
   <div>
     <h1>👨‍🍳 Kitchen Dashboard</h1>
     <p>Confirm, prepare and complete orders. Once you mark an order Ready it goes to the waiter automatically.</p>
   </div>
-  <div class="kitchen-clock"><span class="dot"></span> <span id="liveClock"></span></div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <div class="sound-toggle" id="soundToggle" onclick="toggleSound()">🔔 <span id="soundToggleLabel">Sound On</span></div>
+    <div class="live-badge"><span class="live-dot"></span> Live</div>
+    <div class="kitchen-clock"><span class="dot"></span> <span id="liveClock"></span></div>
+  </div>
 </div>
 
 <div class="kitchen-stats">
@@ -356,7 +477,7 @@
     <input type="text" id="orderSearch" placeholder="Search by Order # or customer name..." onkeyup="filterOrders()">
   </div>
   <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Now</button>
-  <span class="refresh-timer">Auto-refresh in <span id="countdown">30</span>s</span>
+  <span class="refresh-timer">Full refresh in <span id="countdown">5</span>s</span>
 </div>
 
 <div class="kitchen-board">
@@ -367,10 +488,10 @@
       <span class="kitchen-count">{{ confirmed_orders|length }}</span>
     </div>
     {% for order in confirmed_orders %}
-      <div class="order-card" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
+      <div class="order-card" data-order-id="{{ order.id }}" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
         <div class="order-card-top">
           <span class="order-id">Order #{{ order.id }}</span>
-          <span class="order-time-badge time-ago">just now</span>
+          <span class="order-time-badge"><span class="time-ago">just now</span><span class="urgent-flag">⏰ Urgent</span></span>
         </div>
         <div class="order-user">
           <span>👤 {{ order.user.username }}</span>
@@ -405,10 +526,10 @@
       <span class="kitchen-count">{{ preparing_orders|length }}</span>
     </div>
     {% for order in preparing_orders %}
-      <div class="order-card" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
+      <div class="order-card" data-order-id="{{ order.id }}" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
         <div class="order-card-top">
           <span class="order-id">Order #{{ order.id }}</span>
-          <span class="order-time-badge time-ago">just now</span>
+          <span class="order-time-badge"><span class="time-ago">just now</span><span class="urgent-flag">⏰ Urgent</span></span>
         </div>
         <div class="order-user">
           <span>👤 {{ order.user.username }}</span>
@@ -443,10 +564,10 @@
       <span class="kitchen-count">{{ ready_orders|length }}</span>
     </div>
     {% for order in ready_orders %}
-      <div class="order-card" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
+      <div class="order-card" data-order-id="{{ order.id }}" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
         <div class="order-card-top">
           <span class="order-id">Order #{{ order.id }}</span>
-          <span class="order-time-badge time-ago">just now</span>
+          <span class="order-time-badge"><span class="time-ago">just now</span></span>
         </div>
         <div class="order-user">
           <span>👤 {{ order.user.username }}</span>
@@ -483,7 +604,7 @@
   setInterval(updateClock, 1000);
   updateClock();
 
-  // Time-ago + urgency coloring
+  // Time-ago + urgency coloring (OK < 15min, WARN 15-30min, LATE/URGENT 30+min)
   function updateTimeAgo() {
     document.querySelectorAll('.order-card').forEach(card => {
       const created = new Date(card.getAttribute('data-time'));
@@ -491,9 +612,9 @@
       const badge = card.querySelector('.time-ago');
 
       card.classList.remove('urgency-ok', 'urgency-warn', 'urgency-late');
-      if (diffMin < 10) {
+      if (diffMin < 15) {
         card.classList.add('urgency-ok');
-      } else if (diffMin < 20) {
+      } else if (diffMin < 30) {
         card.classList.add('urgency-warn');
       } else {
         card.classList.add('urgency-late');
@@ -505,7 +626,7 @@
     });
   }
   updateTimeAgo();
-  setInterval(updateTimeAgo, 15000);
+  setInterval(updateTimeAgo, 5000);
 
   // Search filter
   function filterOrders() {
@@ -516,8 +637,237 @@
     });
   }
 
-  // Auto refresh countdown
-  let seconds = 30;
+  // ---- Sound + Voice + Toast for new orders ----
+  const SOUND_KEY = 'kitchenSoundEnabled';
+  const SEEN_KEY = 'kitchenSeenOrderIds';
+
+  function isSoundOn() {
+    return localStorage.getItem(SOUND_KEY) !== 'off';
+  }
+
+  function toggleSound() {
+    const on = isSoundOn();
+    localStorage.setItem(SOUND_KEY, on ? 'off' : 'on');
+    renderSoundToggle();
+    if (!on) beep(); // give feedback when turning back on
+  }
+
+  function renderSoundToggle() {
+    const el = document.getElementById('soundToggle');
+    const label = document.getElementById('soundToggleLabel');
+    if (isSoundOn()) {
+      el.classList.remove('off');
+      label.textContent = 'Sound On';
+    } else {
+      el.classList.add('off');
+      label.textContent = 'Sound Off';
+    }
+  }
+
+  // One shared AudioContext, reused for every beep (creating a new one
+  // each time exhausts the browser's audio-context limit and beeps
+  // silently stop working after a few of them).
+  let sharedAudioCtx = null;
+
+  function getAudioCtx() {
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
+    return sharedAudioCtx;
+  }
+
+  // Rich bell chime using Web Audio API — layered harmonics with a natural
+  // decay (like a real bell/chime), instead of a flat two-tone beep.
+  function beep() {
+    if (!isSoundOn()) return;
+    try {
+      const ctx = getAudioCtx();
+      const now = ctx.currentTime;
+
+      // A pleasant ascending chime: three notes (like a doorbell/temple
+      // bell), each built from a fundamental + soft harmonics for warmth.
+      const notes = [
+        { time: 0.00, freq: 987.77, dur: 0.9 },  // B5
+        { time: 0.14, freq: 1318.5, dur: 0.9 },  // E6
+        { time: 0.30, freq: 1567.98, dur: 1.2 }  // G6
+      ];
+
+      notes.forEach(note => {
+        const startAt = now + note.time;
+
+        // Fundamental tone
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.value = note.freq;
+        gain1.gain.setValueAtTime(0.0001, startAt);
+        gain1.gain.exponentialRampToValueAtTime(0.35, startAt + 0.015);
+        gain1.gain.exponentialRampToValueAtTime(0.0001, startAt + note.dur);
+        osc1.connect(gain1).connect(ctx.destination);
+        osc1.start(startAt);
+        osc1.stop(startAt + note.dur + 0.05);
+
+        // Soft octave harmonic for a bell-like shimmer
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.value = note.freq * 2;
+        gain2.gain.setValueAtTime(0.0001, startAt);
+        gain2.gain.exponentialRampToValueAtTime(0.12, startAt + 0.015);
+        gain2.gain.exponentialRampToValueAtTime(0.0001, startAt + note.dur * 0.7);
+        osc2.connect(gain2).connect(ctx.destination);
+        osc2.start(startAt);
+        osc2.stop(startAt + note.dur + 0.05);
+      });
+    } catch (e) { /* audio blocked until user interacts once — safe to ignore */ }
+  }
+
+  // Picks a Google voice specifically (closest to "Google AI voice" sound),
+  // preferring the non-local/cloud version for clarity. Falls back to
+  // other female-sounding voices, then any English voice.
+  let cachedVoice = null;
+
+  function pickBestVoice() {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return null;
+
+    // Google voices first — cloud version preferred (clearer, less robotic)
+    const googleCloud = voices.find(v => /Google/i.test(v.name) && /en/i.test(v.lang) && v.localService === false);
+    if (googleCloud) return googleCloud;
+    const googleAny = voices.find(v => /Google/i.test(v.name) && /en/i.test(v.lang));
+    if (googleAny) return googleAny;
+
+    const preferredNames = [
+      'Microsoft Aria Online (Natural)',
+      'Microsoft Jenny Online (Natural)',
+      'Microsoft Zira - English (United States)',
+      'Zira', 'Karen', 'Moira', 'Fiona', 'Tessa', 'Veena'
+    ];
+    for (const name of preferredNames) {
+      const match = voices.find(v => v.name.includes(name));
+      if (match) return match;
+    }
+
+    const femaleMatch = voices.find(v => /female/i.test(v.name));
+    if (femaleMatch) return femaleMatch;
+
+    return (
+      voices.find(v => /en-IN/i.test(v.lang)) ||
+      voices.find(v => /en-US/i.test(v.lang)) ||
+      voices.find(v => /en/i.test(v.lang)) ||
+      voices[0]
+    );
+  }
+
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.onvoiceschanged = () => { cachedVoice = pickBestVoice(); };
+    cachedVoice = pickBestVoice();
+  }
+
+  // Speaks the announcement directly — no pause()/resume() keep-alive trick.
+  // These announcements are always short (well under Chrome's ~14s cutoff),
+  // and pause()/resume() was what caused the muffled/broken/stuttery audio.
+  function speakAnnouncement(text) {
+    if (!isSoundOn()) return;
+    if (!('speechSynthesis' in window)) return;
+    try {
+      const utter = new SpeechSynthesisUtterance(text);
+      const voice = cachedVoice || pickBestVoice();
+      if (voice) {
+        utter.voice = voice;
+        utter.lang = voice.lang;
+      }
+      utter.rate = 0.95;
+      utter.pitch = 1.0;
+      utter.volume = 1;
+      window.speechSynthesis.speak(utter);
+    } catch (e) { /* speech blocked until user interacts once — safe to ignore */ }
+  }
+
+  function showToast(orderId, customer) {
+    const stack = document.getElementById('toastStack');
+    const toast = document.createElement('div');
+    toast.className = 'kitchen-toast';
+    toast.innerHTML = `
+      <span class="toast-bell">🔔</span>
+      <span class="toast-text">
+        <span class="toast-title">New Order</span>
+        #${orderId} — ${customer}
+      </span>`;
+    stack.appendChild(toast);
+    setTimeout(() => toast.remove(), 4600);
+  }
+
+  function checkForNewOrders() {
+    const currentIds = Array.from(document.querySelectorAll('.col-confirmed .order-card'))
+      .map(c => c.getAttribute('data-order-id'));
+
+    let seen;
+    try {
+      seen = JSON.parse(sessionStorage.getItem(SEEN_KEY) || 'null');
+    } catch (e) {
+      seen = null;
+    }
+
+    if (seen !== null) {
+      const newIds = currentIds.filter(id => !seen.includes(id));
+      newIds.forEach(id => {
+        const card = document.querySelector(`.col-confirmed .order-card[data-order-id="${id}"]`);
+        const customer = card ? card.querySelector('.order-user span').textContent.replace('👤', '').trim() : '';
+        showToast(id, customer);
+      });
+
+      if (newIds.length > 0) {
+        beep();
+        setTimeout(() => {
+          if (newIds.length === 1) {
+            speakAnnouncement(`New order received. Order number ${newIds[0]}.`);
+          } else {
+            speakAnnouncement(`${newIds.length} new orders received.`);
+          }
+        }, 500);
+      }
+    }
+
+    sessionStorage.setItem(SEEN_KEY, JSON.stringify(currentIds));
+  }
+
+  // Chrome/browser autoplay policy blocks audio (beep + speech) until the
+  // page has had at least one real user gesture (click/tap/keypress).
+  // Because this dashboard auto-reloads every 2 minutes, each fresh reload
+  // starts "locked" again — so a new order arriving before the chef
+  // clicks anything would play silently. This unlocks audio on the very
+  // first interaction so all later beeps/voice announcements work.
+  let audioUnlocked = false;
+  function unlockAudioOnce() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    try {
+      getAudioCtx(); // creates/resumes the shared AudioContext
+    } catch (e) { /* ignore */ }
+    try {
+      // A near-silent, near-zero-length utterance "wakes up" the speech
+      // engine so later speakAnnouncement() calls aren't blocked.
+      const unlockUtter = new SpeechSynthesisUtterance(' ');
+      unlockUtter.volume = 0;
+      window.speechSynthesis.speak(unlockUtter);
+    } catch (e) { /* ignore */ }
+    document.removeEventListener('click', unlockAudioOnce);
+    document.removeEventListener('keydown', unlockAudioOnce);
+    document.removeEventListener('touchstart', unlockAudioOnce);
+  }
+  document.addEventListener('click', unlockAudioOnce);
+  document.addEventListener('keydown', unlockAudioOnce);
+  document.addEventListener('touchstart', unlockAudioOnce);
+
+  renderSoundToggle();
+  checkForNewOrders();
+
+  // Full board refresh every 5 seconds (columns, stats, everything)
+  let seconds = 5;
   const countdownEl = document.getElementById('countdown');
   setInterval(() => {
     seconds--;

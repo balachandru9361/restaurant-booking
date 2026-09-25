@@ -16,7 +16,7 @@ from accounts.forms import StaffCreationForm
 from menu.models import Category, FoodItem, FoodItemImage
 from menu.forms import MenuItemForm
 from booking.models import Table, TableBooking
-from booking.availability import booking_window, release_table, table_status_map
+from booking.availability import booking_window, release_table, table_status_map, upcoming_status_map
 from orders.models import Order
 
 logger = logging.getLogger(__name__)
@@ -83,15 +83,19 @@ def delete_menu_item(request, pk):
 def manage_tables(request):
     tables = Table.objects.all().order_by('number')
     holds = table_status_map()
+    upcoming = upcoming_status_map()
     now = timezone.now()
 
     rows = []
     for table in tables:
         hold = holds.get(table.id)
+        up = upcoming.get(table.id)
         rows.append({
             'table': table,
             'hold': hold,
             'mins_left': int((hold.end - now).total_seconds() // 60) + 1 if hold else 0,
+            'upcoming': up,
+            'upcoming_in_mins': int((up.start - now).total_seconds() // 60) + 1 if up else 0,
         })
 
     return render(request, 'dashboard/manage_tables.html', {
@@ -100,6 +104,7 @@ def manage_tables(request):
         'total_capacity': tables.aggregate(total=Sum('capacity'))['total'] or 0,
         'booked_count': len(holds),
         'free_count': tables.count() - len(holds),
+        'upcoming_count': len(upcoming),
     })
 
 
@@ -165,6 +170,16 @@ def manage_orders(request):
     return render(request, 'dashboard/manage_orders.html', {'orders': orders})
 
 
+@admin_required
+@require_POST
+def mark_cash_received(request, pk):
+    """Used by the 'Mark Received' button on Manage Orders for cash payments."""
+    order = get_object_or_404(Order, pk=pk, payment_method='cash')
+    order.payment_status = 'paid'
+    order.save(update_fields=['payment_status'])
+    return JsonResponse({'success': True})
+
+
 # ---- Reports ----
 @admin_required
 def sales_reports(request):
@@ -176,11 +191,27 @@ def sales_reports(request):
 
     recent_orders = confirmed_orders.order_by('-created_at')[:20]
 
+    # Cash vs Online breakdown
+    online_orders = confirmed_orders.filter(payment_method='online')
+    cash_orders = confirmed_orders.filter(payment_method='cash')
+
+    online_revenue = online_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+    cash_revenue = cash_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+
+    cash_pending_orders = confirmed_orders.filter(payment_method='cash', payment_status='cash_pending')
+    cash_pending_amount = cash_pending_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+
     context = {
         'total_revenue': total_revenue,
         'total_orders': total_orders,
         'avg_order_value': avg_order_value,
         'recent_orders': recent_orders,
+        'online_revenue': online_revenue,
+        'online_count': online_orders.count(),
+        'cash_revenue': cash_revenue,
+        'cash_count': cash_orders.count(),
+        'cash_pending_amount': cash_pending_amount,
+        'cash_pending_count': cash_pending_orders.count(),
     }
     return render(request, 'dashboard/sales_reports.html', context)
 
@@ -233,7 +264,6 @@ def kitchen_dashboard(request):
         'ready_orders': ready_orders,
     }
     return render(request, 'dashboard/kitchen.html', context)
-
 
 # Which status moves each role is allowed to make.
 # Kitchen prepares; only the server marks an order as served (delivered).
@@ -376,4 +406,3 @@ def notifications_poll(request):
 def notifications_mark_read(request):
     Notification.objects.filter(is_read=False).update(is_read=True)
     return redirect('dashboard:admin_home')
-

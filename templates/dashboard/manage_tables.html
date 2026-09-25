@@ -54,6 +54,11 @@
     align-items: center;
     gap: 12px;
     border-left: 4px solid #3498db;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .mini-stat:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
   }
   .mini-stat:nth-child(2) { border-left-color: #2ecc71; }
   .mini-stat .emoji { font-size: 22px; }
@@ -62,7 +67,7 @@
 
   .tables-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 20px;
   }
 
@@ -73,9 +78,20 @@
     text-align: center;
     box-shadow: 0 4px 15px rgba(0,0,0,0.06);
     position: relative;
+    overflow: hidden;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     animation: popIn 0.3s ease backwards;
     border-top: 4px solid #3498db;
+  }
+  .table-card::before {
+    content: "";
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(52,152,219,0.08), transparent 70%);
   }
   .table-card:nth-child(4n+2) { border-top-color: #2ecc71; }
   .table-card:nth-child(4n+3) { border-top-color: #f39c12; }
@@ -99,6 +115,9 @@
     align-items: center;
     justify-content: center;
     font-size: 26px;
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 6px 16px rgba(52,152,219,0.18);
   }
 
   .table-number {
@@ -106,6 +125,8 @@
     font-weight: 800;
     color: #1a1a2e;
     margin-bottom: 4px;
+    position: relative;
+    z-index: 1;
   }
   .table-capacity {
     font-size: 12.5px;
@@ -115,6 +136,8 @@
     justify-content: center;
     gap: 5px;
     margin-bottom: 16px;
+    position: relative;
+    z-index: 1;
   }
   .table-capacity .seat-badge {
     background: #f5f5f8;
@@ -128,6 +151,8 @@
     display: flex;
     gap: 8px;
     justify-content: center;
+    position: relative;
+    z-index: 1;
   }
   .table-actions a {
     flex: 1;
@@ -144,17 +169,33 @@
 
   /* --- table hold status (2-hour auto hide) --- */
   .table-card.is-held { border-top-color: #e74c3c !important; background: #fffafa; }
-  .table-card.is-held .table-icon { background: linear-gradient(135deg, #ffe5e5, #ffd3d3); }
+  .table-card.is-held .table-icon { background: linear-gradient(135deg, #ffe5e5, #ffd3d3); box-shadow: 0 6px 16px rgba(231,76,60,0.2); }
+
+  .table-card.is-upcoming { border-top-color: #f39c12 !important; background: #fffdf6; }
+  .table-card.is-upcoming .table-icon { background: linear-gradient(135deg, #fff3d6, #ffe8b3); box-shadow: 0 6px 16px rgba(243,156,18,0.2); }
+
   .hold-pill {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 11.5px; font-weight: 800; padding: 4px 12px; border-radius: 20px;
     margin-bottom: 10px;
+    position: relative;
+    z-index: 1;
   }
   .hold-pill.free { background: #e3f9ec; color: #1e8e4e; }
   .hold-pill.held { background: #ffe5e5; color: #d63031; }
-  .hold-info { font-size: 12px; color: #777; line-height: 1.5; margin-bottom: 14px; min-height: 36px; }
+  .hold-pill.upcoming { background: #fff3d6; color: #b9770e; }
+  .hold-pill.upcoming .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #f39c12;
+    animation: pulseDot 1.4s ease-in-out infinite;
+  }
+  @keyframes pulseDot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  .hold-info { font-size: 12px; color: #777; line-height: 1.5; margin-bottom: 14px; min-height: 36px; position: relative; z-index: 1; }
   .hold-info strong { color: #1a1a2e; }
-  .open-form { margin-bottom: 10px; }
+  .open-form { margin-bottom: 10px; position: relative; z-index: 1; }
   .open-btn {
     width: 100%; border: none; cursor: pointer; font-size: 12.5px; font-weight: 800;
     padding: 9px 0; border-radius: 8px; color: #fff;
@@ -197,6 +238,10 @@
     <div class="emoji">🔒</div>
     <div><div class="num">{{ booked_count }}</div><div class="lbl">Booked now</div></div>
   </div>
+  <div class="mini-stat" style="border-left-color:#f39c12;">
+    <div class="emoji">🕒</div>
+    <div><div class="num">{{ upcoming_count }}</div><div class="lbl">Reserved (upcoming)</div></div>
+  </div>
   <div class="mini-stat" style="border-left-color:#2ecc71;">
     <div class="emoji">✅</div>
     <div><div class="num">{{ free_count }}</div><div class="lbl">Free now</div></div>
@@ -205,8 +250,8 @@
 
 <div class="tables-grid">
   {% for row in rows %}
-  {% with table=row.table hold=row.hold %}
-  <div class="table-card {% if hold %}is-held{% endif %}">
+  {% with table=row.table hold=row.hold upcoming=row.upcoming %}
+  <div class="table-card {% if hold %}is-held{% elif upcoming %}is-upcoming{% endif %}">
     <div class="table-icon">🪑</div>
     <div class="table-number">Table {{ table.number }}</div>
     <div class="table-capacity">
@@ -214,7 +259,7 @@
     </div>
 
     {% if hold %}
-      <span class="hold-pill held">🔒 Booked</span>
+      <span class="hold-pill held">🔒 Occupied</span>
       <div class="hold-info">
         {{ hold.label }}<br>
         Opens automatically at <strong>{{ hold.end|time:"g:i A" }}</strong>
@@ -225,8 +270,16 @@
         <input type="hidden" name="next" value="manage_tables">
         <button type="submit" class="open-btn" onclick="return confirm('Open Table {{ table.number }} now?')">🔓 Open Table</button>
       </form>
+    {% elif upcoming %}
+      <span class="hold-pill upcoming"><span class="dot"></span> Reserved</span>
+      <div class="hold-info">
+        {{ upcoming.label }}<br>
+        Arriving at <strong>{{ upcoming.start|time:"g:i A" }}</strong>
+        (in {{ row.upcoming_in_mins }} min) — free until then
+      </div>
     {% else %}
-      <span class="hold-pill free">✅ Free</span>
+      <span class="hold-pill free">✅ Free</span>http://127.0.0.1:8000/
+
       <div class="hold-info">Available for booking</div>
     {% endif %}
 

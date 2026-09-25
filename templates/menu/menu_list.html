@@ -8,8 +8,7 @@
 <style>
     /* ===== PHOTO BACKGROUND ===== */
     body {
-        background-image:
-        linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.65)),
+        background-image: linear-gradient(rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.65)),
         url("{% static 'images/menu-bg.jpg' %}");
         background-size: cover;
         background-position: center top;
@@ -18,14 +17,22 @@
         background-color: #f7f7f7;
     }
 
-    html, body {
+    html,
+    body {
         overflow-x: hidden;
     }
 
     /* ===== Page load fade-up entrance ===== */
     @keyframes fadeUpIn {
-        from { opacity: 0; transform: translateY(18px); }
-        to { opacity: 1; transform: translateY(0); }
+        from {
+            opacity: 0;
+            transform: translateY(18px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     .menu-hero {
@@ -51,6 +58,32 @@
         font-size: 0.95rem;
     }
 
+    /* ===== CATEGORY IMAGE FIX ===== */
+
+    .menu-slide-wrap {
+        position: relative;
+        width: 100%;
+        height: 160px;
+        overflow: hidden;
+        background: #f5f5f5;
+    }
+
+    .menu-slide-track {
+        display: flex;
+        width: 100%;
+        height: 100%;
+    }
+
+    .menu-slide-img {
+        flex: 0 0 100%;
+        width: 100% !important;
+        height: 160px !important;
+        object-fit: cover;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
     /* ===== Attractive Search Bar ===== */
     .search-section {
         background: linear-gradient(135deg, gray);
@@ -58,7 +91,7 @@
         padding: 36px 24px;
         max-width: 700px;
         margin: 0 auto 30px;
-        box-shadow: 0 14px 34px rgba(255,107,107,0.3);
+        box-shadow: 0 14px 34px rgba(255, 107, 107, 0.3);
         position: relative;
         overflow: hidden;
         animation: fadeUpIn 0.6s ease 0.12s both;
@@ -102,13 +135,13 @@
         outline: none;
         font-family: inherit;
         background: #fff;
-        box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
         transition: box-shadow 0.25s ease, transform 0.2s ease, border-color 0.25s ease;
         box-sizing: border-box;
     }
 
     .search-bar-wrap input:focus {
-        box-shadow: 0 8px 28px rgba(0,0,0,0.28), 0 0 0 4px rgba(255,107,107,0.35);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28), 0 0 0 4px rgba(255, 107, 107, 0.35);
         transform: translateY(-2px);
         border-color: #ff6b6b;
     }
@@ -128,7 +161,7 @@
         transition: transform 0.25s ease;
     }
 
-    .search-bar-wrap input:focus ~ .search-icon {
+    .search-bar-wrap input:focus~.search-icon {
         transform: translateY(-50%) scale(1.15);
     }
 
@@ -164,7 +197,7 @@
 
     .search-result-count {
         text-align: center;
-        color: rgba(255,255,255,0.9);
+        color: rgba(255, 255, 255, 0.9);
         font-size: 0.8rem;
         font-weight: 600;
         margin-top: 10px;
@@ -189,26 +222,28 @@
         z-index: 1;
     }
 
-    .category-bar::-webkit-scrollbar { display: none; }
+    .category-bar::-webkit-scrollbar {
+        display: none;
+    }
 
     .category-pill {
         flex-shrink: 0;
         scroll-snap-align: start;
         padding: 9px 22px;
         border-radius: 30px;
-        background: rgba(255,255,255,0.2);
+        background: rgba(255, 255, 255, 0.2);
         color: #fff;
         font-size: 0.85rem;
         font-weight: 700;
         text-decoration: none;
-        border: 1.5px solid rgba(255,255,255,0.4);
+        border: 1.5px solid rgba(255, 255, 255, 0.4);
         cursor: pointer;
         transition: background-color 0.25s ease, color 0.25s ease, transform 0.2s ease, border-color 0.25s ease;
         white-space: nowrap;
     }
 
     .category-pill:hover {
-        background: rgba(255,255,255,0.32);
+        background: rgba(255, 255, 255, 0.32);
         color: #fff;
         text-decoration: none;
         transform: translateY(-1px);
@@ -268,7 +303,7 @@
         background: #fff;
         border-radius: 16px;
         overflow: hidden;
-        box-shadow: 0 3px 12px rgba(0,0,0,0.07);
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07);
         display: flex;
         flex-direction: column;
         transition: transform 0.25s ease, box-shadow 0.25s ease, outline 0.2s ease, opacity 0.5s ease;
@@ -283,7 +318,7 @@
 
     .item-card:hover {
         transform: translateY(-6px) scale(1.03);
-        box-shadow: 0 16px 30px rgba(0,0,0,0.16);
+        box-shadow: 0 16px 30px rgba(0, 0, 0, 0.16);
     }
 
     .item-card.selected {
@@ -297,13 +332,19 @@
     }
 
     .item-image-select img {
-        transition: transform 0.35s ease;
         max-width: 100%;
         height: auto;
     }
 
-    .item-card:hover .item-image-select img {
-        transform: scale(1.07);
+    /* Zoom the whole slide wrap (not each image) so the next slide never peeks in */
+    .menu-slide-wrap {
+        transition: transform 0.35s ease;
+    }
+
+    @media (hover: hover) {
+        .item-card:hover .menu-slide-wrap {
+            transform: scale(1.07);
+        }
     }
 
     .item-select-checkbox {
@@ -319,7 +360,7 @@
         left: 12px;
         width: 26px;
         height: 26px;
-        background: rgba(255,255,255,0.9);
+        background: rgba(255, 255, 255, 0.9);
         border: 2px solid #d1d5db;
         border-radius: 6px;
         cursor: pointer;
@@ -329,12 +370,12 @@
         touch-action: manipulation;
     }
 
-    .item-select-checkbox:checked + .select-tick {
+    .item-select-checkbox:checked+.select-tick {
         background: #1f2937;
         border-color: #1f2937;
     }
 
-    .item-select-checkbox:checked + .select-tick::after {
+    .item-select-checkbox:checked+.select-tick::after {
         content: "✓";
         position: absolute;
         top: 50%;
@@ -444,9 +485,17 @@
     }
 
     @keyframes qtyPop {
-        0% { transform: scale(1); }
-        40% { transform: scale(1.35); }
-        100% { transform: scale(1); }
+        0% {
+            transform: scale(1);
+        }
+
+        40% {
+            transform: scale(1.35);
+        }
+
+        100% {
+            transform: scale(1);
+        }
     }
 
     .item-card-qty input.qty-pop {
@@ -526,7 +575,7 @@
         color: #fff;
         padding: 14px 24px;
         border-radius: 30px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
         align-items: center;
         gap: 18px;
         z-index: 200;
@@ -600,31 +649,72 @@
 
     /* ===== MOBILE FIXES ===== */
     @media (max-width: 500px) {
-        .menu-hero { padding: 24px 16px 16px; }
-        .menu-hero h1 { font-size: 1.55rem; }
-        .menu-hero p { font-size: 0.85rem; }
+        .menu-hero {
+            padding: 24px 16px 16px;
+        }
 
-        .search-section { padding: 24px 16px; border-radius: 18px; }
+        .menu-hero h1 {
+            font-size: 1.55rem;
+        }
+
+        .menu-hero p {
+            font-size: 0.85rem;
+        }
+
+        .search-section {
+            padding: 24px 16px;
+            border-radius: 18px;
+        }
 
         .search-bar-wrap input {
             font-size: 16px;
             padding: 14px 46px 14px 46px;
         }
 
-        .menu-category { padding: 0 14px; margin-bottom: 34px; }
-        .menu-category h2 { font-size: 1.2rem; }
+        .menu-category {
+            padding: 0 14px;
+            margin-bottom: 34px;
+        }
+
+        .menu-category h2 {
+            font-size: 1.2rem;
+        }
 
         .item-grid {
             grid-template-columns: 1fr;
             gap: 16px;
         }
-        .item-card img { height: 180px; }
-        .menu-slide-wrap { height: 180px; }
-        .item-card-body { padding: 14px; }
-        .item-card h3 { font-size: 1rem; }
-        .item-card .description { font-size: 0.85rem; margin-bottom: 10px; }
-        .item-card .price { font-size: 1.05rem; margin-bottom: 10px; }
-        .item-card-actions { flex-direction: row; gap: 10px; }
+
+        .item-card img {
+            height: 180px;
+        }
+
+        .menu-slide-wrap {
+            height: 180px;
+        }
+
+        .item-card-body {
+            padding: 14px;
+        }
+
+        .item-card h3 {
+            font-size: 1rem;
+        }
+
+        .item-card .description {
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+
+        .item-card .price {
+            font-size: 1.05rem;
+            margin-bottom: 10px;
+        }
+
+        .item-card-actions {
+            flex-direction: row;
+            gap: 10px;
+        }
 
         .bulk-select-bar {
             bottom: max(16px, env(safe-area-inset-bottom));
@@ -651,12 +741,19 @@
             font-size: 0.82rem;
         }
 
-        body { padding-bottom: 120px; }
+        body {
+            padding-bottom: 120px;
+        }
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .menu-hero, .search-section, .bulk-select-bar.active,
-        .menu-category, .item-card, .item-card-qty input.qty-pop {
+
+        .menu-hero,
+        .search-section,
+        .bulk-select-bar.active,
+        .menu-category,
+        .item-card,
+        .item-card-qty input.qty-pop {
             animation: none !important;
             transition: none !important;
             opacity: 1 !important;
@@ -672,7 +769,7 @@
 </div>
 
 <div class="search-section">
-<p class="search-title">✨ What are you craving today?</p>
+    <p class="search-title">✨ What are you craving today?</p>
     <div class="search-bar-wrap" id="searchWrap">
         <span class="search-icon">🔍</span>
         <input type="text" id="menuSearch" placeholder="Search for a dish...">
@@ -684,7 +781,7 @@
     <div class="category-bar" id="categoryBar">
         <a href="javascript:void(0)" class="category-pill active" data-target="all">All</a>
         {% for category in categories %}
-            <a href="javascript:void(0)" class="category-pill" data-target="{{ category.slug }}">{{ category.name }}</a>
+        <a href="javascript:void(0)" class="category-pill" data-target="{{ category.slug }}">{{ category.name }}</a>
         {% endfor %}
     </div>
 </div>
@@ -695,55 +792,50 @@
 
     <div class="item-grid">
         {% for item in category.items.all %}
-            {% if item.is_available %}
-            <div class="item-card" data-item-name="{{ item.name|lower }}">
-                <div class="item-image-select">
-                    <input type="checkbox" class="item-select-checkbox" id="select-{{ item.id }}"
-                           data-name="{{ item.name }}" data-price="{{ item.price }}" data-id="{{ item.id }}">
-                    <label for="select-{{ item.id }}" class="select-tick"></label>
+        {% if item.is_available %}
+        <div class="item-card" data-item-name="{{ item.name|lower }}">
+            <div class="item-image-select">
+                <input type="checkbox" class="item-select-checkbox" id="select-{{ item.id }}"
+                    data-name="{{ item.name }}" data-price="{{ item.price }}" data-id="{{ item.id }}">
+                <label for="select-{{ item.id }}" class="select-tick"></label>
 
-                    <div class="menu-slide-wrap">
-                        <div class="menu-slide-track">
-                            {% if item.image %}
-                                <img src="{{ item.image.url }}" alt="{{ item.name }}" class="menu-slide-img">
-                            {% else %}
-                                <img src="{% static 'images/no-image.png' %}" alt="No image" class="menu-slide-img">
-                            {% endif %}
-                            {% for img in item.gallery_images.all %}
-                                <img src="{{ img.image.url }}" alt="{{ item.name }}" class="menu-slide-img">
-                            {% endfor %}
-                        </div>
+                <div class="menu-slide-wrap">
+                    <div class="menu-slide-track">
+                        {% if item.image %}
+                        <img src="{{ item.image.url }}" alt="{{ item.name }}" class="menu-slide-img">
+                        {% else %}
+                        <img src="{% static 'images/no-image.png' %}" alt="No image" class="menu-slide-img">
+                        {% endif %}
+                        {% for img in item.gallery_images.all %}
+                        <img src="{{ img.image.url }}" alt="{{ item.name }}" class="menu-slide-img">
+                        {% endfor %}
                     </div>
                 </div>
-                <div class="item-card-body">
-                    <h3>{{ item.name }}</h3>
-                    <p class="description">{{ item.description|truncatewords:15 }}</p>
-                    <p class="price">₹{{ item.price }}</p>
-
-                    <form method="post" action="{% url 'orders:add_to_cart' item.id %}">
-                        {% csrf_token %}
-                        <div class="item-card-qty">
-                            <button type="button" onclick="stepQty(this, -1)">−</button>
-
-                            <input type="number"
-                                   name="quantity"
-                                   value="0"
-                                   min="0"
-                                   max="200"
-                                   readonly>
-
-                            <button type="button" onclick="stepQty(this, 1)">+</button>
-                        </div>
-                        <div class="item-card-actions">
-                            <button type="submit" class="btn-cart">Add to Cart</button>
-                            <a href="{% url 'item_detail' item.id %}" class="btn-view">View</a>
-                        </div>
-                    </form>
-                </div>
             </div>
-            {% endif %}
+            <div class="item-card-body">
+                <h3>{{ item.name }}</h3>
+                <p class="description">{{ item.description|truncatewords:15 }}</p>
+                <p class="price">₹{{ item.price }}</p>
+
+                <form method="post" action="{% url 'orders:add_to_cart' item.id %}">
+                    {% csrf_token %}
+                    <div class="item-card-qty">
+                        <button type="button" onclick="stepQty(this, -1)">−</button>
+
+                        <input type="number" name="quantity" value="0" min="0" max="200" readonly>
+
+                        <button type="button" onclick="stepQty(this, 1)">+</button>
+                    </div>
+                    <div class="item-card-actions">
+                        <button type="submit" class="btn-cart">Add to Cart</button>
+                        <a href="{% url 'item_detail' item.id %}" class="btn-view">View</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
         {% empty %}
-            <p class="empty-msg">No items in this category yet.</p>
+        <p class="empty-msg">No items in this category yet.</p>
         {% endfor %}
     </div>
 </section>
@@ -836,7 +928,7 @@
             const qtyInput = card.querySelector('.item-card-qty input');
             let qty = parseInt(qtyInput.value, 10) || 0;
             if (qty < 1) qty = 1;
-            return { id: cb.dataset.id, quantity: qty };
+            return {id: cb.dataset.id, quantity: qty};
         });
 
         const btn = document.getElementById('addSelectedBtn');
@@ -849,60 +941,184 @@
                 'Content-Type': 'application/json',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: JSON.stringify({ items: items })
+            body: JSON.stringify({items: items})
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                window.location.href = "{% url 'orders:view_cart' %}";
-            } else {
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.href = "{% url 'orders:view_cart' %}";
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = 'Add Selected to Cart';
+                    alert('Error: ' + (data.error || 'Something went wrong'));
+                }
+            })
+            .catch(err => {
                 btn.disabled = false;
                 btn.textContent = 'Add Selected to Cart';
-                alert('Error: ' + (data.error || 'Something went wrong'));
-            }
-        })
-        .catch(err => {
-            btn.disabled = false;
-            btn.textContent = 'Add Selected to Cart';
-            console.error(err);
-            alert('Failed to add items. Please try again.');
-        });
+                console.error(err);
+                alert('Failed to add items. Please try again.');
+            });
     }
 
     // ===== Search + Category filter (combined) =====
+    // ===== Search + Category filter =====
+
     const searchInput = document.getElementById('menuSearch');
     const sections = document.querySelectorAll('.menu-category');
     const noResults = document.getElementById('noResults');
     const pills = document.querySelectorAll('.category-pill');
+
     let activeCategory = 'all';
 
+
     function applyFilters() {
+
         const q = searchInput.value.toLowerCase().trim();
+
         let anyVisible = false;
         let matchCount = 0;
 
-        document.getElementById('searchWrap').classList.toggle('has-text', q.length > 0);
 
-        sections.forEach(section => {
-            const categoryMatch = activeCategory === 'all' || section.id === activeCategory;
-            const categoryNameMatch = q !== '' && section.dataset.name.toLowerCase().startsWith(q);
+        document
+            .getElementById('searchWrap')
+            .classList.toggle('has-text', q.length > 0);
+
+
+        sections.forEach(function (section) {
+
+            const categoryMatch =
+                activeCategory === 'all' ||
+                section.id === activeCategory;
+
+
+            const categoryName =
+                (section.dataset.name || '').toLowerCase();
+
+
+            const categoryNameMatch =
+                q !== '' &&
+                categoryName.startsWith(q);
+
+
             let sectionHasMatch = false;
 
-            section.querySelectorAll('.item-card').forEach(card => {
-                const nameMatch = q === '' || categoryNameMatch || card.dataset.itemName.includes(q);
-                const show = categoryMatch && nameMatch;
-                card.style.display = show ? 'flex' : 'none';
-                if (show) { sectionHasMatch = true; matchCount++; }
+
+            const cards =
+                section.querySelectorAll('.item-card');
+
+
+            cards.forEach(function (card) {
+
+                const itemName =
+                    (card.dataset.itemName || '').toLowerCase();
+
+
+                const nameMatch =
+                    q === '' ||
+                    categoryNameMatch ||
+                    itemName.includes(q);
+
+
+                const show =
+                    categoryMatch && nameMatch;
+
+
+                if (show) {
+
+                    // SHOW CARD
+                    card.style.display = 'flex';
+                    card.style.opacity = '1';
+                    card.style.visibility = 'visible';
+                    card.style.transform = 'translateY(0)';
+
+                    sectionHasMatch = true;
+                    matchCount++;
+
+
+                    // ==============================
+                    // RESET IMAGE TO FIRST IMAGE
+                    // ==============================
+
+                    const track =
+                        card.querySelector('.menu-slide-track');
+
+
+                    if (track) {
+
+                        track.style.transition = 'none';
+
+                        track.style.transform =
+                            'translateX(0)';
+
+                    }
+
+
+                } else {
+
+                    // HIDE CARD
+                    card.style.display = 'none';
+
+                }
+
             });
 
-            section.style.display = (categoryMatch && sectionHasMatch) ? 'block' : 'none';
-            if (categoryMatch && sectionHasMatch) anyVisible = true;
+
+            // ==============================
+            // SHOW / HIDE CATEGORY
+            // ==============================
+
+            if (categoryMatch && sectionHasMatch) {
+
+                section.style.display = 'block';
+
+                section.style.opacity = '1';
+                section.style.visibility = 'visible';
+                section.style.transform = 'translateY(0)';
+
+                section.classList.add('in-view');
+
+                anyVisible = true;
+
+            } else {
+
+                section.style.display = 'none';
+
+            }
+
         });
 
-        noResults.style.display = anyVisible ? 'none' : 'block';
 
-        const resultCount = document.getElementById('resultCount');
-        resultCount.textContent = q ? matchCount + ' dish' + (matchCount !== 1 ? 'es' : '') + ' found' : '';
+        // ==============================
+        // NO RESULTS
+        // ==============================
+
+        noResults.style.display =
+            anyVisible ? 'none' : 'block';
+
+
+        // ==============================
+        // RESULT COUNT
+        // ==============================
+
+        const resultCount =
+            document.getElementById('resultCount');
+
+
+        if (q !== '') {
+
+            resultCount.textContent =
+                matchCount +
+                ' dish' +
+                (matchCount !== 1 ? 'es' : '') +
+                ' found';
+
+        } else {
+
+            resultCount.textContent = '';
+
+        }
+
     }
 
     function clearSearchBox() {
@@ -910,29 +1126,53 @@
         applyFilters();
         searchInput.focus();
     }
-
     if (searchInput) {
-        searchInput.addEventListener('input', applyFilters);
+
+        searchInput.addEventListener(
+            'input',
+            applyFilters
+        );
+
     }
 
-    pills.forEach(pill => {
+    pills.forEach(function (pill) {
+
         pill.addEventListener('click', function () {
-            pills.forEach(p => p.classList.remove('active'));
+
+            // Remove active from all
+            pills.forEach(function (p) {
+                p.classList.remove('active');
+            });
+
+
+            // Active selected category
             this.classList.add('active');
-            activeCategory = this.dataset.target;
+
+
+            // Get category slug
+            activeCategory =
+                this.getAttribute('data-target');
+
+
+            console.log(
+                'Selected category:',
+                activeCategory
+            );
             applyFilters();
+
         });
+
     });
 
     // ===== Auto-play slideshow for item images (seamless circular loop) =====
+    const SLIDE_INTERVAL = 2000; // 2 seconds (milliseconds la) - speed maatha inga mattum change pannunga
+
     document.querySelectorAll('.menu-slide-wrap').forEach(function (wrap) {
         const track = wrap.querySelector('.menu-slide-track');
         if (!track) return;
 
         let slides = Array.from(track.querySelectorAll('.menu-slide-img'));
         if (slides.length <= 1) return;
-
-        // Clone the first slide and place it at the end so the loop feels seamless
         const firstClone = slides[0].cloneNode(true);
         track.appendChild(firstClone);
         slides = Array.from(track.querySelectorAll('.menu-slide-img'));
@@ -945,22 +1185,27 @@
             track.style.transition = animate ? 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)' : 'none';
             track.style.transform = 'translateX(-' + (current * 100) + '%)';
         }
-
-        // When we finish sliding onto the cloned first image, snap back
-        // instantly (no animation) to the real first image so it loops forever.
         track.addEventListener('transitionend', function () {
             if (current === total - 1) {
                 goToSlide(0, false);
-                void track.offsetWidth; // force reflow so the next transition works
+                void track.offsetWidth;
             }
         });
 
         setInterval(function () {
-            goToSlide(current + 1, true);
-        }, 1000); // change image every 1 second
-    });
+            const card = wrap.closest('.item-card');
 
-    // ===== Scroll reveal: sections fade-in + slide-up as they enter viewport =====
+            if (
+                card &&
+                card.style.display === 'none'
+            ) {
+                return;
+            }
+
+            goToSlide(current + 1, true);
+
+        }, SLIDE_INTERVAL);
+    });
     (function () {
         const revealSections = document.querySelectorAll('.menu-category');
         if (!('IntersectionObserver' in window) || revealSections.length === 0) {
@@ -975,7 +1220,7 @@
                     observer.unobserve(entry.target);
                 }
             });
-        }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+        }, {threshold: 0.12, rootMargin: '0px 0px -40px 0px'});
 
         revealSections.forEach(section => observer.observe(section));
     })();

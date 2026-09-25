@@ -1,4 +1,5 @@
 import json
+import logging
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -9,8 +10,10 @@ from django.conf import settings
 from django.utils import timezone
 from menu.models import FoodItem
 from booking.models import Table
-from booking.availability import table_status_map, is_table_busy_now
+from booking.availability import table_status_map, is_table_busy_now, upcoming_holds, WALKIN_BUFFER
 from .models import Order, OrderItem, Coupon
+
+logger = logging.getLogger(__name__)
 
 
 @require_POST
@@ -117,12 +120,26 @@ def _get_tables_with_status(user=None):
     A table is hidden/held for 2 hours after it is booked (reservation time or
     dine-in order) and then opens again automatically. The admin can also open
     it early. The customer who holds the table can still use it.
+
+    A table with an upcoming reservation starting within WALKIN_BUFFER is also
+    shown as booked, so a walk-in doesn't get seated right before the
+    reserved customer arrives.
     """
+    now = timezone.now()
     holds = table_status_map()
+
+    # Soonest upcoming booking (not yet started) per table, if it starts
+    # within the walk-in buffer window.
+    soon_holds = {}
+    for h in upcoming_holds():
+        if h.kind == 'booking' and h.start - now <= WALKIN_BUFFER:
+            current = soon_holds.get(h.table_id)
+            if current is None or h.start < current.start:
+                soon_holds[h.table_id] = h
 
     result = []
     for table in Table.objects.all().order_by('number'):
-        hold = holds.get(table.id)
+        hold = holds.get(table.id) or soon_holds.get(table.id)
         is_booked = bool(hold) and not (user is not None and user.is_authenticated and hold.user_id == user.id)
         result.append({
             'id': table.id,
@@ -306,9 +323,16 @@ def initiate_payment(request, order_id):
 @login_required
 @require_POST
 def payment_success(request, order_id):
-    """Called when the mock checkout 'completes' — marks the order confirmed."""
+    """Called when the mock checkout 'completes' — marks the order confirmed.
+    Handles both online (mock Razorpay) and cash payment methods. The
+    checkout template sends 'payment_method' as 'online' or 'cash'."""
     order = get_object_or_404(Order, id=order_id, user=request.user)
+
+    payment_method = request.POST.get('payment_method', 'online')
+
     order.status = 'confirmed'
+    order.payment_method = payment_method
+    order.payment_status = 'cash_pending' if payment_method == 'cash' else 'paid'
     order.save()
 
     if request.user.email:
@@ -317,22 +341,36 @@ def payment_success(request, order_id):
             for oi in order.items.all()
         )
         discount_line = f"\nDiscount ({order.coupon.code}): -Rs.{order.discount_amount}\n" if order.coupon else ""
-        send_mail(
-            subject=f'Order Confirmed - Order #{order.id}',
-            message=(
-                f"Hi {request.user.get_full_name() or request.user.username},\n\n"
-                f"Your order #{order.id} has been confirmed!\n\n"
-                f"{item_lines}\n"
-                f"{discount_line}\n"
-                f"Total: Rs.{order.total_amount}\n\n"
-                f"Thank you for ordering with Chandru Restaurant!"
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[request.user.email],
-            fail_silently=False,
-        )
 
-    messages.success(request, 'Your order has been placed successfully!')
+        if payment_method == 'cash':
+            payment_line = f"\nPayment: Cash at Restaurant (Rs.{order.total_amount} to be paid on arrival)\n"
+        else:
+            payment_line = f"\nPayment: Paid Online (Rs.{order.total_amount})\n"
+
+        try:
+            send_mail(
+                subject=f'Order Confirmed - Order #{order.id}',
+                message=(
+                    f"Hi {request.user.get_full_name() or request.user.username},\n\n"
+                    f"Your order #{order.id} has been confirmed!\n\n"
+                    f"{item_lines}\n"
+                    f"{discount_line}"
+                    f"{payment_line}\n"
+                    f"Total: Rs.{order.total_amount}\n\n"
+                    f"Thank you for ordering with Chandru Restaurant!"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[request.user.email],
+                fail_silently=False,
+            )
+        except Exception:
+            logger.exception('Could not send order confirmation email for order %s', order.id)
+
+    if payment_method == 'cash':
+        messages.success(request, 'Order confirmed! Please pay in cash at the restaurant.')
+    else:
+        messages.success(request, 'Your order has been placed successfully!')
+
     return redirect('orders:order_history')
 
 

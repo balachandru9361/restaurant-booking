@@ -166,10 +166,11 @@
 
 .pay-header .lock { font-size: 0.75rem; color: #8fd0ff; font-weight: 600; }
 
-.method-tabs { display: flex; border-bottom: 1px solid #e6e9f2; background: #fbfcfe; }
+.method-tabs { display: flex; border-bottom: 1px solid #e6e9f2; background: #fbfcfe; flex-wrap: wrap; }
 
 .method-tab {
     flex: 1;
+    min-width: 60px;
     text-align: center;
     padding: 14px 4px 12px;
     font-size: 0.76rem;
@@ -308,6 +309,28 @@
 .wallet-row .wlab { font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .wallet-row .arrow { color: #b9c2d6; }
 
+.cash-wrap { text-align: center; padding: 20px 0 4px; }
+.cash-icon {
+    width: 64px; height: 64px;
+    background: #fff4e0;
+    border: 2px solid #f5a623;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.8rem;
+    margin: 0 auto 16px;
+}
+.cash-wrap h4 { font-size: 1.05rem; font-weight: 800; margin-bottom: 8px; }
+.cash-wrap p { font-size: 0.85rem; color: #8a90a3; margin-bottom: 18px; line-height: 1.5; }
+.cash-note {
+    text-align: left;
+    background: #fbfcfe;
+    border: 1px solid #e6e9f2;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 0.8rem;
+    color: #5b6070;
+}
+
 .pay-footer { padding: 20px 24px; border-top: 1px solid #e6e9f2; background: #fbfcfe; }
 
 .pay-btn {
@@ -327,6 +350,10 @@
     gap: 8px;
     transition: transform 0.12s ease, box-shadow 0.18s ease;
     box-shadow: 0 12px 24px -12px rgba(51,149,255,0.55);
+}
+.pay-btn.cash-btn {
+    background: linear-gradient(135deg, #f5a623, #e08e00);
+    box-shadow: 0 12px 24px -12px rgba(245,166,35,0.55);
 }
 .pay-btn:hover { transform: translateY(-1px); box-shadow: 0 16px 30px -12px rgba(51,149,255,0.6); }
 .pay-btn:active { transform: scale(0.98); }
@@ -448,10 +475,12 @@
                 <div class="method-tab" data-pane="upi"><span class="tab-icon">📱</span>UPI</div>
                 <div class="method-tab" data-pane="netbanking"><span class="tab-icon">🏦</span>Netbanking</div>
                 <div class="method-tab" data-pane="wallet"><span class="tab-icon">👛</span>Wallet</div>
+                <div class="method-tab" data-pane="cash"><span class="tab-icon">💵</span>Cash</div>
             </div>
 
             <form id="payForm" method="post" action="{% url 'orders:payment_success' order.id %}">
                 {% csrf_token %}
+                <input type="hidden" name="payment_method" id="paymentMethodInput" value="online">
                 <div class="method-body">
 
                     <div class="method-pane" id="pane-qr">
@@ -527,6 +556,17 @@
                         </div>
                     </div>
 
+                    <div class="method-pane" id="pane-cash">
+                        <div class="cash-wrap">
+                            <div class="cash-icon">💵</div>
+                            <h4>Pay at the Restaurant</h4>
+                            <p>No need to pay online. Confirm your order now and pay ₹{{ order.total_amount }} in cash when you arrive or on delivery.</p>
+                            <div class="cash-note">
+                                Your table/order will be marked <strong>Confirmed</strong> immediately. Staff will collect ₹{{ order.total_amount }} in cash.
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
                 <div class="pay-footer">
@@ -545,14 +585,17 @@
 <div class="success-overlay" id="successOverlay">
     <div class="success-card">
         <div class="success-tick">✓</div>
-        <h3>Payment Successful</h3>
-        <p>Redirecting to your order...</p>
+        <h3 id="successTitle">Payment Successful</h3>
+        <p id="successSub">Redirecting to your order...</p>
     </div>
 </div>
 
 <script>
     // Tab switching
     const payAmount = "{{ order.total_amount }}";
+    const paymentMethodInput = document.getElementById('paymentMethodInput');
+    const payBtnEl = document.getElementById('payBtn');
+
     document.querySelectorAll('.method-tab').forEach(tab => {
         tab.addEventListener('click', () => {
             document.querySelectorAll('.method-tab').forEach(t => t.classList.remove('active'));
@@ -561,10 +604,19 @@
             document.getElementById('pane-' + tab.dataset.pane).classList.add('active');
 
             const label = document.getElementById('payBtnLabel');
-            if (tab.dataset.pane === 'qr') {
-                label.textContent = "I've completed the payment";
+
+            if (tab.dataset.pane === 'cash') {
+                paymentMethodInput.value = 'cash';
+                label.textContent = 'Confirm - Pay at Restaurant';
+                payBtnEl.classList.add('cash-btn');
             } else {
-                label.textContent = 'Pay ₹' + payAmount;
+                paymentMethodInput.value = 'online';
+                payBtnEl.classList.remove('cash-btn');
+                if (tab.dataset.pane === 'qr') {
+                    label.textContent = "I've completed the payment";
+                } else {
+                    label.textContent = 'Pay ₹' + payAmount;
+                }
             }
         });
     });
@@ -619,14 +671,25 @@
     payForm.addEventListener('submit', function (e) {
         e.preventDefault();
         payBtn.classList.add('processing');
-        document.getElementById('payBtnLabel').textContent = 'Processing…';
+
+        const isCash = paymentMethodInput.value === 'cash';
+        document.getElementById('payBtnLabel').textContent = isCash ? 'Confirming…' : 'Processing…';
+
+        const delay = isCash ? 500 : 1400;
 
         setTimeout(() => {
+            if (isCash) {
+                document.getElementById('successTitle').textContent = 'Order Confirmed';
+                document.getElementById('successSub').textContent = 'Pay in cash at the restaurant. Redirecting...';
+            } else {
+                document.getElementById('successTitle').textContent = 'Payment Successful';
+                document.getElementById('successSub').textContent = 'Redirecting to your order...';
+            }
             document.getElementById('successOverlay').classList.add('show');
             setTimeout(() => {
                 payForm.submit(); // actually submits to the Django view now
             }, 1200);
-        }, 1400);
+        }, delay);
     });
 </script>
 

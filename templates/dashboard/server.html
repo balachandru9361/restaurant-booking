@@ -55,6 +55,13 @@
   }
   .stat-box .stat-num { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 700; color: #0d1b2a; }
   .stat-box .stat-label { font-size: 12px; color: #6b7280; margin-top: 2px; }
+  .stat-box.has-ready {
+    animation: readyPulse 1.6s ease-in-out infinite;
+  }
+  @keyframes readyPulse {
+    0%,100% { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    50% { box-shadow: 0 2px 10px rgba(0,0,0,0.06), 0 0 0 3px rgba(15,118,110,0.3), 0 0 18px rgba(15,118,110,0.25); }
+  }
 
   .server-board {
     display: grid;
@@ -135,7 +142,84 @@
 
   .empty-col { text-align: center; color: #9ca3af; font-size: 13px; padding: 40px 0; }
   .empty-col .empty-icon { font-size: 30px; display: block; margin-bottom: 8px; opacity: 0.5; }
+
+  /* --- Attractive toast notification (matches Kitchen Dashboard style) --- */
+  #toastStack {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .server-toast {
+    background: linear-gradient(135deg, #0d1b2a, #16283d);
+    color: #fff;
+    padding: 16px 20px;
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(212,175,55,0.25), 0 0 24px rgba(212,175,55,0.15);
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 280px;
+    max-width: 360px;
+    border-left: 4px solid #d4af37;
+    animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), toastGlow 1.6s ease-in-out 0.35s 3, toastOut 0.35s ease 6.6s forwards;
+  }
+  .server-toast .toast-bell {
+    font-size: 24px;
+    flex-shrink: 0;
+    animation: bellRing 0.6s ease-in-out 0.3s 2;
+    transform-origin: top center;
+  }
+  .server-toast .toast-title {
+    color: #9ca3af;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    display: block;
+  }
+  .server-toast .toast-target {
+    font-family: 'Sora', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+    display: block;
+    line-height: 1.15;
+  }
+  .server-toast.is-takeaway .toast-target { color: #ffe8a3; }
+  .server-toast .toast-sub {
+    color: #d1d5db;
+    font-size: 12.5px;
+    font-weight: 600;
+    display: block;
+    margin-top: 3px;
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(40px) scale(0.9); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  @keyframes toastOut {
+    to { opacity: 0; transform: translateX(40px) scale(0.95); }
+  }
+  @keyframes toastGlow {
+    0%,100% { box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(212,175,55,0.25), 0 0 24px rgba(212,175,55,0.15); }
+    50% { box-shadow: 0 12px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(212,175,55,0.5), 0 0 36px rgba(212,175,55,0.45); }
+  }
+  @keyframes bellRing {
+    0%, 100% { transform: rotate(0deg); }
+    20% { transform: rotate(-18deg); }
+    40% { transform: rotate(14deg); }
+    60% { transform: rotate(-9deg); }
+    80% { transform: rotate(5deg); }
+  }
 </style>
+
+<div id="toastStack"></div>
 
 <div class="kitchen-header">
   <div>
@@ -148,7 +232,7 @@
 <div id="liveRegion" data-ready-ids="{% for o in ready_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
 
 <div class="kitchen-stats">
-  <div class="stat-box" style="border-left-color:#0f766e;">
+  <div class="stat-box{% if ready_orders|length > 0 %} has-ready{% endif %}" style="border-left-color:#0f766e;">
     <div class="stat-num">{{ ready_orders|length }}</div>
     <div class="stat-label">✅ Ready to Serve</div>
   </div>
@@ -253,6 +337,133 @@
   setInterval(updateClock, 1000);
   updateClock();
 
+  // ---- Rich bell chime (Web Audio API) — same premium chime as Kitchen ----
+  let sharedAudioCtx = null;
+  function getAudioCtx() {
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume();
+    }
+    return sharedAudioCtx;
+  }
+
+  function beep() {
+    try {
+      const ctx = getAudioCtx();
+
+      // If Chrome auto-suspended the context (its battery-saving policy
+      // after ~30s of silence), resume() is async — scheduling sound
+      // before it finishes can silently fail. Wait for resume, then play.
+      const playChime = () => {
+        const now = ctx.currentTime;
+
+        const gong = ctx.createOscillator();
+        const gongGain = ctx.createGain();
+        gong.type = 'sine';
+        gong.frequency.value = 220;
+        gongGain.gain.setValueAtTime(0.0001, now);
+        gongGain.gain.exponentialRampToValueAtTime(0.22, now + 0.02);
+        gongGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
+        gong.connect(gongGain).connect(ctx.destination);
+        gong.start(now);
+        gong.stop(now + 1.45);
+
+        const notes = [
+          { time: 0.00, freq: 987.77, dur: 0.9 },
+          { time: 0.14, freq: 1318.5, dur: 0.9 },
+          { time: 0.30, freq: 1567.98, dur: 1.2 }
+        ];
+
+        notes.forEach(note => {
+          const startAt = now + note.time;
+
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = 'sine';
+          osc1.frequency.value = note.freq;
+          gain1.gain.setValueAtTime(0.0001, startAt);
+          gain1.gain.exponentialRampToValueAtTime(0.4, startAt + 0.015);
+          gain1.gain.exponentialRampToValueAtTime(0.0001, startAt + note.dur);
+          osc1.connect(gain1).connect(ctx.destination);
+          osc1.start(startAt);
+          osc1.stop(startAt + note.dur + 0.05);
+
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.value = note.freq * 2;
+          gain2.gain.setValueAtTime(0.0001, startAt);
+          gain2.gain.exponentialRampToValueAtTime(0.14, startAt + 0.015);
+          gain2.gain.exponentialRampToValueAtTime(0.0001, startAt + note.dur * 0.7);
+          osc2.connect(gain2).connect(ctx.destination);
+          osc2.start(startAt);
+          osc2.stop(startAt + note.dur + 0.05);
+        });
+      };
+
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(playChime).catch(() => {});
+      } else {
+        playChime();
+      }
+    } catch (e) { /* audio blocked until user interacts once — safe to ignore */ }
+  }
+
+  // Unlock audio on first interaction (autoplay policy) so the chime
+  // isn't silently blocked before the server has clicked anything.
+  let audioUnlocked = false;
+  function unlockAudioOnce() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    try { getAudioCtx(); } catch (e) { /* ignore */ }
+    document.removeEventListener('click', unlockAudioOnce);
+    document.removeEventListener('keydown', unlockAudioOnce);
+    document.removeEventListener('touchstart', unlockAudioOnce);
+  }
+  document.addEventListener('click', unlockAudioOnce);
+  document.addEventListener('keydown', unlockAudioOnce);
+  document.addEventListener('touchstart', unlockAudioOnce);
+
+  // ---- Attractive toast notification: big color-coded table/takeaway
+  // label so a server glancing from across the room can read it at once ----
+  function showToast(orderId, target, isTakeaway) {
+    const stack = document.getElementById('toastStack');
+    const toast = document.createElement('div');
+    toast.className = 'server-toast' + (isTakeaway ? ' is-takeaway' : '');
+    toast.innerHTML = `
+      <span class="toast-bell">🔔</span>
+      <span>
+        <span class="toast-title">Order Ready</span>
+        <span class="toast-target">${target}</span>
+        <span class="toast-sub">Order #${orderId}</span>
+      </span>`;
+    stack.appendChild(toast);
+    setTimeout(() => toast.remove(), 7000);
+  }
+
+  // ---- FIX: refreshLive() was being called but never defined, so the
+  // Ready-to-Serve column, stat counters and Served-Today list never
+  // actually updated in the DOM (only the toast + sound fired).
+  // This re-fetches the current page's HTML, pulls out the fresh
+  // #liveRegion markup, and swaps it in. No new backend endpoint needed. ----
+  function refreshLive() {
+    return fetch(window.location.href, { credentials: 'same-origin' })
+      .then(r => r.text())
+      .then(html => {
+        const parser = new DOMParser();
+        const freshDoc = parser.parseFromString(html, 'text/html');
+        const freshRegion = freshDoc.getElementById('liveRegion');
+        const currentRegion = document.getElementById('liveRegion');
+        if (freshRegion && currentRegion) {
+          currentRegion.innerHTML = freshRegion.innerHTML;
+          currentRegion.dataset.readyIds = freshRegion.dataset.readyIds;
+        }
+      })
+      .catch(() => { /* keep old DOM if refresh fails; next poll will retry */ });
+  }
+
   // ---- Live message when the kitchen marks an order Ready ----
   (function () {
     const region = () => document.getElementById('liveRegion');
@@ -269,8 +480,9 @@
 
           if (fresh.length || removed) {
             fresh.forEach(o => showToast(
-              '🔔 Order #' + o.id + ' is ready!',
-              o.table ? 'Serve to Table ' + o.table : 'Takeaway — hand over at the counter'
+              o.id,
+              o.table ? '🪑 TABLE ' + o.table : '🥡 TAKEAWAY',
+              !o.table
             ));
             if (fresh.length) beep();
             known = currentIds;

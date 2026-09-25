@@ -120,6 +120,13 @@
         font-weight: 800;
     }
 
+    .badge-group {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
     .order-status-badge {
         font-size: 0.72rem;
         font-weight: 700;
@@ -146,6 +153,31 @@
     }
 
     .order-status-badge.cancelled {
+        background: #fdecec;
+        color: #dc2626;
+    }
+
+    .payment-badge {
+        font-size: 0.72rem;
+        font-weight: 700;
+        padding: 5px 14px;
+        border-radius: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.02em;
+        white-space: nowrap;
+    }
+
+    .payment-badge.paid {
+        background: #e8f9ee;
+        color: #16a34a;
+    }
+
+    .payment-badge.cash_pending {
+        background: #fff4e0;
+        color: #b06a00;
+    }
+
+    .payment-badge.pending {
         background: #fdecec;
         color: #dc2626;
     }
@@ -276,7 +308,22 @@
             <div class="order-card" data-status="{{ order.status }}">
                 <div class="order-card-top">
                     <h3>Order #{{ order.id }}</h3>
-                    <span class="order-status-badge {{ order.status }}">{{ order.status }}</span>
+                    <div class="badge-group">
+                        <span class="order-status-badge {{ order.status }}">{{ order.status }}</span>
+                        {% if order.payment_method == 'cash' %}
+                            {% if order.payment_status == 'paid' %}
+                                <span class="payment-badge paid">Cash Paid</span>
+                            {% else %}
+                                <span class="payment-badge cash_pending">Cash Pending</span>
+                            {% endif %}
+                        {% else %}
+                            {% if order.payment_status == 'paid' %}
+                                <span class="payment-badge paid">Paid Online</span>
+                            {% else %}
+                                <span class="payment-badge pending">Payment Pending</span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
                 </div>
                 <p class="order-date">Placed on {{ order.created_at|date:"d M Y, h:i A" }}</p>
 

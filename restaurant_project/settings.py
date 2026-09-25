@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -133,14 +134,15 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-
-
+# Email settings (used for password reset emails)
+# EMAIL_HOST_PASSWORD is now read from an environment variable instead of
+# being hardcoded here, so it never gets committed to GitHub by mistake.
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'nbalachandru22122002@gmail.com'
-EMAIL_HOST_PASSWORD = 'dsybuqxcfqmeuvjf'
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = 'Chandru Restaurant <nbalachandru22122002@gmail.com>'
 
 
@@ -149,6 +151,3 @@ DEFAULT_FROM_EMAIL = 'Chandru Restaurant <nbalachandru22122002@gmail.com>'
 LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
-
-
-

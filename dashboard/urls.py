@@ -19,6 +19,7 @@ urlpatterns = [
     path('users/add-staff/', views.add_staff, name='add_staff'),
     path('orders/', views.manage_orders, name='manage_orders'),
     path('orders/<int:pk>/update-status/', views.api_order_status, name='api_order_status'),
+    path('orders/<int:pk>/mark-cash-received/', views.mark_cash_received, name='mark_cash_received'),
     path('reports/', views.sales_reports, name='sales_reports'),
     path('kitchen/', views.kitchen_dashboard, name='kitchen_dashboard'),
     path('kitchen/<int:pk>/status/<str:new_status>/', views.update_order_status, name='update_order_status'),

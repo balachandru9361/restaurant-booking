@@ -292,6 +292,48 @@ document.addEventListener('DOMContentLoaded', function () {
     if (slides.length > 1) {
         setInterval(showNextSlide, 1000); // 1 second-ku maarum
     }
+
+    // ===== Footer social icons -> click panna open aagum =====
+    const waUrl = 'https://wa.me/919876543210?text=' +
+        encodeURIComponent('Hi Chandru Restaurant, I want to book a table');
+
+    // Unga real Instagram username inga podunga
+    const igUrl = 'https://www.instagram.com/your_handle/';
+
+    function linkFooterIcon(selector, url) {
+        const icon = document.querySelector(selector);
+        if (!icon) return;
+
+        const target = icon.closest('a, button, .social-icon') || icon;
+        if (target.tagName === 'A') {
+            target.href = url;
+            target.target = '_blank';
+            target.rel = 'noopener noreferrer';
+        } else {
+            target.style.cursor = 'pointer';
+            target.addEventListener('click', function () {
+                window.open(url, '_blank', 'noopener');
+            });
+        }
+    }
+
+    linkFooterIcon(
+        'footer .bi-whatsapp, footer .fa-whatsapp, footer [class*="whatsapp"], footer [aria-label*="hatsApp" i], footer [title*="hatsApp" i]',
+        waUrl
+    );
+
+    linkFooterIcon(
+        'footer .bi-instagram, footer .fa-instagram, footer [class*="instagram"], footer [aria-label*="nstagram" i], footer [title*="nstagram" i]',
+        igUrl
+    );
+
+    // Footer-la "Fast Delivery" badge-ah remove pannum
+    document.querySelectorAll('footer *').forEach(function (el) {
+        const text = el.textContent.trim();
+        if (/fast\s*delivery/i.test(text) && !/secure/i.test(text) && text.length < 30) {
+            el.remove();
+        }
+    });
 });
 </script>
 

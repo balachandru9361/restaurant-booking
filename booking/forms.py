@@ -4,9 +4,18 @@ from .models import TableBooking, Table
 
 
 class TableBookingForm(forms.ModelForm):
+    # Hidden field, filled in by the JS table-grid on the booking page.
+    # Optional at the form level - if left blank, the view auto-assigns the
+    # smallest free table (same fallback behaviour as before).
+    table = forms.ModelChoiceField(
+        queryset=Table.objects.all(),
+        required=False,
+        widget=forms.HiddenInput(),
+    )
+
     class Meta:
         model = TableBooking
-        fields = ['name', 'phone', 'guests', 'booking_date', 'booking_time', 'occasion', 'special_request']
+        fields = ['name', 'phone', 'guests', 'booking_date', 'booking_time', 'occasion', 'special_request', 'table']
         widgets = {
             'booking_date': forms.DateInput(attrs={'type': 'date'}),
             'booking_time': forms.TimeInput(attrs={'type': 'time'}),

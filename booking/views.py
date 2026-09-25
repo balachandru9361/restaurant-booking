@@ -40,7 +40,10 @@ def book_table(request):
                 messages.error(request, 'Max 6 guests allowed per table. Please choose 6 or fewer.')
                 return render(request, 'booking/booking_form.html', {'form': form})
 
-            # Server-side availability double-check + auto-assign a table.
+            # The JS table-grid sends the table the customer clicked (optional).
+            selected_table = form.cleaned_data.get('table')
+
+            # Server-side availability double-check + assign a table.
             # A booked table is held for 2 hours from the booked time.
             with transaction.atomic():
                 slot_start = timezone.make_aware(
@@ -55,8 +58,21 @@ def book_table(request):
                     )
                     return render(request, 'booking/booking_form.html', {'form': form})
 
+                if selected_table:
+                    # Re-check the customer's chosen table is still free and big
+                    # enough - someone else may have booked it in the meantime.
+                    if selected_table not in free_tables:
+                        messages.error(
+                            request,
+                            f'Sorry, Table #{selected_table.number} was just booked or is too small. '
+                            'Please pick another table.'
+                        )
+                        return render(request, 'booking/booking_form.html', {'form': form})
+                    booking.table = selected_table
+                else:
+                    booking.table = free_tables[0]  # best fit: smallest table that fits the group
+
                 booking.user = request.user
-                booking.table = free_tables[0]  # best fit: smallest table that fits the group
                 booking.save()
 
             # --- Send booking confirmation email (never fail the booking if mail is down) ---
@@ -133,6 +149,40 @@ def check_availability(request):
         'remaining': free_seats,
         'message': f'✅ Available! {n} table{"s" if n != 1 else ""} free for this slot (held for 2 hours once booked).'
     })
+
+
+@login_required
+def table_status_for_slot(request):
+    """AJAX endpoint: per-table free/booked status for a given date + time
+    (+ optional guests, to flag tables too small for the party), so the
+    booking page can render a table grid like the cart page does."""
+    date = request.GET.get('date')
+    time = request.GET.get('time')
+    guests = request.GET.get('guests', 1)
+
+    try:
+        guests = int(guests)
+    except (TypeError, ValueError):
+        guests = 1
+
+    slot_start = _parse_slot(date, time)
+    if slot_start is None:
+        return JsonResponse({'tables': []})
+
+    busy_ids = busy_table_ids_for_slot(slot_start)
+
+    tables = Table.objects.all().order_by('number')
+    data = [
+        {
+            'id': t.id,
+            'number': t.number,
+            'capacity': t.capacity,
+            'busy': t.id in busy_ids,
+            'fits': t.capacity >= guests,
+        }
+        for t in tables
+    ]
+    return JsonResponse({'tables': data})
 
 
 @login_required

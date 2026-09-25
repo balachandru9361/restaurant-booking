@@ -12,7 +12,7 @@
   }
   .btn-export:hover { border-color: #2ecc71; color: #2ecc71; }
 
-  .big-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 30px; }
+  .big-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 20px; }
   .big-stat {
     background: linear-gradient(135deg, #1a1a2e, #24243e);
     border-radius: 18px; padding: 26px 24px; color: #fff; position: relative; overflow: hidden;
@@ -28,6 +28,17 @@
   .big-stat .lbl { font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; position: relative; z-index: 1; }
   .big-stat .val { font-size: 32px; font-weight: 800; margin-top: 8px; position: relative; z-index: 1; }
   .big-stat .sub { font-size: 12px; opacity: 0.75; margin-top: 6px; position: relative; z-index: 1; }
+
+  .pay-stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; margin-bottom: 30px; }
+  .pay-stat {
+    background: #fff; border-radius: 16px; padding: 20px 22px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06); border-left: 4px solid #3498db;
+  }
+  .pay-stat.cash { border-left-color: #2ecc71; }
+  .pay-stat.pending { border-left-color: #f39c12; }
+  .pay-stat .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; color: #999; font-weight: 700; }
+  .pay-stat .val { font-size: 24px; font-weight: 800; color: #1a1a2e; margin-top: 6px; }
+  .pay-stat .sub { font-size: 12px; color: #aaa; margin-top: 4px; }
 
   .toolbar { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
   .filter-chip {
@@ -69,12 +80,19 @@
   .trend-up { color: #2ecc71; font-weight: 700; font-size: 12.5px; }
   .trend-down { color: #e74c3c; font-weight: 700; font-size: 12.5px; }
 
+  .pay-tag {
+    display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;
+  }
+  .pay-tag.online { background: #e3f0ff; color: #3498db; }
+  .pay-tag.cash { background: #e3f9ec; color: #2ecc71; }
+  .pay-tag.cash-pending { background: #fff3cd; color: #b06a00; }
+
   .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
   .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
 
   @media (max-width: 700px) {
     .reports-table-wrap { overflow-x: auto; }
-    table.reports-table { min-width: 600px; }
+    table.reports-table { min-width: 680px; }
   }
 </style>
 
@@ -104,6 +122,24 @@
   </div>
 </div>
 
+<div class="pay-stat-row">
+  <div class="pay-stat">
+    <div class="lbl">💳 Online Revenue</div>
+    <div class="val">₹{{ online_revenue|default:"0" }}</div>
+    <div class="sub">{{ online_count|default:"0" }} orders paid online</div>
+  </div>
+  <div class="pay-stat cash">
+    <div class="lbl">💵 Cash Collected</div>
+    <div class="val">₹{{ cash_revenue|default:"0" }}</div>
+    <div class="sub">{{ cash_count|default:"0" }} cash orders total</div>
+  </div>
+  <div class="pay-stat pending">
+    <div class="lbl">⏳ Cash Pending to Collect</div>
+    <div class="val">₹{{ cash_pending_amount|default:"0" }}</div>
+    <div class="sub">{{ cash_pending_count|default:"0" }} orders not yet collected</div>
+  </div>
+</div>
+
 <div class="toolbar">
   <div class="filter-chip active" data-range="all" onclick="setRange('all')">All Time</div>
   <div class="filter-chip" data-range="week" onclick="setRange('week')">This Week</div>
@@ -122,6 +158,7 @@
         <th>Order ID</th>
         <th>Customer</th>
         <th>Amount</th>
+        <th>Payment</th>
         <th>Status</th>
         <th>Date</th>
       </tr>
@@ -132,11 +169,22 @@
         <td>#{{ order.id }}</td>
         <td>{{ order.user.get_full_name|default:order.user.username }}</td>
         <td class="amount">₹{{ order.total_amount }}</td>
+        <td>
+          {% if order.payment_method == 'cash' %}
+            {% if order.payment_status == 'paid' %}
+              <span class="pay-tag cash">Cash</span>
+            {% else %}
+              <span class="pay-tag cash-pending">Cash Pending</span>
+            {% endif %}
+          {% else %}
+            <span class="pay-tag online">Online</span>
+          {% endif %}
+        </td>
         <td>{{ order.status|title }}</td>
         <td>{{ order.created_at|date:"d M Y" }}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="5">
+      <tr><td colspan="6">
         <div class="empty-state">
           <div class="big-emoji">📊</div>
           <p>No order data yet to generate reports.</p>
@@ -206,11 +254,11 @@
   applyRange();
 
   function exportCSV() {
-    let csv = 'Order ID,Customer,Amount,Status,Date\n';
+    let csv = 'Order ID,Customer,Amount,Payment,Status,Date\n';
     rows.forEach(r => {
       if (r.style.display === 'none') return;
       const cells = r.querySelectorAll('td');
-      csv += `"${cells[0].innerText}","${cells[1].innerText}","${cells[2].innerText}","${cells[3].innerText}","${cells[4].innerText}"\n`;
+      csv += `"${cells[0].innerText}","${cells[1].innerText}","${cells[2].innerText}","${cells[3].innerText}","${cells[4].innerText}","${cells[5].innerText}"\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv' });
     const link = document.createElement('a');
