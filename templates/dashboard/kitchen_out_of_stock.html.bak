@@ -1,0 +1,587 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  :root {
+    --oos-red: #F63A3A; --oos-ink: #1a1a2e; --oos-muted: #6b7280;
+    --oos-green: #2bb673; --oos-amber: #f59e0b;
+  }
+
+  /* ---------- hero ---------- */
+  .oos-hero {
+    background: linear-gradient(135deg, #1a1a2e 0%, #243b6b 55%, #F63A3A 140%);
+    color: #fff; border-radius: 20px; padding: 26px 28px; margin-bottom: 20px;
+    display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap;
+    box-shadow: 0 14px 34px rgba(26,26,46,.25); position: relative; overflow: hidden;
+  }
+  .oos-hero::after {
+    content: "🚫"; position: absolute; right: -10px; bottom: -34px; font-size: 150px; opacity: .08;
+  }
+  .oos-hero h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: .3px; }
+  .oos-hero p { margin: 0; color: #cbd5e1; font-size: 14px; max-width: 520px; line-height: 1.5; }
+  .oos-clock {
+    background: rgba(255,255,255,.12); backdrop-filter: blur(6px); border-radius: 14px;
+    padding: 10px 16px; text-align: right; z-index: 1;
+  }
+  .oos-clock b { display: block; font-size: 22px; letter-spacing: .5px; }
+  .oos-clock small { color: #cbd5e1; font-size: 12px; }
+
+  /* ---------- restock banner ---------- */
+  .oos-restock { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .oos-restock .row {
+    display: flex; gap: 12px; align-items: center;
+    background: linear-gradient(90deg, #ecfdf5, #fff); border: 1px solid #a7f3d0;
+    border-left: 5px solid var(--oos-green); border-radius: 12px; padding: 11px 14px;
+    font-size: 13.5px; color: #065f46; animation: slideIn .4s ease;
+  }
+  .oos-restock .row .ico { font-size: 22px; }
+  .oos-restock .row small { display: block; color: #047857; opacity: .85; margin-top: 2px; }
+  .oos-restock .row time { margin-left: auto; font-size: 12px; color: #047857; white-space: nowrap; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- stat cards ---------- */
+  .oos-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .oos-stat {
+    background: #fff; border-radius: 16px; padding: 16px 18px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.06); cursor: pointer; border: 2px solid transparent;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+  }
+  .oos-stat:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0,0,0,.1); }
+  .oos-stat.active { border-color: var(--oos-ink); }
+  .oos-stat .badge {
+    width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px;
+  }
+  .oos-stat.all .badge { background: #e0e7ff; }
+  .oos-stat.ok .badge { background: #d1fae5; }
+  .oos-stat.low .badge { background: #fef3c7; }
+  .oos-stat.pending .badge { background: #fee2e2; }
+  .oos-stat b { display: block; font-size: 26px; color: var(--oos-ink); line-height: 1; }
+  .oos-stat span { font-size: 12.5px; color: var(--oos-muted); }
+
+  /* ---------- toolbar ---------- */
+  .oos-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+  .oos-search-wrap { position: relative; flex: 1; min-width: 240px; }
+  .oos-search-wrap input {
+    width: 100%; box-sizing: border-box; padding: 13px 44px 13px 42px; border: 1px solid #e5e7eb; border-radius: 12px;
+    font-size: 14px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.04); outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .oos-search-wrap input:focus { border-color: var(--oos-red); box-shadow: 0 0 0 4px rgba(246,58,58,.12); }
+  .oos-search-wrap .s-ico { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 15px; }
+  .oos-search-wrap kbd {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: #f3f4f6; border: 1px solid #e5e7eb;
+    border-radius: 6px; padding: 1px 7px; font-size: 12px; color: var(--oos-muted);
+  }
+  .oos-select {
+    padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; font-size: 13.5px; cursor: pointer;
+  }
+  .oos-view { display: inline-flex; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
+  .oos-view button { border: 0; background: transparent; padding: 11px 14px; cursor: pointer; font-size: 15px; }
+  .oos-view button.on { background: var(--oos-ink); color: #fff; }
+
+  .oos-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
+  .oos-tab {
+    border: 1px solid #e5e7eb; background: #fff; border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+    color: #374151; cursor: pointer; transition: all .15s ease;
+  }
+  .oos-tab:hover { border-color: var(--oos-ink); }
+  .oos-tab.on { background: var(--oos-ink); color: #fff; border-color: var(--oos-ink); }
+  .oos-tab em { font-style: normal; opacity: .7; margin-left: 4px; }
+
+  /* ---------- cards ---------- */
+  .oos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .oos-grid.list { grid-template-columns: 1fr; }
+  .oos-card {
+    background: #fff; border-radius: 18px; padding: 18px; position: relative;
+    box-shadow: 0 4px 16px rgba(0,0,0,.06); border: 2px solid transparent;
+    display: flex; flex-direction: column; gap: 12px;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    animation: cardIn .35s ease both;
+  }
+  .oos-card:hover { transform: translateY(-4px); box-shadow: 0 14px 28px rgba(0,0,0,.12); }
+  .oos-card::before {
+    content: ""; position: absolute; left: 0; top: 18px; bottom: 18px; width: 5px; border-radius: 0 6px 6px 0; background: var(--oos-green);
+  }
+  .oos-card.low::before { background: var(--oos-amber); }
+  .oos-card.pending::before { background: var(--oos-red); }
+  .oos-card.pending { background: linear-gradient(180deg, #fff7f7, #fff); border-color: #fecaca; }
+  .oos-card.selected { border-color: var(--oos-ink); }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  .oos-top { display: flex; align-items: center; gap: 12px; }
+  .oos-avatar {
+    width: 48px; height: 48px; border-radius: 14px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;
+  }
+  .oos-card.low .oos-avatar { background: #fef3c7; }
+  .oos-card.pending .oos-avatar { background: #fee2e2; }
+  .oos-title { flex: 1; min-width: 0; }
+  .oos-title h3 { margin: 0; font-size: 16.5px; color: var(--oos-ink); text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .oos-title small { color: var(--oos-muted); font-size: 12.5px; }
+
+  .oos-check { width: 20px; height: 20px; accent-color: var(--oos-red); cursor: pointer; }
+  .oos-check:disabled { cursor: not-allowed; opacity: .35; }
+
+  .tag { font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; white-space: nowrap; letter-spacing: .3px; }
+  .tag.ok { background: #d1fae5; color: #065f46; }
+  .tag.low { background: #fef3c7; color: #92400e; }
+  .tag.pending { background: #fee2e2; color: #991b1b; display: inline-flex; align-items: center; gap: 6px; }
+  .tag.pending::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--oos-red); animation: pulse 1.3s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(246,58,58,.6); } 100% { box-shadow: 0 0 0 9px rgba(246,58,58,0); } }
+
+  .oos-qtyrow { display: flex; align-items: baseline; justify-content: space-between; }
+  .oos-qty { font-size: 26px; font-weight: 800; color: var(--oos-ink); }
+  .oos-qty small { font-size: 13px; font-weight: 600; color: var(--oos-muted); margin-left: 4px; }
+  .oos-limit { font-size: 12px; color: var(--oos-muted); }
+
+  .oos-bar { height: 9px; background: #eef0f4; border-radius: 99px; overflow: hidden; }
+  .oos-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #34d399, var(--oos-green)); transition: width .8s cubic-bezier(.2,.8,.2,1); }
+  .oos-card.low .oos-bar i { background: linear-gradient(90deg, #fbbf24, var(--oos-amber)); }
+  .oos-card.pending .oos-bar i { background: linear-gradient(90deg, #fb7185, var(--oos-red)); }
+
+  .oos-btn {
+    padding: 12px 14px; border: 0; border-radius: 12px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;
+    background: linear-gradient(135deg, #ff5a5a, var(--oos-red)); box-shadow: 0 6px 14px rgba(246,58,58,.3);
+    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+  }
+  .oos-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(246,58,58,.38); }
+  .oos-btn:active:not(:disabled) { transform: scale(.98); }
+  .oos-btn:disabled { background: #e5e7eb; color: #6b7280; box-shadow: none; cursor: not-allowed; }
+
+  /* list view */
+  .oos-grid.list .oos-card { flex-direction: row; align-items: center; gap: 18px; }
+  .oos-grid.list .oos-top { flex: 1.3; }
+  .oos-grid.list .oos-meta { flex: 1.4; display: flex; flex-direction: column; gap: 8px; }
+  .oos-grid.list .oos-btn { min-width: 170px; }
+  .oos-meta { display: flex; flex-direction: column; gap: 12px; }
+
+  .oos-empty { display: none; text-align: center; background: #fff; border-radius: 18px; padding: 50px 20px; color: var(--oos-muted); box-shadow: 0 4px 16px rgba(0,0,0,.06); }
+  .oos-empty b { display: block; font-size: 40px; margin-bottom: 8px; }
+
+  /* ---------- bulk bar ---------- */
+  .oos-bulk {
+    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 140%); z-index: 9000;
+    background: var(--oos-ink); color: #fff; border-radius: 16px; padding: 12px 14px 12px 20px; display: flex; gap: 12px; align-items: center;
+    box-shadow: 0 18px 40px rgba(0,0,0,.35); transition: transform .3s cubic-bezier(.2,.8,.2,1); max-width: 94vw;
+  }
+  .oos-bulk.show { transform: translate(-50%, 0); }
+  .oos-bulk input { padding: 9px 12px; border-radius: 10px; border: 0; width: 210px; font-size: 13px; }
+  .oos-bulk .ghost { background: transparent; border: 1px solid rgba(255,255,255,.35); color: #fff; border-radius: 10px; padding: 9px 14px; cursor: pointer; }
+
+  /* ---------- modal ---------- */
+  .oos-modal-bg {
+    position: fixed; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(4px); z-index: 9500;
+    display: none; align-items: center; justify-content: center; padding: 18px;
+  }
+  .oos-modal-bg.open { display: flex; animation: fade .2s ease; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .oos-modal { background: #fff; border-radius: 22px; width: 100%; max-width: 440px; padding: 24px; box-shadow: 0 30px 70px rgba(0,0,0,.4); animation: pop .25s cubic-bezier(.2,.8,.2,1); }
+  @keyframes pop { from { transform: scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+  .oos-modal .m-ico { font-size: 40px; }
+  .oos-modal h2 { margin: 6px 0 4px; color: var(--oos-ink); font-size: 21px; }
+  .oos-modal p { margin: 0 0 14px; color: var(--oos-muted); font-size: 13.5px; }
+  .oos-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .oos-chip {
+    border: 1px solid #e5e7eb; background: #f9fafb; border-radius: 999px; padding: 7px 13px; font-size: 12.5px; cursor: pointer; font-weight: 600; color: #374151;
+    transition: all .15s ease;
+  }
+  .oos-chip:hover, .oos-chip.on { background: var(--oos-ink); color: #fff; border-color: var(--oos-ink); }
+  .oos-modal textarea {
+    width: 100%; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 12px; padding: 11px 12px; font-size: 14px; resize: none; height: 74px; font-family: inherit; outline: none;
+  }
+  .oos-modal textarea:focus { border-color: var(--oos-red); box-shadow: 0 0 0 4px rgba(246,58,58,.12); }
+  .oos-count { text-align: right; font-size: 11.5px; color: var(--oos-muted); margin: 3px 0 14px; }
+  .oos-actions { display: flex; gap: 10px; }
+  .oos-actions .oos-btn { flex: 1; }
+  .oos-actions .cancel { flex: .6; background: #f3f4f6; color: #374151; box-shadow: none; }
+  .oos-actions .cancel:hover { background: #e5e7eb; box-shadow: none; transform: none; }
+
+  @media (max-width: 760px) {
+    .oos-grid.list .oos-card { flex-direction: column; align-items: stretch; }
+    .oos-hero h1 { font-size: 23px; }
+    .oos-bulk { flex-wrap: wrap; justify-content: center; }
+  }
+</style>
+
+<!-- HERO -->
+<div class="oos-hero">
+  <div>
+    <h1>🚫 Out of Stock</h1>
+    <p>Oru item theernthuchuna report pannunga. Admin-ku udane alert pogum. Restock aanaa inga message varum.</p>
+  </div>
+  <div class="oos-clock">
+    <b id="oosClock">--:--:--</b>
+    <small id="oosDate"></small>
+  </div>
+</div>
+
+<!-- RECENT RESTOCKS -->
+{% if recent_restocks %}
+<div class="oos-restock">
+  {% for r in recent_restocks %}
+    <div class="row">
+      <span class="ico">📦</span>
+      <div>
+        <b>{{ r.item.name }}</b> restocked
+        <small>{{ r.restocked_message }}</small>
+      </div>
+      {% if r.restocked_at %}<time>{{ r.restocked_at|timesince }} ago</time>{% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- STATS -->
+<div class="oos-stats">
+  <div class="oos-stat all active" data-filter="all"><div class="badge">🛒</div><div><b id="stAll">0</b><span>Total items</span></div></div>
+  <div class="oos-stat ok" data-filter="ok"><div class="badge">✅</div><div><b id="stOk">0</b><span>In stock</span></div></div>
+  <div class="oos-stat low" data-filter="low"><div class="badge">⚠️</div><div><b id="stLow">0</b><span>Running low</span></div></div>
+  <div class="oos-stat pending" data-filter="pending"><div class="badge">🚫</div><div><b id="stPending">0</b><span>Reported to admin</span></div></div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="oos-toolbar">
+  <div class="oos-search-wrap">
+    <span class="s-ico">🔍</span>
+    <input type="text" id="oosSearch" placeholder="Search item..." autocomplete="off">
+    <kbd>/</kbd>
+  </div>
+  <select id="oosSort" class="oos-select">
+    <option value="attention">Sort: Needs attention first</option>
+    <option value="az">Sort: A to Z</option>
+    <option value="lowest">Sort: Lowest stock first</option>
+  </select>
+  <div class="oos-view">
+    <button type="button" id="vGrid" class="on" title="Grid view">▦</button>
+    <button type="button" id="vList" title="List view">☰</button>
+  </div>
+</div>
+
+<div class="oos-tabs" id="oosTabs">
+  <button type="button" class="oos-tab on" data-filter="all">All <em id="tAll">0</em></button>
+  <button type="button" class="oos-tab" data-filter="ok">In stock <em id="tOk">0</em></button>
+  <button type="button" class="oos-tab" data-filter="low">Low <em id="tLow">0</em></button>
+  <button type="button" class="oos-tab" data-filter="pending">Reported <em id="tPending">0</em></button>
+</div>
+
+<!-- GRID -->
+<div class="oos-grid" id="oosGrid">
+  {% for g in grocery_items %}
+    <div class="oos-card {% if g.id in pending_ids %}pending{% elif g.is_low %}low{% endif %}"
+         id="oos-{{ g.id }}"
+         data-id="{{ g.id }}"
+         data-name="{{ g.name|lower }}"
+         data-label="{{ g.name }}"
+         data-qty="{{ g.quantity|stringformat:'s' }}"
+         data-limit="{{ g.low_stock_limit|stringformat:'s' }}"
+         data-url="{% url 'dashboard:kitchen_request_stock' g.pk %}"
+         data-status="{% if g.id in pending_ids %}pending{% elif g.is_low %}low{% else %}ok{% endif %}"
+         style="animation-delay: {{ forloop.counter0|add:0 }}0ms">
+      <div class="oos-top">
+        <div class="oos-avatar" data-emoji>🛒</div>
+        <div class="oos-title">
+          <h3>{{ g.name }}</h3>
+          <small>Item #{{ g.id }}</small>
+        </div>
+        <span class="tag {% if g.id in pending_ids %}pending{% elif g.is_low %}low{% else %}ok{% endif %}" data-tag>
+          {% if g.id in pending_ids %}Reported{% elif g.is_low %}LOW{% else %}In stock{% endif %}
+        </span>
+        <input type="checkbox" class="oos-check" title="Select for bulk report" {% if g.id in pending_ids %}disabled{% endif %}>
+      </div>
+
+      <div class="oos-meta">
+        <div>
+          <div class="oos-qtyrow">
+            <div class="oos-qty">{{ g.quantity|floatformat:"-2" }}<small>{{ g.unit }} left</small></div>
+            <div class="oos-limit">Low at {{ g.low_stock_limit|floatformat:"-2" }} {{ g.unit }}</div>
+          </div>
+          <div class="oos-bar"><i data-bar></i></div>
+        </div>
+        <button type="button" class="oos-btn" data-report {% if g.id in pending_ids %}disabled{% endif %}>
+          {% if g.id in pending_ids %}⏳ Waiting for admin...{% else %}🚫 Out of Stock{% endif %}
+        </button>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="oos-empty" id="oosEmpty">
+  <b>🔎</b>
+  Intha filter-ku item edhuvum illa.
+</div>
+
+{% if not grocery_items %}
+  <div class="oos-empty" style="display:block">
+    <b>🛒</b>
+    Grocery items illa. Admin "Manage Grocery"-la add pannanum.
+  </div>
+{% endif %}
+
+<!-- BULK BAR -->
+<div class="oos-bulk" id="oosBulk">
+  <span><b id="bulkCount">0</b> selected</span>
+  <input type="text" id="bulkNote" maxlength="120" placeholder="Common note (optional)">
+  <button type="button" class="oos-btn" id="bulkGo" style="padding:10px 16px">Report all</button>
+  <button type="button" class="ghost" id="bulkClear">Clear</button>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="oos-modal-bg" id="oosModalBg">
+  <div class="oos-modal" role="dialog" aria-modal="true">
+    <div class="m-ico" id="mEmoji">🚫</div>
+    <h2 id="mTitle">Report out of stock?</h2>
+    <p id="mSub">Admin-ku udane alert pogum.</p>
+    <div class="oos-chips" id="mChips">
+      <button type="button" class="oos-chip">Finished</button>
+      <button type="button" class="oos-chip">Expired</button>
+      <button type="button" class="oos-chip">Spoiled</button>
+      <button type="button" class="oos-chip">Urgent needed</button>
+      <button type="button" class="oos-chip">Quality issue</button>
+    </div>
+    <textarea id="mNote" maxlength="120" placeholder="Note (optional)"></textarea>
+    <div class="oos-count"><span id="mCount">0</span>/120</div>
+    <div class="oos-actions">
+      <button type="button" class="oos-btn cancel" id="mCancel">Cancel</button>
+      <button type="button" class="oos-btn" id="mConfirm">Send to Admin</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const grid = document.getElementById('oosGrid');
+  const cards = Array.from(grid.querySelectorAll('.oos-card'));
+  const searchEl = document.getElementById('oosSearch');
+  const sortEl = document.getElementById('oosSort');
+  const emptyEl = document.getElementById('oosEmpty');
+  let filter = 'all';
+
+  // ---------- helpers ----------
+  function csrf() {
+    const m = document.cookie.match('(?:^|; )csrftoken=([^;]*)');
+    return m ? decodeURIComponent(m[1]) : '{{ csrf_token }}';
+  }
+  function toast(t, s, k) { if (window.showToast) window.showToast(t, s, k); }
+
+  const EMOJI = [
+    [/rice|basmathi|biryani/, '🍚'], [/oil/, '🛢️'], [/juice|mojito|drink/, '🧃'], [/apple/, '🍎'],
+    [/onion/, '🧅'], [/tomato/, '🍅'], [/potato/, '🥔'], [/chicken/, '🍗'], [/mutton|lamb/, '🥩'],
+    [/fish|prawn|meen|crab/, '🐟'], [/egg/, '🥚'], [/milk|curd|paneer|butter|cheese|cream/, '🥛'],
+    [/sugar|salt|masala|spice|chilli|pepper|turmeric/, '🧂'], [/flour|maida|wheat|atta|rava/, '🌾'],
+    [/dal|lentil|bean|gram/, '🫘'], [/carrot/, '🥕'], [/lemon|lime/, '🍋'], [/banana/, '🍌'],
+    [/water|soda/, '💧'], [/tea|coffee/, '☕'], [/garlic|ginger/, '🧄']
+  ];
+  function emojiFor(name) {
+    for (const [re, e] of EMOJI) if (re.test(name)) return e;
+    return '🛒';
+  }
+
+  // ---------- init cards ----------
+  cards.forEach(function (c) {
+    c.querySelector('[data-emoji]').textContent = emojiFor(c.dataset.name);
+    const qty = parseFloat(c.dataset.qty) || 0;
+    const limit = parseFloat(c.dataset.limit) || 0;
+    const max = Math.max(limit * 4, qty, 1);
+    const pct = Math.max(3, Math.min(100, (qty / max) * 100));
+    requestAnimationFrame(function () {
+      setTimeout(function () { c.querySelector('[data-bar]').style.width = pct + '%'; }, 80);
+    });
+  });
+
+  // ---------- stats ----------
+  function stats() {
+    const n = { all: cards.length, ok: 0, low: 0, pending: 0 };
+    cards.forEach(function (c) { n[c.dataset.status]++; });
+    document.getElementById('stAll').textContent = n.all;
+    document.getElementById('stOk').textContent = n.ok;
+    document.getElementById('stLow').textContent = n.low;
+    document.getElementById('stPending').textContent = n.pending;
+    document.getElementById('tAll').textContent = n.all;
+    document.getElementById('tOk').textContent = n.ok;
+    document.getElementById('tLow').textContent = n.low;
+    document.getElementById('tPending').textContent = n.pending;
+  }
+
+  // ---------- filter + search + sort ----------
+  const RANK = { pending: 0, low: 1, ok: 2 };
+  function sortCards() {
+    const mode = sortEl.value;
+    const sorted = cards.slice().sort(function (a, b) {
+      if (mode === 'az') return a.dataset.name.localeCompare(b.dataset.name);
+      const qa = parseFloat(a.dataset.qty), qb = parseFloat(b.dataset.qty);
+      if (mode === 'lowest') return qa - qb;
+      const r = RANK[a.dataset.status] - RANK[b.dataset.status];
+      return r !== 0 ? r : qa - qb;
+    });
+    sorted.forEach(function (c) { grid.appendChild(c); });
+  }
+  function apply() {
+    const q = searchEl.value.trim().toLowerCase();
+    let shown = 0;
+    cards.forEach(function (c) {
+      const okF = filter === 'all' || c.dataset.status === filter;
+      const okQ = !q || c.dataset.name.indexOf(q) !== -1;
+      const show = okF && okQ;
+      c.style.display = show ? '' : 'none';
+      if (show) shown++;
+    });
+    emptyEl.style.display = (shown === 0 && cards.length) ? 'block' : 'none';
+    document.querySelectorAll('[data-filter]').forEach(function (el) {
+      el.classList.toggle('active', el.classList.contains('oos-stat') && el.dataset.filter === filter);
+      el.classList.toggle('on', el.classList.contains('oos-tab') && el.dataset.filter === filter);
+    });
+  }
+  document.querySelectorAll('[data-filter]').forEach(function (el) {
+    el.addEventListener('click', function () { filter = el.dataset.filter; apply(); });
+  });
+  searchEl.addEventListener('input', apply);
+  sortEl.addEventListener('change', function () { sortCards(); try { localStorage.setItem('oosSort', sortEl.value); } catch (e) {} });
+
+  // ---------- view toggle ----------
+  function setView(v) {
+    grid.classList.toggle('list', v === 'list');
+    document.getElementById('vGrid').classList.toggle('on', v !== 'list');
+    document.getElementById('vList').classList.toggle('on', v === 'list');
+    try { localStorage.setItem('oosView', v); } catch (e) {}
+  }
+  document.getElementById('vGrid').onclick = function () { setView('grid'); };
+  document.getElementById('vList').onclick = function () { setView('list'); };
+  try {
+    setView(localStorage.getItem('oosView') || 'grid');
+    const s = localStorage.getItem('oosSort');
+    if (s) sortEl.value = s;
+  } catch (e) {}
+
+  // ---------- mark reported ----------
+  function markPending(c) {
+    c.dataset.status = 'pending';
+    c.classList.remove('low', 'selected');
+    c.classList.add('pending');
+    const tag = c.querySelector('[data-tag]');
+    tag.className = 'tag pending';
+    tag.textContent = 'Reported';
+    const btn = c.querySelector('[data-report]');
+    btn.disabled = true;
+    btn.textContent = '⏳ Waiting for admin...';
+    const cb = c.querySelector('.oos-check');
+    cb.checked = false; cb.disabled = true;
+    stats(); sortCards(); apply(); updateBulk();
+  }
+
+  // ---------- send request ----------
+  async function send(card, note) {
+    try {
+      const body = new FormData();
+      body.append('note', note || '');
+      const res = await fetch(card.dataset.url, {
+        method: 'POST', headers: { 'X-CSRFToken': csrf() }, body: body, credentials: 'same-origin'
+      });
+      const d = await res.json();
+      if (d.ok) { markPending(card); return { ok: true, name: d.name }; }
+      if (d.error && d.error.indexOf('Already') === 0) { markPending(card); }
+      return { ok: false, error: d.error || 'Error' };
+    } catch (e) {
+      return { ok: false, error: 'Network error. Thirumba try pannunga.' };
+    }
+  }
+
+  // ---------- modal (single report) ----------
+  const bg = document.getElementById('oosModalBg');
+  const mNote = document.getElementById('mNote');
+  const mCount = document.getElementById('mCount');
+  let current = null;
+
+  function openModal(card) {
+    current = card;
+    document.getElementById('mEmoji').textContent = emojiFor(card.dataset.name);
+    document.getElementById('mTitle').textContent = card.dataset.label + ' theernthucha?';
+    document.getElementById('mSub').textContent = 'Admin-ku udane alert + notification pogum.';
+    mNote.value = ''; mCount.textContent = '0';
+    document.querySelectorAll('#mChips .oos-chip').forEach(function (c) { c.classList.remove('on'); });
+    bg.classList.add('open');
+    setTimeout(function () { mNote.focus(); }, 60);
+  }
+  function closeModal() { bg.classList.remove('open'); current = null; }
+
+  document.querySelectorAll('#mChips .oos-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      document.querySelectorAll('#mChips .oos-chip').forEach(function (c) { c.classList.remove('on'); });
+      chip.classList.add('on');
+      mNote.value = chip.textContent;
+      mCount.textContent = mNote.value.length;
+    });
+  });
+  mNote.addEventListener('input', function () { mCount.textContent = mNote.value.length; });
+  document.getElementById('mCancel').onclick = closeModal;
+  bg.addEventListener('click', function (e) { if (e.target === bg) closeModal(); });
+
+  document.getElementById('mConfirm').onclick = async function () {
+    if (!current) return;
+    const btn = this, card = current;
+    btn.disabled = true; btn.textContent = 'Sending...';
+    const r = await send(card, mNote.value.trim());
+    btn.disabled = false; btn.textContent = 'Send to Admin';
+    closeModal();
+    if (r.ok) toast('✅ Admin-ku alert poiduchu', r.name + ' out of stock', 'good');
+    else toast('⚠️ ' + r.error, '', 'alert');
+  };
+
+  cards.forEach(function (c) {
+    c.querySelector('[data-report]').addEventListener('click', function () {
+      if (c.dataset.status !== 'pending') openModal(c);
+    });
+    c.querySelector('.oos-check').addEventListener('change', function () {
+      c.classList.toggle('selected', this.checked);
+      updateBulk();
+    });
+  });
+
+  // ---------- bulk ----------
+  const bulk = document.getElementById('oosBulk');
+  function selected() { return cards.filter(function (c) { return c.querySelector('.oos-check').checked; }); }
+  function updateBulk() {
+    const n = selected().length;
+    document.getElementById('bulkCount').textContent = n;
+    bulk.classList.toggle('show', n > 0);
+  }
+  document.getElementById('bulkClear').onclick = function () {
+    cards.forEach(function (c) { c.querySelector('.oos-check').checked = false; c.classList.remove('selected'); });
+    updateBulk();
+  };
+  document.getElementById('bulkGo').onclick = async function () {
+    const list = selected();
+    if (!list.length) return;
+    const btn = this, note = document.getElementById('bulkNote').value.trim();
+    btn.disabled = true; btn.textContent = 'Sending...';
+    let ok = 0, fail = 0;
+    for (const c of list) {
+      const r = await send(c, note);
+      r.ok ? ok++ : fail++;
+    }
+    btn.disabled = false; btn.textContent = 'Report all';
+    document.getElementById('bulkNote').value = '';
+    if (ok) toast('✅ ' + ok + ' item(s) admin-ku report aayiduchu', fail ? fail + ' failed / already reported' : '', 'good');
+    else toast('⚠️ Edhuvum send aagala', '', 'alert');
+  };
+
+  // ---------- keyboard ----------
+  document.addEventListener('keydown', function (e) {
+    const typing = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '');
+    if (e.key === '/' && !typing) { e.preventDefault(); searchEl.focus(); }
+    if (e.key === 'Escape') { closeModal(); searchEl.blur(); }
+    if (e.key === 'Enter' && bg.classList.contains('open') && document.activeElement !== mNote) {
+      document.getElementById('mConfirm').click();
+    }
+  });
+
+  // ---------- clock ----------
+  function tick() {
+    const d = new Date();
+    document.getElementById('oosClock').textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    document.getElementById('oosDate').textContent = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
+  }
+  tick(); setInterval(tick, 1000);
+
+  // ---------- go ----------
+  stats(); sortCards(); apply(); updateBulk();
+})();
+</script>
+{% endblock %}

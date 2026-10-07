@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+{% block title %}Your Cart - Chandru Restaurant{% endblock %}
+
+{% block content %}
+{# URL lookups use "as" so a wrong name never crashes the page. Check these names against your urls.py #}
+{% url 'orders:checkout' as checkout_url %}
+{% if not checkout_url %}{% url 'orders:place_order' as checkout_url %}{% endif %}
+{% if not checkout_url %}{% url 'orders:confirm_order' as checkout_url %}{% endif %}
+{% url 'orders:apply_coupon' as coupon_url %}
+{% url 'menu_list' as menu_url %}
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  .cart-page { --navy:#1c2333; --coral:#ff6b6b; --gold:#ffb703; --green:#22c55e; --ink:#1f2937; --muted:#6b7280;
+    max-width:1180px; margin:0 auto; padding:36px 20px 70px; font-family:'Inter',system-ui,sans-serif; color:var(--ink); }
+  .cart-hero { text-align:center; margin-bottom:26px; }
+  .cart-hero h1 { font-family:'Sora',sans-serif; font-size:2.2rem; margin:0 0 6px; }
+  .cart-hero p { color:var(--muted); margin:0 0 22px; }
+  .cart-icon { display:inline-block; animation:wiggle 2.4s ease-in-out infinite; transform-origin:70% 70%; }
+  @keyframes wiggle { 0%,100%{transform:rotate(0)} 10%{transform:rotate(-14deg)} 20%{transform:rotate(10deg)} 30%{transform:rotate(0)} }
+
+  /* order journey */
+  .journey { list-style:none; display:flex; justify-content:center; gap:0; padding:0; margin:0 auto; max-width:620px; counter-reset:step; }
+  .journey li { flex:1; position:relative; font-size:.78rem; color:var(--muted); font-weight:500; padding-top:34px; text-align:center; counter-increment:step; }
+  .journey li::before { content:counter(step); position:absolute; top:0; left:50%; transform:translateX(-50%); width:26px; height:26px; border-radius:50%;
+    background:#e5e7eb; color:#6b7280; display:grid; place-items:center; font-weight:600; font-size:.78rem; z-index:1; }
+  .journey li::after { content:""; position:absolute; top:12px; left:-50%; width:100%; height:2px; background:#e5e7eb; }
+  .journey li:first-child::after { display:none; }
+  .journey li.active { color:var(--ink); }
+  .journey li.active::before { background:var(--coral); color:#fff; box-shadow:0 0 0 0 rgba(255,107,107,.6); animation:pulse 1.8s infinite; }
+  @keyframes pulse { 70%{box-shadow:0 0 0 10px rgba(255,107,107,0)} 100%{box-shadow:0 0 0 0 rgba(255,107,107,0)} }
+
+  .cart-grid { display:grid; grid-template-columns:1fr 380px; gap:26px; align-items:start; }
+  @media (max-width:900px){ .cart-grid{grid-template-columns:1fr} }
+
+  /* items */
+  .cart-item { display:grid; grid-template-columns:72px 1fr auto auto auto; align-items:center; gap:16px; background:#fff; border-radius:18px;
+    padding:14px 18px; margin-bottom:14px; box-shadow:0 6px 22px rgba(15,23,42,.07); border:1px solid #f1f5f9;
+    opacity:0; transform:translateY(18px); animation:rise .55s cubic-bezier(.2,.8,.2,1) forwards; animation-delay:calc(var(--i) * 90ms);
+    transition:transform .25s, box-shadow .25s, max-height .4s, margin .4s, padding .4s; }
+  .cart-item:hover { transform:translateY(-3px); box-shadow:0 12px 30px rgba(15,23,42,.12); }
+  @keyframes rise { to { opacity:1; transform:none; } }
+  .cart-item.removing { animation:none; opacity:0; transform:translateX(60px) scale(.96); transition:all .38s ease; }
+  .cart-item img { width:72px; height:72px; object-fit:cover; border-radius:14px; background:#f3f4f6; }
+  .ci-name { font-family:'Sora',sans-serif; font-size:1.02rem; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+  .ci-each { color:var(--muted); font-size:.85rem; margin:0; }
+  .veg-dot { width:14px; height:14px; border:2px solid var(--green); border-radius:3px; display:inline-grid; place-items:center; flex:none; }
+  .veg-dot::after { content:""; width:6px; height:6px; border-radius:50%; background:var(--green); }
+  .veg-dot.non { border-color:#dc2626; } .veg-dot.non::after { background:#dc2626; }
+  .qty-pill { background:#f3f4f6; border-radius:999px; padding:6px 14px; font-weight:600; font-size:.85rem; }
+  .ci-price { color:var(--coral); font-family:'Sora',sans-serif; font-size:1.1rem; min-width:90px; text-align:right; }
+  .remove-btn { color:#9ca3af; font-size:.85rem; text-decoration:none; padding:6px 10px; border-radius:8px; transition:.2s; }
+  .remove-btn:hover { color:#dc2626; background:#fee2e2; }
+  @media (max-width:640px){ .cart-item{grid-template-columns:60px 1fr auto; } .qty-pill,.remove-btn{grid-column:2} .ci-price{grid-row:1;grid-column:3} .cart-item img{width:60px;height:60px} }
+
+  /* summary */
+  .summary { background:linear-gradient(160deg,#1c2333,#111827); color:#e5e7eb; border-radius:24px; padding:28px; position:sticky; top:90px;
+    box-shadow:0 20px 45px rgba(17,24,39,.35); opacity:0; animation:rise .6s .2s cubic-bezier(.2,.8,.2,1) forwards; }
+  .summary h2 { font-family:'Sora',sans-serif; color:#fff; font-size:1.25rem; margin:0 0 18px; }
+  .row { display:flex; justify-content:space-between; margin:10px 0; font-size:.95rem; }
+  .row.discount { color:#4ade80; }
+  .row.total { border-top:1px dashed rgba(255,255,255,.18); padding-top:16px; margin-top:16px; font-family:'Sora',sans-serif; font-size:1.35rem; color:#fff; }
+  .coupon { display:flex; gap:8px; margin:18px 0 6px; }
+  .coupon input { flex:1; min-width:0; background:rgba(255,255,255,.08); border:1px dashed rgba(255,255,255,.3); color:#fff; border-radius:12px; padding:11px 14px; font:inherit; outline:none; text-transform:uppercase; }
+  .coupon input:focus { border-color:var(--gold); }
+  .coupon button { background:var(--gold); color:#1f2937; border:0; border-radius:12px; padding:0 16px; font-weight:700; cursor:pointer; transition:.2s; }
+  .coupon button:hover { transform:translateY(-1px); filter:brightness(1.08); }
+  .coupon-chip { display:inline-block; margin-top:14px; background:rgba(74,222,128,.15); color:#4ade80; border-radius:999px; padding:5px 12px; font-size:.8rem; font-weight:600; }
+
+  /* confirm button */
+  .confirm-btn { position:relative; display:flex; align-items:center; justify-content:center; height:56px; margin-top:22px; border-radius:999px; overflow:hidden;
+    background:linear-gradient(135deg,#ff6b6b,#ff8e53); color:#fff; font-weight:700; font-size:1.02rem; text-decoration:none; cursor:pointer;
+    box-shadow:0 10px 24px rgba(255,107,107,.45); transition:transform .2s, box-shadow .2s, background .4s, width .4s; }
+  .confirm-btn:hover { transform:translateY(-2px); box-shadow:0 14px 30px rgba(255,107,107,.55); }
+  .confirm-btn:active { transform:scale(.97); }
+  .confirm-btn .arrow { display:inline-block; margin-left:8px; transition:transform .25s; }
+  .confirm-btn:hover .arrow { transform:translateX(6px); }
+  .confirm-btn::before { content:""; position:absolute; top:0; left:-60%; width:40%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent); transform:skewX(-20deg); animation:shine 3.2s infinite; }
+  @keyframes shine { 0%,60%{left:-60%} 100%{left:130%} }
+  .ripple { position:absolute; border-radius:50%; background:rgba(255,255,255,.55); width:20px; height:20px; transform:translate(-50%,-50%) scale(0); animation:ripple .7s ease-out forwards; pointer-events:none; }
+  @keyframes ripple { to { transform:translate(-50%,-50%) scale(18); opacity:0; } }
+  .cb-spinner, .cb-check { position:absolute; opacity:0; }
+  .cb-spinner { width:24px; height:24px; border:3px solid rgba(255,255,255,.4); border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .cb-check { width:28px; height:28px; fill:none; stroke:#fff; stroke-width:3.2; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:30; stroke-dashoffset:30; }
+  .confirm-btn.is-loading .cb-label { opacity:0; transform:scale(.8); }
+  .confirm-btn.is-loading .cb-spinner { opacity:1; }
+  .confirm-btn.is-done { background:linear-gradient(135deg,#22c55e,#16a34a); box-shadow:0 10px 24px rgba(34,197,94,.45); }
+  .confirm-btn.is-done .cb-label, .confirm-btn.is-done .cb-spinner { opacity:0; }
+  .confirm-btn.is-done .cb-check { opacity:1; animation:draw .5s .05s ease forwards; }
+  @keyframes draw { to { stroke-dashoffset:0; } }
+  .cb-label { transition:.25s; }
+  .continue { display:block; text-align:center; margin-top:16px; color:#9ca3af; text-decoration:none; font-size:.9rem; }
+  .continue:hover { color:#fff; }
+  .trust { display:flex; justify-content:center; gap:14px; margin-top:18px; font-size:.72rem; color:#9ca3af; flex-wrap:wrap; }
+
+  /* success overlay */
+  .overlay { position:fixed; inset:0; z-index:2000; display:grid; place-items:center; background:rgba(17,24,39,.72); backdrop-filter:blur(6px); opacity:0; pointer-events:none; transition:opacity .35s; }
+  .overlay.show { opacity:1; pointer-events:auto; }
+  .ov-card { background:#fff; border-radius:28px; padding:38px 44px; text-align:center; max-width:360px; transform:scale(.7); transition:transform .5s cubic-bezier(.2,1.4,.4,1); }
+  .overlay.show .ov-card { transform:scale(1); }
+  .ov-ring { width:84px; height:84px; margin:0 auto 18px; border-radius:50%; background:#dcfce7; display:grid; place-items:center; }
+  .ov-ring svg { width:46px; height:46px; fill:none; stroke:#16a34a; stroke-width:3.4; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:30; stroke-dashoffset:30; }
+  .overlay.show .ov-ring svg { animation:draw .6s .35s ease forwards; }
+  .ov-card h3 { font-family:'Sora',sans-serif; margin:0 0 8px; font-size:1.4rem; }
+  .ov-card p { margin:0; color:var(--muted); font-size:.92rem; }
+  .confetti { position:fixed; left:50%; top:46%; pointer-events:none; z-index:2001; }
+  .confetti span { position:absolute; width:9px; height:14px; border-radius:2px; background:var(--c); opacity:0; animation:fly 1.5s ease-out forwards; }
+  @keyframes fly { 0%{opacity:1; transform:translate(0,0) rotate(0)} 100%{opacity:0; transform:translate(var(--dx),var(--dy)) rotate(var(--rot))} }
+
+  /* empty */
+  .empty { text-align:center; padding:60px 20px; background:#fff; border-radius:24px; box-shadow:0 6px 22px rgba(15,23,42,.07); }
+  .empty .big { font-size:4.5rem; animation:float 3s ease-in-out infinite; display:inline-block; }
+  @keyframes float { 50% { transform:translateY(-12px); } }
+  .empty a { display:inline-block; margin-top:18px; background:var(--coral); color:#fff; padding:13px 28px; border-radius:999px; text-decoration:none; font-weight:700; }
+
+  /* toast */
+  .toasts { position:fixed; top:90px; right:20px; z-index:1500; display:grid; gap:10px; }
+  .toast { background:#fff; border-left:5px solid var(--green); border-radius:12px; padding:12px 18px; box-shadow:0 10px 28px rgba(0,0,0,.15); font-weight:500; animation:slidein .4s ease, fadeout .4s 3.4s forwards; }
+  .toast.error { border-color:#dc2626; }
+  @keyframes slidein { from{transform:translateX(120%);opacity:0} }
+  @keyframes fadeout { to{opacity:0; transform:translateY(-10px)} }
+
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:.01ms !important; animation-delay:0s !important; transition-duration:.01ms !important;} .cart-item,.summary{opacity:1;transform:none} }
+</style>
+
+<div class="cart-page">
+  <header class="cart-hero">
+    <h1><span class="cart-icon">🛒</span> Your Cart</h1>
+    <p>Review your items before checking out.</p>
+    <ol class="journey">
+      <li class="active">Cart</li>
+      <li>Admin approval</li>
+      <li>Kitchen</li>
+      <li>Served</li>
+    </ol>
+  </header>
+
+  {% if cart_items %}
+  <div class="cart-grid">
+    <section>
+      {% for item in cart_items %}
+      {% url 'orders:remove_from_cart' item.id as remove_url %}
+      {% if not remove_url %}{% url 'orders:remove_item' item.id as remove_url %}{% endif %}
+      <article class="cart-item" style="--i:{{ forloop.counter0 }}">
+        {% if item.food_item.image %}<img src="{{ item.food_item.image.url }}" alt="{{ item.food_item.name }}">{% else %}<img alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==">{% endif %}
+        <div>
+          <h3 class="ci-name"><span class="veg-dot{% if not item.food_item.is_veg %} non{% endif %}" title="{% if item.food_item.is_veg %}Veg{% else %}Non-veg{% endif %}"></span>{{ item.food_item.name }}</h3>
+          <p class="ci-each">₹{{ item.food_item.price }} each</p>
+        </div>
+        <span class="qty-pill">Qty: {{ item.quantity }}</span>
+        <strong class="ci-price">₹{{ item.subtotal }}</strong>
+        <a class="remove-btn" href="{{ remove_url|default:'#' }}">Remove</a>
+      </article>
+      {% endfor %}
+    </section>
+
+    <aside class="summary">
+      <h2>Order Summary</h2>
+      <div class="row"><span>Items</span><span>{{ cart_items|length }}</span></div>
+      <div class="row"><span>Subtotal</span><span>₹{{ subtotal }}</span></div>
+      {% if discount_amount %}
+      <div class="row discount"><span>Discount</span><span>- ₹{{ discount_amount }}</span></div>
+      {% endif %}
+
+      {% if coupon %}
+        <span class="coupon-chip">🎟️ Coupon applied: {{ coupon }}</span>
+      {% elif coupon_url %}
+        <form class="coupon" method="post" action="{{ coupon_url }}">
+          {% csrf_token %}
+          <input type="text" name="code" placeholder="Coupon code" autocomplete="off">
+          <button type="submit">Apply</button>
+        </form>
+      {% endif %}
+
+      <div class="row total"><span>Total</span><span>₹<span data-count="{{ total|stringformat:'f' }}">{{ total }}</span></span></div>
+
+      <a href="{{ checkout_url|default:'#' }}" class="confirm-btn" id="confirmBtn">
+        <span class="cb-label">Confirm Order <span class="arrow">→</span></span>
+        <span class="cb-spinner"></span>
+        <svg class="cb-check" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+      </a>
+      <a class="continue" href="{{ menu_url|default:'/' }}">← Continue Shopping</a>
+      <div class="trust"><span>🔒 Secure payments</span><span>👨‍🍳 Fresh from our kitchen</span></div>
+    </aside>
+  </div>
+  {% else %}
+  <div class="empty">
+    <span class="big">🍽️</span>
+    <h2>Your cart is empty</h2>
+    <p>Looks like you have not picked anything yet.</p>
+    <a href="{{ menu_url|default:'/' }}">Browse the menu</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="overlay" id="successOverlay">
+  <div class="ov-card">
+    <div class="ov-ring"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
+    <h3>Order sent!</h3>
+    <p>Waiting for admin approval. Taking you to the next step...</p>
+  </div>
+</div>
+<div class="confetti" id="confetti"></div>
+
+{% if messages %}
+<div class="toasts">
+  {% for message in messages %}<div class="toast {{ message.tags }}">{{ message }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<script>
+(function () {
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Count-up for the total amount
+  document.querySelectorAll('[data-count]').forEach(function (el) {
+    var target = parseFloat(el.dataset.count), start = null, dur = reduce ? 0 : 900;
+    if (isNaN(target)) return;
+    function step(ts) {
+      if (start === null) start = ts;
+      var p = dur ? Math.min((ts - start) / dur, 1) : 1;
+      el.textContent = (target * (1 - Math.pow(1 - p, 3))).toFixed(2);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+
+  // Slide-out animation before a remove link is followed
+  document.querySelectorAll('.remove-btn').forEach(function (link) {
+    link.addEventListener('click', function (e) {
+      var href = link.getAttribute('href');
+      if (!href || href === '#') return;
+      e.preventDefault();
+      link.closest('.cart-item').classList.add('removing');
+      setTimeout(function () { window.location.href = href; }, reduce ? 0 : 380);
+    });
+  });
+
+  // Confirm Order: ripple, spinner, check mark, confetti, success overlay, then go on
+  var btn = document.getElementById('confirmBtn');
+  if (!btn) return;
+  var overlay = document.getElementById('successOverlay');
+  var box = document.getElementById('confetti');
+  var colors = ['#ff6b6b', '#ffb703', '#22c55e', '#3b82f6', '#a855f7', '#ffffff'];
+
+  function burst() {
+    for (var i = 0; i < 44; i++) {
+      var s = document.createElement('span');
+      var angle = Math.random() * Math.PI * 2, dist = 140 + Math.random() * 260;
+      s.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+      s.style.setProperty('--dy', Math.sin(angle) * dist + 80 + 'px');
+      s.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+      s.style.setProperty('--c', colors[i % colors.length]);
+      s.style.animationDelay = Math.random() * 0.15 + 's';
+      box.appendChild(s);
+    }
+    setTimeout(function () { box.innerHTML = ''; }, 2000);
+  }
+
+  btn.addEventListener('click', function (e) {
+    e.preventDefault();
+    if (btn.classList.contains('is-loading') || btn.classList.contains('is-done')) return;
+    var href = btn.getAttribute('href');
+
+    var r = btn.getBoundingClientRect(), dot = document.createElement('span');
+    dot.className = 'ripple';
+    dot.style.left = (e.clientX - r.left) + 'px';
+    dot.style.top = (e.clientY - r.top) + 'px';
+    btn.appendChild(dot);
+    setTimeout(function () { dot.remove(); }, 700);
+
+    btn.classList.add('is-loading');
+    setTimeout(function () {
+      btn.classList.remove('is-loading');
+      btn.classList.add('is-done');
+      overlay.classList.add('show');
+      if (!reduce) burst();
+    }, reduce ? 0 : 900);
+    setTimeout(function () {
+      if (href && href !== '#') window.location.href = href;
+    }, reduce ? 300 : 2800);
+  });
+})();
+</script>
+{% endblock %}

@@ -1,311 +1,486 @@
 {% extends "dashboard/base_admin.html" %}
 {% block admin_content %}
 <style>
-  .page-header {
-    display: flex; justify-content: space-between; align-items: center;
-    flex-wrap: wrap; gap: 14px; margin-bottom: 22px;
-  }
-  .page-header h2 { font-size: 24px; color: #1a1a2e; display: flex; align-items: center; gap: 10px; }
-  .page-header p { font-size: 13px; color: #999; margin-top: 3px; }
+.oh-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+.oh-head h2 { font-size:25px; color:#1a1a2e; margin:0; }
+.oh-head p { font-size:13px; color:#999; margin:3px 0 0; }
+.oh-actions { display:flex; gap:8px; }
+.btn { border:1.5px solid #e2e4ea; background:#fff; color:#1a1a2e; padding:9px 15px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; transition:.15s; }
+.btn:hover { border-color:#1a1a2e; }
+.btn.live-on { border-color:#2ecc71; color:#1e9e55; background:#effcf4; }
 
-  .stats-strip {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 14px; margin-bottom: 26px;
-  }
-  .mini-stat {
-    background: #fff; border-radius: 12px; padding: 16px 18px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 12px;
-    border-left: 4px solid #2ecc71; cursor: pointer; transition: transform 0.15s ease;
-  }
-  .mini-stat:hover { transform: translateY(-2px); }
-  .mini-stat:nth-child(2) { border-left-color: #f39c12; }
-  .mini-stat:nth-child(3) { border-left-color: #3498db; }
-  .mini-stat:nth-child(4) { border-left-color: #F63A3A; }
-  .mini-stat .emoji { font-size: 22px; }
-  .mini-stat .num { font-size: 19px; font-weight: 800; color: #1a1a2e; line-height: 1; }
-  .mini-stat .lbl { font-size: 11.5px; color: #999; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
+.oh-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:18px; }
+.st { background:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer;
+box-shadow:0 4px 14px rgba(0,0,0,.05); border:2px solid transparent; transition:.15s; }
+.st:hover { transform:translateY(-2px); }
+.st.on { border-color:#1a1a2e; }
+.st .ic { width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:21px; background:#eef2ff; }
+.st.amber .ic { background:#fff3cd; } .st.blue .ic { background:#e3f0ff; } .st.green .ic { background:#e3f9ec; }
+.st.red .ic { background:#fdecec; } .st.teal .ic { background:#e0f7f4; }
+.st b { display:block; font-size:21px; color:#1a1a2e; line-height:1.05; }
+.st span { font-size:11px; color:#8b8fa3; text-transform:uppercase; letter-spacing:.3px; }
 
-  .toolbar { display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
-  .search-box { flex: 1; min-width: 220px; position: relative; }
-  .search-box input {
-    width: 100%; padding: 11px 16px 11px 40px; border: 1.5px solid #e6e6ee;
-    border-radius: 10px; font-size: 14px; background: #fff;
-  }
-  .search-box input:focus { outline: none; border-color: #F63A3A; box-shadow: 0 0 0 4px rgba(246,58,58,0.08); }
-  .search-box::before {
-    content: "🔍"; position: absolute; left: 14px; top: 50%;
-    transform: translateY(-50%); font-size: 14px; opacity: 0.5;
-  }
-  .filter-chip {
-    padding: 9px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
-    background: #f5f5f8; color: #666; cursor: pointer; border: 1.5px solid transparent;
-    transition: all 0.15s ease; white-space: nowrap;
-  }
-  .filter-chip.active { background: #1a1a2e; color: #fff; }
-  .filter-chip:hover:not(.active) { border-color: #ddd; }
+.oh-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
+.search-box { flex:1; min-width:230px; position:relative; }
+.search-box input { width:100%; padding:11px 14px 11px 40px; border:1.5px solid #e6e6ee; border-radius:10px; font-size:14px; background:#fff; }
+.search-box input:focus { outline:none; border-color:#F63A3A; box-shadow:0 0 0 4px rgba(246,58,58,.08); }
+.search-box::before { content:"🔍"; position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:14px; opacity:.5; }
+.oh-bar select { padding:10px 12px; border:1.5px solid #e6e6ee; border-radius:10px; font-size:13px; font-weight:600; background:#fff; cursor:pointer; }
 
-  .orders-table-wrap {
-    background: #fff; border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); overflow: hidden;
-  }
-  table.orders-table { width: 100%; border-collapse: collapse; }
-  table.orders-table thead th {
-    background: #1a1a2e; color: #fff; text-align: left; padding: 15px 16px;
-    font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
-  }
-  table.orders-table tbody tr {
-    transition: background 0.15s ease; animation: fadeSlide 0.3s ease backwards;
-  }
-  @keyframes fadeSlide { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: translateX(0); } }
-  table.orders-table tbody tr:hover { background: #fafafb; }
-  table.orders-table td {
-    padding: 13px 16px; border-top: 1px solid #f2f2f5; font-size: 14.5px;
-    vertical-align: middle; color: #333;
-  }
+/* payment chips row */
+.pay-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
+.pay-row .lbl { font-size:11.5px; font-weight:800; color:#8b8fa3; text-transform:uppercase; letter-spacing:.4px; margin-right:4px; }
+.pay-chip { padding:8px 14px; border-radius:20px; font-size:13px; font-weight:700; background:#fff; color:#555; cursor:pointer; border:1.5px solid #e6e6ee; transition:.15s; white-space:nowrap; user-select:none; }
+.pay-chip b { margin-left:5px; background:rgba(0,0,0,.07); padding:1px 7px; border-radius:10px; font-size:11.5px; }
+.pay-chip:hover:not(.active) { border-color:#F63A3A; transform:translateY(-1px); }
+.pay-chip.active { background:#F63A3A; border-color:#F63A3A; color:#fff; box-shadow:0 6px 14px rgba(246,58,58,.3); }
+.pay-chip.active b { background:rgba(255,255,255,.25); }
 
-  .order-id { font-weight: 800; color: #1a1a2e; }
-  .order-items { font-size: 12.5px; color: #888; max-width: 220px; }
+.chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+.filter-chip { padding:8px 14px; border-radius:20px; font-size:13px; font-weight:700; background:#f1f2f6; color:#666; cursor:pointer; border:1.5px solid transparent; transition:.15s; white-space:nowrap; }
+.filter-chip b { margin-left:5px; background:rgba(0,0,0,.08); padding:1px 7px; border-radius:10px; font-size:11.5px; }
+.filter-chip.active { background:#1a1a2e; color:#fff; } .filter-chip.active b { background:rgba(255,255,255,.2); }
+.filter-chip:hover:not(.active) { border-color:#ccc; }
+.shown { font-size:12.5px; color:#8b8fa3; margin-left:auto; align-self:center; }
 
-  .status-badge {
-    padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700;
-    display: inline-flex; align-items: center; gap: 5px;
-  }
-  .status-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-  .status-pending  { background: #fff3cd; color: #f39c12; }
-  .status-confirmed{ background: #fdecec; color: #F63A3A; }
-  .status-preparing{ background: #e3f0ff; color: #3498db; }
-  .status-ready    { background: #f3e5f9; color: #9b59b6; }
-  .status-delivered,
-  .status-completed{ background: #e3f9ec; color: #2ecc71; }
-  .status-cancelled{ background: #ffe5e5; color: #e74c3c; }
+.oh-wrap { background:#fff; border-radius:16px; box-shadow:0 6px 20px rgba(0,0,0,.06); overflow:hidden; }
+table.orders-table { width:100%; border-collapse:collapse; }
+.orders-table thead th { background:#1a1a2e; color:#fff; text-align:left; padding:14px 14px; font-size:11.5px; text-transform:uppercase; letter-spacing:.5px; }
+.orders-table td { padding:13px 14px; border-top:1px solid #f0f1f5; font-size:14px; vertical-align:middle; color:#333; }
+.orders-table tbody tr { transition:background .15s; }
+.orders-table tbody tr:hover td { background:#fafbfd; }
+.orders-table tbody tr.needs-approval td { background:#fffbeb; }
+.orders-table tbody tr.needs-approval td:first-child { box-shadow:inset 4px 0 #f39c12; }
+.order-id { font-weight:800; color:#1a1a2e; font-size:15px; }
+.ago { display:block; font-size:11.5px; color:#9aa0b4; margin-top:2px; font-weight:500; }
+.needs-approval .ago { color:#b06a00; font-weight:700; }
 
-  select.status-select {
-    padding: 7px 10px; border-radius: 8px; border: 1.5px solid #e6e6ee;
-    font-size: 12.5px; font-weight: 700; background: #fafafa; cursor: pointer;
-  }
+.cust { display:flex; align-items:center; gap:9px; }
+.av { width:32px; height:32px; border-radius:50%; background:#1a1a2e; color:#fff; font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
 
-  .amount { font-weight: 800; color: #1a1a2e; }
+.items { display:flex; flex-direction:column; gap:7px; min-width:210px; }
+.it { display:flex; align-items:center; gap:9px; }
+.it img, .ph { width:40px; height:40px; border-radius:10px; object-fit:cover; flex:0 0 auto; background:#f3f4f8; }
+.ph { display:flex; align-items:center; justify-content:center; font-size:22px; }
+.it .q { font-weight:800; color:#F63A3A; font-size:13px; }
+.it .n { font-size:13px; color:#333; font-weight:600; line-height:1.2; }
 
-  /* --- Table badge --- */
-  .table-tag {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 5px 12px; border-radius: 20px; font-size: 12.5px; font-weight: 700;
-    background: #eef2ff; color: #4f46e5; white-space: nowrap;
-  }
-  .table-tag.takeaway {
-    background: #f5f5f8; color: #888;
-  }
+.amount { font-weight:800; color:#1a1a2e; white-space:nowrap; }
+.table-tag { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:12.5px; font-weight:700; background:#eef2ff; color:#4f46e5; white-space:nowrap; }
+.table-tag.takeaway { background:#f3f4f8; color:#888; }
 
-  /* --- Payment badge --- */
-  .pay-cell { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-  .pay-badge {
-    padding: 4px 11px; border-radius: 16px; font-size: 11.5px; font-weight: 700;
-    white-space: nowrap;
-  }
-  .pay-badge.online { background: #e3f0ff; color: #3498db; }
-  .pay-badge.cash-pending { background: #fff3cd; color: #b06a00; }
-  .pay-badge.paid { background: #e3f9ec; color: #2ecc71; }
+.pay-cell { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+.pay-badge { padding:4px 11px; border-radius:16px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+.pay-badge.online { background:#e3f0ff; color:#3498db; } .pay-badge.cash-pending { background:#fff3cd; color:#b06a00; }
+.pay-badge.paid { background:#e3f9ec; color:#1e9e55; } .pay-badge.unpaid { background:#f3f4f8; color:#888; }
+.pay-badge.refund-pending { background:#ffe5e5; color:#e74c3c; } .pay-badge.refunded { background:#e3f9ec; color:#1e9e55; }
+.cash-btn { padding:5px 11px; border-radius:8px; border:1.5px solid #2ecc71; background:#fff; color:#1e9e55; font-size:11.5px; font-weight:700; cursor:pointer; transition:.15s; }
+.cash-btn:hover { background:#2ecc71; color:#fff; } .cash-btn:disabled { opacity:.5; cursor:default; }
+.refund-btn { padding:5px 11px; border-radius:8px; border:1.5px solid #e74c3c; background:#fff; color:#e74c3c; font-size:11.5px; font-weight:700; cursor:pointer; transition:.15s; }
+.refund-btn:hover { background:#e74c3c; color:#fff; } .refund-btn:disabled { opacity:.5; cursor:default; }
 
-  .cash-btn {
-    padding: 5px 11px; border-radius: 8px; border: 1.5px solid #2ecc71;
-    background: #fff; color: #2ecc71; font-size: 11.5px; font-weight: 700;
-    cursor: pointer; transition: all 0.15s ease;
-  }
-  .cash-btn:hover { background: #2ecc71; color: #fff; }
-  .cash-btn:disabled { opacity: 0.5; cursor: default; }
+/* read-only status badge (monitor only) */
+.status-badge { display:inline-block; padding:6px 12px; border-radius:20px; font-size:12.5px; font-weight:800; white-space:nowrap; }
+.status-badge.status-pending { background:#fff3cd; color:#b06a00; }
+.status-badge.status-confirmed { background:#fdecec; color:#F63A3A; }
+.status-badge.status-preparing { background:#e3f0ff; color:#3498db; }
+.status-badge.status-ready { background:#f3e5f9; color:#9b59b6; }
+.status-badge.status-out_for_delivery { background:#e0f7f4; color:#0f766e; }
+.status-badge.status-delivered, .status-badge.status-completed { background:#e3f9ec; color:#1e9e55; }
+.status-badge.status-cancelled { background:#ffe5e5; color:#e74c3c; }
+.status-badge.waiting-server { background:#fff3cd; color:#b06a00; }
+.status-badge.await-pay { background:#f3f4f8; color:#888; }
 
-  .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
-  .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
+.empty-state { display:none; text-align:center; padding:50px 20px; color:#aaa; }
+.empty-state.show { display:block; } .empty-state .big { font-size:42px; }
 
-  @media (max-width: 760px) {
-    .orders-table-wrap { overflow-x: auto; }
-    table.orders-table { min-width: 980px; }
-  }
+#toasts { position:fixed; right:18px; bottom:18px; z-index:10000; display:flex; flex-direction:column; gap:8px; }
+.toast { background:#1a1a2e; color:#fff; padding:11px 16px; border-radius:10px; font-size:13.5px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.25); animation:tIn .25s ease; }
+.toast.err { background:#e74c3c; }
+@keyframes tIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+@media (max-width:760px) { .oh-wrap { overflow-x:auto; } table.orders-table { min-width:1000px; } .shown { margin-left:0; } }
 </style>
 
-<div class="page-header">
-  <div>
-    <h2>🧾 Orders</h2>
-    <p>Track and manage all customer orders</p>
-  </div>
+<div class="oh-head">
+<div>
+<h2>🧾 Orders</h2>
+<p>Monitor every order. The server sends orders to the kitchen; you collect cash and pay refunds here.</p>
+</div>
+<div class="oh-actions">
+<button type="button" class="btn live-on" id="liveBtn" onclick="toggleLive()">🟢 Live</button>
+<button type="button" class="btn" onclick="exportCsv()">⬇️ Export CSV</button>
+</div>
 </div>
 
-<div class="stats-strip">
-  <div class="mini-stat" onclick="setFilter('all')">
-    <div class="emoji">📦</div>
-    <div><div class="num">{{ orders|length }}</div><div class="lbl">Total Orders</div></div>
-  </div>
-  <div class="mini-stat" onclick="setFilter('pending')">
-    <div class="emoji">⏳</div>
-    <div><div class="num" id="pendingCount">0</div><div class="lbl">Pending</div></div>
-  </div>
-  <div class="mini-stat" onclick="setFilter('preparing')">
-    <div class="emoji">👨‍🍳</div>
-    <div><div class="num" id="preparingCount">0</div><div class="lbl">Preparing</div></div>
-  </div>
-  <div class="mini-stat" onclick="setFilter('delivered')">
-    <div class="emoji">✅</div>
-    <div><div class="num" id="deliveredCount">0</div><div class="lbl">Delivered</div></div>
-  </div>
+<div class="oh-stats">
+<div class="st" data-f="all" onclick="setFilter('all')"><div class="ic">📦</div><div><b id="sTotal">0</b><span>Total orders</span></div></div>
+<div class="st amber" data-f="approval" onclick="setFilter('approval')"><div class="ic">⏳</div><div><b id="sApproval">0</b><span>Waiting for server</span></div></div>
+<div class="st blue" data-f="kitchen" onclick="setFilter('kitchen')"><div class="ic">👨‍🍳</div><div><b id="sKitchen">0</b><span>In kitchen</span></div></div>
+<div class="st green" data-f="delivered" onclick="setFilter('delivered')"><div class="ic">✅</div><div><b id="sDelivered">0</b><span>Delivered</span></div></div>
+<div class="st teal"><div class="ic">💰</div><div><b id="sSales">₹0</b><span>Today's sales</span></div></div>
+<div class="st red" onclick="setPay('cashpending')"><div class="ic">💵</div><div><b id="sCash">₹0</b><span>Cash to collect</span></div></div>
+<div class="st red" onclick="setPay('refundpending')"><div class="ic">💸</div><div><b id="sRefund">₹0</b><span>Refunds to pay</span></div></div>
 </div>
 
-<div class="toolbar">
-  <div class="search-box">
-    <input type="text" id="orderSearch" placeholder="Search by order ID or customer...">
-  </div>
-  <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">All</div>
-  <div class="filter-chip" data-filter="pending" onclick="setFilter('pending')">Pending</div>
-  <div class="filter-chip" data-filter="preparing" onclick="setFilter('preparing')">Preparing</div>
-  <div class="filter-chip" data-filter="delivered" onclick="setFilter('delivered')">Delivered</div>
-  <div class="filter-chip" data-filter="cancelled" onclick="setFilter('cancelled')">Cancelled</div>
+<div class="oh-bar">
+<div class="search-box"><input type="text" id="orderSearch" placeholder="Search order ID, customer or dish...  ( / )" autocomplete="off"></div>
+<select id="sortBy" autocomplete="off">
+<option value="attention">⚡ Needs attention first</option>
+<option value="newest">🕒 Newest first</option>
+<option value="oldest">🕰️ Oldest first</option>
+<option value="amount">💰 Highest amount</option>
+</select>
 </div>
 
-<div class="orders-table-wrap">
-  <table class="orders-table">
-    <thead>
-      <tr>
-        <th>Order ID</th>
-        <th>Customer</th>
-        <th>Table</th>
-        <th>Items</th>
-        <th>Amount</th>
-        <th>Payment</th>
-        <th>Status</th>
-        <th>Placed On</th>
-      </tr>
-    </thead>
-    <tbody id="ordersTableBody">
+<div class="pay-row" id="payRow">
+<span class="lbl">Payment</span>
+<div class="pay-chip active" data-pay="all">All payments<b>0</b></div>
+<div class="pay-chip" data-pay="cashpending">💵 Cash pending<b>0</b></div>
+<div class="pay-chip" data-pay="cashpaid">💵 Cash paid<b>0</b></div>
+<div class="pay-chip" data-pay="online">💳 Paid online<b>0</b></div>
+<div class="pay-chip" data-pay="refundpending">💸 Refund pending<b>0</b></div>
+<div class="pay-chip" data-pay="refunded">↩️ Refunded<b>0</b></div>
+<div class="pay-chip" data-pay="unpaid">⏳ Unpaid<b>0</b></div>
+</div>
+
+<div class="chips">
+<div class="filter-chip active" data-filter="all" onclick="setFilter('all')">All<b>0</b></div>
+<div class="filter-chip" data-filter="approval" onclick="setFilter('approval')">Waiting for server<b>0</b></div>
+<div class="filter-chip" data-filter="pending" onclick="setFilter('pending')">Pending<b>0</b></div>
+<div class="filter-chip" data-filter="kitchen" onclick="setFilter('kitchen')">In kitchen<b>0</b></div>
+<div class="filter-chip" data-filter="delivered" onclick="setFilter('delivered')">Delivered<b>0</b></div>
+<div class="filter-chip" data-filter="cancelled" onclick="setFilter('cancelled')">Cancelled<b>0</b></div>
+<span class="shown" id="shownCount"></span>
+</div>
+
+<div class="oh-wrap">
+<table class="orders-table">
+<thead>
+<tr><th>Order</th><th>Customer</th><th>Table</th><th>Items</th><th>Amount</th><th>Payment</th><th>Status</th><th>Placed On</th></tr>
+</thead>
+<tbody id="ordersTableBody">
       {% for order in orders %}
-      <tr data-status="{{ order.status|lower }}"
-          data-search="{{ order.id }}-{{ order.user.username|default:order.user.get_full_name|lower }}">
-        <td class="order-id">#{{ order.id }}</td>
-        <td>{{ order.user.get_full_name|default:order.user.username }}</td>
-        <td>
+      {% with cname=order.user.get_full_name|default:order.user.username %}
+<tr data-id="{{ order.id }}" data-status="{{ order.status|lower }}"
+data-approval="{% if order.status == 'pending' and order.payment_status != 'pending' %}1{% else %}0{% endif %}"
+data-pay="{% if order.payment_status == 'pending' %}unpaid{% elif order.payment_method == 'cash' %}{% if order.payment_status == 'paid' %}cashpaid{% else %}cashpending{% endif %}{% elif order.status == 'cancelled' and order.payment_status == 'paid' %}{% if order.refunded %}refunded{% else %}refundpending{% endif %}{% else %}online{% endif %}"
+data-amount="{{ order.total_amount|stringformat:'s' }}"
+data-ts="{{ order.created_at|date:'U' }}"
+data-day="{{ order.created_at|date:'Y-m-d' }}"
+data-date="{{ order.created_at|date:'d M Y H:i' }}"
+data-cust="{{ cname }}"
+class="{% if order.status == 'pending' and order.payment_status != 'pending' %}needs-approval{% endif %}"
+data-search="{{ order.id }} {{ cname|lower }} {% for item in order.items.all %}{{ item.food_item.name|lower }} {% endfor %}">
+<td><span class="order-id">#{{ order.id }}</span></td>
+<td><div class="cust"><span class="av">{{ cname|slice:":1"|upper }}</span>{{ cname }}</div></td>
+<td>
+          {# Monitor only: the server assigns tables from the Server Dashboard #}
           {% if order.table %}
-            <span class="table-tag">🪑 #{{ order.table.number }}</span>
+<span class="table-tag" id="tableTag{{ order.id }}">🪑 #{{ order.table.number }}</span>
+          {% elif order.is_takeaway %}
+<span class="table-tag takeaway" id="tableTag{{ order.id }}">🥡 Takeaway</span>
+          {% elif order.is_delivery %}
+<span class="table-tag takeaway" id="tableTag{{ order.id }}">🛵 Home delivery</span>
           {% else %}
-            <span class="table-tag takeaway">🥡 Takeaway</span>
+<span class="table-tag" id="tableTag{{ order.id }}">🍽️ No table yet</span>
           {% endif %}
-        </td>
-        <td class="order-items">
-          {% for item in order.items.all %}{{ item.quantity }}× {{ item.food_item.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
-        </td>
-        <td class="amount">₹{{ order.total_amount }}</td>
-        <td>
-          <div class="pay-cell">
-            {% if order.payment_method == 'cash' %}
+</td>
+<td>
+          {% include 'dashboard/_order_meta.html' %}
+<div class="items">
+            {% for item in order.items.all %}
+<div class="it">
+              {% if item.food_item.image %}<img src="{{ item.food_item.image.url }}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="ph" style="display:none" data-n="{{ item.food_item.name }}"></span>{% else %}<span class="ph" data-n="{{ item.food_item.name }}"></span>{% endif %}
+<span class="q">{{ item.quantity }}×</span><span class="n">{{ item.food_item.name }}</span>
+</div>
+            {% endfor %}
+</div>
+</td>
+<td class="amount">₹{{ order.total_amount|inr }}</td>
+<td>
+<div class="pay-cell">
+            {% if order.payment_status == 'pending' %}
+<span class="pay-badge unpaid" id="payBadge{{ order.id }}">⏳ Payment Pending</span>
+            {% elif order.payment_method == 'cash' %}
               {% if order.payment_status == 'paid' %}
-                <span class="pay-badge paid" id="payBadge{{ order.id }}">💵 Cash Paid</span>
+<span class="pay-badge paid" id="payBadge{{ order.id }}">💵 Cash Paid</span>
               {% else %}
-                <span class="pay-badge cash-pending" id="payBadge{{ order.id }}">💵 Cash Pending</span>
-                <button class="cash-btn" id="cashBtn{{ order.id }}" onclick="markCashReceived({{ order.id }})">Mark Received</button>
+<span class="pay-badge cash-pending" id="payBadge{{ order.id }}">💵 Cash Pending</span>
+<button class="cash-btn" id="cashBtn{{ order.id }}" onclick="markCashReceived({{ order.id }})">Mark Received</button>
+              {% endif %}
+            {% elif order.status == 'cancelled' and order.payment_status == 'paid' %}
+              {% if order.refunded %}
+<span class="pay-badge refunded" id="payBadge{{ order.id }}">↩️ Refunded</span>
+              {% else %}
+<span class="pay-badge refund-pending" id="payBadge{{ order.id }}">💸 Refund pending</span>
+<button class="refund-btn" id="refundBtn{{ order.id }}" onclick="markRefunded({{ order.id }})">Mark Refunded</button>
               {% endif %}
             {% else %}
-              <span class="pay-badge online" id="payBadge{{ order.id }}">💳 Paid Online</span>
+<span class="pay-badge online" id="payBadge{{ order.id }}">💳 Paid Online</span>
             {% endif %}
-          </div>
-        </td>
-        <td>
-          <select class="status-select status-{{ order.status|lower }}" onchange="updateStatus(this, {{ order.id }})">
-            <option value="pending" {% if order.status|lower == "pending" %}selected{% endif %}>⏳ Pending</option>
-            <option value="confirmed" {% if order.status|lower == "confirmed" %}selected{% endif %}>🧾 Confirmed</option>
-            <option value="preparing" {% if order.status|lower == "preparing" %}selected{% endif %}>👨‍🍳 Preparing</option>
-            <option value="ready" {% if order.status|lower == "ready" %}selected{% endif %}>🔔 Ready</option>
-            <option value="delivered" {% if order.status|lower == "delivered" %}selected{% endif %}>✅ Delivered</option>
-            <option value="cancelled" {% if order.status|lower == "cancelled" %}selected{% endif %}>❌ Cancelled</option>
-          </select>
-        </td>
-        <td>{{ order.created_at|date:"d M Y, g:i A" }}</td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="8">
-        <div class="empty-state">
-          <div class="big-emoji">🧾</div>
-          <p>No orders placed yet.</p>
-        </div>
-      </td></tr>
+</div>
+</td>
+<td>
+          {# Monitor only: read-only status. The server and kitchen move the order along. #}
+          {% if order.status == 'pending' and order.payment_status != 'pending' %}
+<span class="status-badge waiting-server">⏳ Waiting for server</span>
+          {% elif order.status == 'pending' %}
+<span class="status-badge await-pay">⏳ Awaiting payment</span>
+          {% else %}
+<span class="status-badge status-{{ order.status|lower }}" data-status-badge>{{ order.get_status_display }}</span>
+          {% endif %}
+</td>
+<td>{{ order.created_at|date:"d M Y, g:i A" }}<span class="ago">{{ order.created_at|timesince }} ago</span></td>
+</tr>
+      {% endwith %}
       {% endfor %}
-    </tbody>
-  </table>
+</tbody>
+</table>
+<div class="empty-state" id="emptyState"><div class="big">🧾</div><p>No orders match your filters.</p></div>
 </div>
 
+<div id="toasts"></div>
+
 <script>
-  const rows = document.querySelectorAll('#ordersTableBody tr[data-status]');
-  let currentFilter = 'all';
+const tbody = document.getElementById('ordersTableBody');
+const searchInput = document.getElementById('orderSearch');
+const KITCHEN = ['confirmed', 'preparing', 'ready', 'out_for_delivery'];
+const PAID = ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
+const STATUS_LABELS = {
+  pending: 'Pending', confirmed: 'Confirmed', preparing: 'Preparing', ready: 'Ready',
+  out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled'
+};
+let currentFilter = 'all', payFilter = 'all', sortBy = 'attention', live = true;
 
-  function computeCounts() {
-    let pending = 0, preparing = 0, delivered = 0;
-    rows.forEach(r => {
-      if (r.dataset.status === 'pending') pending++;
-      if (r.dataset.status === 'preparing') preparing++;
-      if (r.dataset.status === 'delivered' || r.dataset.status === 'completed') delivered++;
-    });
-    document.getElementById('pendingCount').textContent = pending;
-    document.getElementById('preparingCount').textContent = preparing;
-    document.getElementById('deliveredCount').textContent = delivered;
+const getRows = () => Array.from(tbody.querySelectorAll('tr[data-status]'));
+const money = n => '₹' + Math.round(n).toLocaleString('en-IN');
+const setText = (id, v) => { document.getElementById(id).textContent = v; };
+function todayStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function getCsrfToken() { return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ''; }
+
+function toast(msg, err) {
+  const t = document.createElement('div');
+  t.className = 'toast' + (err ? ' err' : '');
+  t.textContent = msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+/* ---- remember filters, so a page refresh does not reset them ---- */
+const VIEW_KEY = 'ordersViewState';
+function saveView() {
+  try { sessionStorage.setItem(VIEW_KEY, JSON.stringify({ f: currentFilter, p: payFilter, s: sortBy, q: searchInput.value })); } catch (e) {}
+}
+function loadView() {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(VIEW_KEY) || 'null');
+    if (!v) return;
+    currentFilter = v.f || 'all';
+    payFilter = v.p || 'all';
+    sortBy = v.s || 'attention';
+    searchInput.value = v.q || '';
+    document.getElementById('sortBy').value = sortBy;
+  } catch (e) {}
+}
+
+/* ---- dish icons when there is no photo ---- */
+const ICONS = [
+  [/mojito|juice|crush|shake|soda|drink|lassi|tea|coffee|lime/i, '🍹'],
+  [/fish|meen|nethili|prawn|crab|sura/i, '🐟'],
+  [/biryani|biriyani|rice|pulao/i, '🍛'],
+  [/chicken|65|tikka|kebab|wings|lollipop/i, '🍗'],
+  [/mutton|kari|lamb|beef|keema|chops/i, '🍖'],
+  [/paneer|veg|mushroom|gobi|aloo/i, '🥘'],
+  [/egg|omelette/i, '🥚'],
+  [/apple|mango|berry|strawberr|fruit|banana/i, '🍎'],
+  [/ice|cake|sweet|dessert|halwa|kulfi/i, '🍨'],
+  [/parotta|naan|roti|bread|dosa|chapati/i, '🫓'],
+  [/soup/i, '🍲']
+];
+function fillPh(root) {
+  root.querySelectorAll('.ph').forEach(el => {
+    if (el.textContent) return;
+    const n = el.dataset.n || '';
+    const m = ICONS.find(i => i[0].test(n));
+    el.textContent = m ? m[1] : '🍽️';
+  });
+}
+
+/* ---- filters / stats / sort ---- */
+function inFilter(r, f) {
+  const s = r.dataset.status;
+  if (f === 'all') return true;
+  if (f === 'approval') return r.dataset.approval === '1';
+  if (f === 'kitchen') return KITCHEN.includes(s);
+  if (f === 'delivered') return s === 'delivered' || s === 'completed';
+  return s === f;
+}
+function stats() {
+  const rs = getRows(), t = todayStr();
+  let sales = 0, cash = 0, refund = 0;
+  rs.forEach(r => {
+    const amt = parseFloat(r.dataset.amount) || 0;
+    if (r.dataset.day === t && PAID.includes(r.dataset.status)) sales += amt;
+    if (r.dataset.pay === 'cashpending' && r.dataset.status !== 'cancelled') cash += amt;
+    if (r.dataset.pay === 'refundpending') refund += amt;
+  });
+  const c = f => rs.filter(r => inFilter(r, f)).length;
+  setText('sTotal', rs.length); setText('sApproval', c('approval'));
+  setText('sKitchen', c('kitchen')); setText('sDelivered', c('delivered'));
+  setText('sSales', money(sales)); setText('sCash', money(cash)); setText('sRefund', money(refund));
+  document.querySelectorAll('.filter-chip').forEach(ch => { ch.querySelector('b').textContent = c(ch.dataset.filter); });
+  document.querySelectorAll('.pay-chip').forEach(ch => {
+    const p = ch.dataset.pay;
+    ch.querySelector('b').textContent = p === 'all' ? rs.length : rs.filter(r => r.dataset.pay === p).length;
+  });
+}
+function sortRows() {
+  const rs = getRows();
+  rs.sort((a, b) => {
+    if (sortBy === 'attention') { const d = (b.dataset.approval | 0) - (a.dataset.approval | 0); if (d) return d; }
+    if (sortBy === 'oldest') return a.dataset.ts - b.dataset.ts;
+    if (sortBy === 'amount') return parseFloat(b.dataset.amount) - parseFloat(a.dataset.amount);
+    return b.dataset.ts - a.dataset.ts;
+  });
+  rs.forEach(r => tbody.appendChild(r));
+}
+function applyFilters() {
+  const q = searchInput.value.trim().replace(/^#/, '').toLowerCase();
+  let shown = 0;
+  getRows().forEach(r => {
+    const ok = r.dataset.search.includes(q) && inFilter(r, currentFilter) && (payFilter === 'all' || r.dataset.pay === payFilter);
+    r.style.display = ok ? '' : 'none';
+    if (ok) shown++;
+  });
+  document.getElementById('emptyState').classList.toggle('show', shown === 0);
+  setText('shownCount', shown + ' / ' + getRows().length + ' orders');
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === currentFilter));
+  document.querySelectorAll('.pay-chip').forEach(c => c.classList.toggle('active', c.dataset.pay === payFilter));
+  document.querySelectorAll('.st[data-f]').forEach(c => c.classList.toggle('on', c.dataset.f === currentFilter && currentFilter !== 'all'));
+  saveView();
+}
+function refreshView() { sortRows(); stats(); applyFilters(); }
+function setFilter(f) { currentFilter = f; applyFilters(); }
+function setPay(p) { payFilter = payFilter === p ? 'all' : p; applyFilters(); }
+
+searchInput.addEventListener('input', applyFilters);
+document.getElementById('payRow').addEventListener('click', e => {
+  const chip = e.target.closest('.pay-chip');
+  if (!chip) return;
+  payFilter = chip.dataset.pay;
+  applyFilters();
+});
+document.getElementById('sortBy').addEventListener('change', e => { sortBy = e.target.value; refreshView(); });
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (e.key === '/' && tag !== 'input' && tag !== 'textarea' && tag !== 'select') { e.preventDefault(); searchInput.focus(); }
+});
+
+/* ---- update one row without reloading (used after Mark Received) ---- */
+function setRowStatus(row, status) {
+  row.dataset.status = status;
+  if (status !== 'pending') { row.dataset.approval = '0'; row.classList.remove('needs-approval'); }
+  const badge = row.querySelector('[data-status-badge]');
+  if (badge) {
+    badge.className = 'status-badge status-' + status;
+    badge.textContent = STATUS_LABELS[status] || status;
   }
-  computeCounts();
+  stats(); applyFilters();
+}
 
-  const searchInput = document.getElementById('orderSearch');
-
-  function applyFilters() {
-    const q = searchInput.value.toLowerCase();
-    rows.forEach(row => {
-      const textMatch = row.dataset.search.includes(q);
-      const filterMatch = currentFilter === 'all' || row.dataset.status === currentFilter;
-      row.style.display = (textMatch && filterMatch) ? '' : 'none';
-    });
-  }
-  searchInput.addEventListener('input', applyFilters);
-
-  function setFilter(f) {
-    currentFilter = f;
-    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
-    applyFilters();
-  }
-
-  function getCsrfToken() {
-    return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
-  }
-
-  function updateStatus(select, orderId) {
-    select.className = 'status-select status-' + select.value;
-    fetch(`/dashboard/orders/${orderId}/update-status/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCsrfToken()
-      },
-      body: JSON.stringify({ status: select.value })
-    }).catch(() => console.log('Hook this up to your update-status view'));
-  }
-
-  function markCashReceived(orderId) {
-    const btn = document.getElementById('cashBtn' + orderId);
-    const badge = document.getElementById('payBadge' + orderId);
-    if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
-
-    fetch(`/dashboard/orders/${orderId}/mark-cash-received/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRFToken': getCsrfToken()
-      }
+/* ---- cash received / refund paid (admin money actions) ---- */
+function markCashReceived(orderId) {
+  const btn = document.getElementById('cashBtn' + orderId);
+  const badge = document.getElementById('payBadge' + orderId);
+  const row = badge.closest('tr');
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
+  fetch(`/dashboard/orders/${orderId}/mark-cash-received/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() }
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) throw new Error('fail');
+      badge.className = 'pay-badge paid';
+      badge.textContent = '💵 Cash Paid';
+      if (btn) btn.remove();
+      row.dataset.pay = 'cashpaid';
+      if (data.status) setRowStatus(row, data.status); else { stats(); applyFilters(); }
+      toast(data.status === 'delivered' ? 'Cash received. Order #' + orderId + ' delivered ✅' : 'Cash received for order #' + orderId);
     })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          badge.className = 'pay-badge paid';
-          badge.textContent = '💵 Cash Paid';
-          if (btn) btn.remove();
-        } else {
-          if (btn) { btn.disabled = false; btn.textContent = 'Mark Received'; }
-          alert('Could not update. Try again.');
-        }
-      })
-      .catch(() => {
-        if (btn) { btn.disabled = false; btn.textContent = 'Mark Received'; }
-        alert('Could not update. Try again.');
-      });
-  }
+    .catch(() => {
+      if (btn) { btn.disabled = false; btn.textContent = 'Mark Received'; }
+      toast('Could not update. Try again.', true);
+    });
+}
+
+function markRefunded(orderId) {
+  const btn = document.getElementById('refundBtn' + orderId);
+  const badge = document.getElementById('payBadge' + orderId);
+  const row = badge.closest('tr');
+  if (!confirm('Mark order #' + orderId + ' as refunded?')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
+  fetch(`/dashboard/orders/${orderId}/mark-refunded/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() }
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success) throw new Error('fail');
+      badge.className = 'pay-badge refunded';
+      badge.textContent = '↩️ Refunded';
+      if (btn) btn.remove();
+      row.dataset.pay = 'refunded';
+      stats(); applyFilters();
+      toast('Order #' + orderId + ' refunded ✅');
+    })
+    .catch(() => {
+      if (btn) { btn.disabled = false; btn.textContent = 'Mark Refunded'; }
+      toast('Could not update. Try again.', true);
+    });
+}
+
+/* ---- live refresh + CSV ---- */
+function toggleLive() {
+  live = !live;
+  const b = document.getElementById('liveBtn');
+  b.textContent = live ? '🟢 Live' : '⏸️ Paused';
+  b.classList.toggle('live-on', live);
+}
+async function liveRefresh() {
+  if (!live || document.hidden) return;
+  try {
+    const r = await fetch(location.pathname, { credentials: 'same-origin' });
+    if (!r.ok) return;
+    const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+    const nb = doc.getElementById('ordersTableBody');
+    if (!nb) return;
+    tbody.innerHTML = nb.innerHTML;
+    fillPh(tbody); refreshView();
+  } catch (e) {}
+}
+setInterval(liveRefresh, 15000);
+
+function exportCsv() {
+  const q = s => '"' + String(s).replace(/"/g, '""') + '"';
+  const lines = [['Order', 'Customer', 'Table', 'Items', 'Amount', 'Payment', 'Status', 'Placed'].map(q).join(',')];
+  getRows().filter(r => r.style.display !== 'none').forEach(r => {
+    const items = Array.from(r.querySelectorAll('.it')).map(i => i.querySelector('.q').textContent + ' ' + i.querySelector('.n').textContent).join('; ');
+    lines.push([r.dataset.id, r.dataset.cust, r.querySelector('.table-tag').textContent.trim(), items,
+      r.dataset.amount, r.dataset.pay, r.dataset.status, r.dataset.date].map(q).join(','));
+  });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+  a.download = 'orders_' + todayStr() + '.csv';
+  a.click();
+  toast('CSV downloaded');
+}
+
+fillPh(document);
+loadView();
+refreshView();
 </script>
 {% endblock %}

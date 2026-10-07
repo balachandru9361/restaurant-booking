@@ -1,0 +1,26 @@
+{% extends 'store/store_base.html' %}
+{% block title %}Add {{ cfg.title }}{% endblock %}
+{% block content %}
+<h1>Add {{ cfg.title }}</h1>
+<style>
+  .move-card select, .move-card input { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:.95rem; }
+  .move-card label { display:block; font-weight:600; font-size:.85rem; margin-bottom:4px; }
+  .move-card .fld { margin-bottom:14px; }
+  .move-card .ferr { color:#dc2626; font-size:.82rem; margin-top:4px; }
+</style>
+<div class="card move-card" style="max-width:520px">
+  <form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="ferr">{{ form.non_field_errors|striptags }}</div>{% endif %}
+    {% for f in form %}
+    <div class="fld">
+      <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+      {{ f }}
+      {% if f.errors %}<div class="ferr">{{ f.errors|striptags }}</div>{% endif %}
+    </div>
+    {% endfor %}
+    <button class="btn" type="submit">Save</button>
+    <a class="btn light" href="{% url cfg.list_url %}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

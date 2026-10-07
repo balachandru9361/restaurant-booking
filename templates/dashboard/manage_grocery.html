@@ -1,0 +1,539 @@
+{% extends "store/store_base.html" %}
+{% comment %}
+  Manage Grocery v3 - Store Manager page.
+  Shows pending kitchen out-of-stock reports at the top, with a quick restock form.
+  Layout lives inside store_base.html (sidebar), so no full-bleed trick here.
+{% endcomment %}
+
+{% block content %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@500;600;700&display=swap');
+
+.gs {
+  --ink: #0b2530;
+  --muted: #5f7480;
+  --line: #e1eaee;
+  --card: #ffffff;
+  --teal: #0d9488;
+  --emerald: #10b981;
+  --amber: #f59e0b;
+  --rose: #f43f5e;
+  --indigo: #6366f1;
+  --grad-main: linear-gradient(135deg, #0d9488 0%, #0891b2 50%, #6366f1 100%);
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--ink);
+  width: 100%;
+  padding: 22px 24px;
+  border-radius: 18px;
+  background:
+    radial-gradient(900px 400px at 0% 0%, rgba(13,148,136,.14), transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, rgba(99,102,241,.14), transparent 60%),
+    #f4f8fa;
+}
+.gs * { box-sizing: border-box; }
+.gs h1, .gs h2, .gs .num { font-family: 'Sora', 'Inter', sans-serif; }
+
+/* header */
+.gs-head { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; }
+.gs-head h1 { font-size: 2.1rem; font-weight: 700; margin: 0 0 6px; letter-spacing: -0.02em; background: var(--grad-main); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gs-head p { margin: 0; color: var(--muted); font-size: .95rem; max-width: 62ch; }
+.gs-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.gs-btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px; padding: 10px 16px; font: 500 .86rem 'Inter', sans-serif; cursor: pointer; transition: transform .12s, box-shadow .2s, border-color .15s; }
+.gs-btn:hover { border-color: var(--teal); box-shadow: 0 6px 16px rgba(13,148,136,.18); }
+.gs-btn:active { transform: scale(.97); }
+.gs-btn.primary { background: var(--grad-main); border-color: transparent; color: #fff; font-weight: 600; box-shadow: 0 8px 20px rgba(13,148,136,.3); }
+.gs :focus-visible { outline: 3px solid rgba(99,102,241,.5); outline-offset: 2px; }
+
+/* kitchen reports (pending) */
+.gs-req { background: #fff; border: 1px solid #fecdd3; border-left: 6px solid var(--rose); border-radius: 18px; padding: 18px 20px; margin-bottom: 20px; box-shadow: 0 6px 20px rgba(244,63,94,.08); }
+.gs-req h2 { margin: 0 0 4px; font-size: 1.1rem; color: #be123c; display: flex; align-items: center; gap: 8px; }
+.gs-req .sub { margin: 0 0 14px; font-size: .85rem; color: var(--muted); }
+.gs-req-count { background: #be123c; color: #fff; border-radius: 999px; font: 700 .75rem 'Inter', sans-serif; padding: 2px 10px; }
+.gs-req-row { display: grid; grid-template-columns: minmax(180px, 1.6fr) minmax(140px, 1fr) minmax(260px, 1.6fr); gap: 16px; align-items: center; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; background: #fff7f8; }
+.gs-req-row:last-child { margin-bottom: 0; }
+.gs-req-name { font-weight: 600; text-transform: capitalize; }
+.gs-req-meta { font-size: .8rem; color: var(--muted); margin-top: 3px; }
+.gs-req-note { font-size: .82rem; color: #7a4b00; background: #fef3c7; border-radius: 8px; padding: 3px 9px; display: inline-block; margin-top: 5px; }
+.gs-req-left { font-size: .9rem; }
+.gs-req-left b { font-family: 'Sora', sans-serif; font-size: 1.1rem; color: #be123c; }
+.gs-req-form { display: flex; gap: 8px; align-items: center; }
+.gs-req-form input { width: 110px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: 600 .9rem 'Inter', sans-serif; background: #fff; color: var(--ink); }
+.gs-req-form input:focus { border-color: var(--teal); outline: 3px solid rgba(13,148,136,.2); }
+.gs-req-form .gs-btn { white-space: nowrap; }
+.gs-req-empty { color: var(--muted); font-size: .9rem; }
+
+/* overview banner */
+.gs-overview { background: var(--grad-main); color: #fff; border-radius: 22px; padding: 26px; margin-bottom: 20px; box-shadow: 0 18px 40px rgba(13,148,136,.28); position: relative; overflow: hidden; }
+.gs-overview::after { content: ''; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,.1); }
+.gs-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; position: relative; z-index: 1; }
+.gs-tile { text-align: left; display: flex; align-items: center; gap: 14px; background: rgba(255,255,255,.16); border: 2px solid transparent; backdrop-filter: blur(6px); color: #fff; border-radius: 16px; padding: 16px; cursor: pointer; font-family: 'Inter', sans-serif; transition: transform .15s, background .2s; }
+.gs-tile:hover { background: rgba(255,255,255,.26); transform: translateY(-2px); }
+.gs-tile.active { border-color: #fff; background: rgba(255,255,255,.28); }
+.gs-ico { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 1.4rem; flex: none; }
+.gs-tile.t-all .gs-ico { background: rgba(255,255,255,.9); }
+.gs-tile.t-ok .gs-ico { background: #bbf7d0; }
+.gs-tile.t-low .gs-ico { background: #fde68a; }
+.gs-tile.t-out .gs-ico { background: #fecdd3; }
+.gs-tile b { display: block; font-family: 'Sora', sans-serif; font-size: 1.9rem; line-height: 1; margin-bottom: 4px; }
+.gs-tile span.lbl { font-size: .85rem; opacity: .92; }
+.gs-seg { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: rgba(255,255,255,.2); margin-top: 20px; position: relative; z-index: 1; }
+.gs-seg span { display: block; height: 100%; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.gs-seg .s-ok { background: #4ade80; }
+.gs-seg .s-low { background: #fbbf24; }
+.gs-seg .s-out { background: #fb7185; }
+
+/* add panel */
+.gs-add { background: var(--card); border: 1px solid var(--line); border-radius: 18px; margin-bottom: 20px; overflow: hidden; box-shadow: 0 6px 20px rgba(11,37,48,.05); }
+.gs-add-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; background: none; border: 0; padding: 18px 22px; font: 600 1.02rem 'Sora', sans-serif; color: var(--ink); cursor: pointer; }
+.gs-add-toggle .chev { transition: transform .2s; color: var(--teal); }
+.gs-add.open .chev { transform: rotate(180deg); }
+.gs-add-body { display: none; padding: 0 22px 22px; }
+.gs-add.open .gs-add-body { display: block; }
+.gs-add-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 14px; align-items: end; }
+.gs label { display: block; font-size: .78rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.gs .gs-field { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px; font: 400 .92rem 'Inter', sans-serif; background: #f8fbfc; color: var(--ink); }
+.gs .gs-field:focus { border-color: var(--teal); outline: 3px solid rgba(13,148,136,.2); background: #fff; }
+
+/* list */
+.gs-list { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px 20px 14px; box-shadow: 0 6px 20px rgba(11,37,48,.05); }
+.gs-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+.gs-search { position: relative; flex: 1 1 280px; }
+.gs-search svg { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--teal); pointer-events: none; }
+.gs .gs-search input.gs-field { padding-left: 42px; }
+.gs-count { color: var(--muted); font-size: .82rem; margin-left: auto; }
+
+.gs-cols, .gs-row { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(240px, 2.4fr) 100px 120px 260px 44px; gap: 18px; align-items: center; }
+.gs-cols { padding: 4px 18px 10px; font-size: .74rem; font-weight: 600; color: var(--muted); }
+.gs-row { padding: 16px 18px; margin-bottom: 10px; border: 1px solid var(--line); border-left: 6px solid var(--emerald); border-radius: 16px; background: #fff; transition: box-shadow .2s, transform .15s; }
+.gs-row:hover { box-shadow: 0 10px 26px rgba(11,37,48,.1); transform: translateY(-1px); }
+.gs-row.low { border-left-color: var(--amber); background: linear-gradient(90deg, #fff7e0, #fff 55%); }
+.gs-row.out { border-left-color: var(--rose); background: linear-gradient(90deg, #ffe8ec, #fff 55%); }
+
+.gs-name { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.gs-av { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; color: #fff; font: 700 1.05rem 'Sora', sans-serif; flex: none; box-shadow: 0 6px 14px rgba(0,0,0,.15); }
+.gs-nm { min-width: 0; }
+.gs-nm .n { font-weight: 600; font-size: 1rem; text-transform: capitalize; display: block; }
+.gs-dup { display: inline-block; margin-top: 4px; font-size: .7rem; font-weight: 600; background: #fde68a; color: #7a4b00; border-radius: 6px; padding: 2px 8px; }
+
+/* gauge with alert-limit tick */
+.gs-gauge-qty { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 1.1rem; margin-bottom: 8px; }
+.gs-gauge-qty small { font-family: 'Inter', sans-serif; font-weight: 500; color: var(--muted); font-size: .8rem; }
+.gs-track { position: relative; height: 12px; border-radius: 999px; background: #e6eef1; }
+.gs-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: linear-gradient(90deg, #10b981, #14b8a6); transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.gs-row.low .gs-fill { background: linear-gradient(90deg, #f59e0b, #fb923c); }
+.gs-row.out .gs-fill { background: linear-gradient(90deg, #f43f5e, #fb7185); }
+.gs-tick { position: absolute; left: 33.333%; top: -5px; bottom: -5px; width: 3px; background: var(--ink); border-radius: 3px; opacity: .6; }
+
+.gs-limit { color: var(--muted); font-size: .9rem; font-weight: 500; }
+.gs-pill { display: inline-block; font-size: .78rem; font-weight: 600; border-radius: 999px; padding: 5px 13px; background: #d1fae5; color: #047857; }
+.gs-row.low .gs-pill { background: #fef3c7; color: #92400e; }
+.gs-row.out .gs-pill { background: #ffe4e6; color: #be123c; }
+
+.gs-edit { display: flex; align-items: center; gap: 8px; }
+.gs-step { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #f8fbfc; }
+.gs-step button { border: 0; background: none; width: 34px; height: 38px; font-size: 1.15rem; cursor: pointer; color: var(--teal); font-weight: 700; }
+.gs-step button:hover { background: #ccfbf1; }
+.gs-step input { width: 76px; border: 0; background: transparent; text-align: center; font: 600 .92rem 'Inter', sans-serif; padding: 0; -moz-appearance: textfield; color: var(--ink); }
+.gs-step input::-webkit-outer-spin-button, .gs-step input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.gs-step input:focus { outline: none; }
+.gs-save { border: 0; border-radius: 12px; height: 40px; padding: 0 16px; font: 600 .84rem 'Inter', sans-serif; background: #e6eef1; color: #94a8b0; cursor: not-allowed; transition: background .2s, color .2s, box-shadow .2s; }
+.gs-row.dirty .gs-save { background: var(--grad-main); color: #fff; cursor: pointer; box-shadow: 0 6px 16px rgba(13,148,136,.35); }
+.gs-row.dirty .gs-step { border-color: var(--teal); }
+
+.gs-del { border: 0; background: #f1f5f7; width: 38px; height: 38px; border-radius: 12px; cursor: pointer; color: var(--muted); transition: background .15s, color .15s; }
+.gs-del:hover { background: #ffe4e6; color: var(--rose); }
+
+.gs-empty { text-align: center; padding: 48px 12px; color: var(--muted); display: none; }
+.gs-empty.show { display: block; }
+.gs-empty strong { display: block; font-family: 'Sora', sans-serif; color: var(--ink); font-size: 1.05rem; margin-bottom: 4px; }
+
+/* dialog + toast */
+.gs-dialog { border: 0; border-radius: 18px; padding: 26px; max-width: 400px; width: 92%; box-shadow: 0 24px 60px rgba(11,37,48,.35); }
+.gs-dialog::backdrop { background: rgba(11,37,48,.6); }
+.gs-dialog h2 { font-size: 1.15rem; margin: 0 0 8px; }
+.gs-dialog p { color: var(--muted); font-size: .92rem; margin: 0 0 20px; }
+.gs-dialog .row { display: flex; gap: 10px; justify-content: flex-end; }
+.gs-btn.danger { background: linear-gradient(135deg, #f43f5e, #e11d48); border-color: transparent; color: #fff; font-weight: 600; }
+.gs-toasts { position: fixed; right: 20px; bottom: 20px; display: grid; gap: 8px; z-index: 2000; }
+.gs-toast { background: var(--ink); color: #fff; padding: 13px 18px; border-radius: 14px; font-size: .88rem; box-shadow: 0 10px 30px rgba(0,0,0,.25); border-left: 5px solid var(--emerald); animation: gsIn .25s ease; }
+@keyframes gsIn { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (max-width: 1200px) {
+  .gs-cols { display: none; }
+  .gs-row { grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  .gs-row .gs-gauge, .gs-row .gs-edit { grid-column: 1 / -1; }
+  .gs-add-grid { grid-template-columns: 1fr 1fr; }
+  .gs-add-grid .span2 { grid-column: 1 / -1; }
+  .gs-tiles { grid-template-columns: 1fr 1fr; }
+  .gs-req-row { grid-template-columns: 1fr 1fr; }
+  .gs-req-row .gs-req-form { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) { .gs { padding: 14px; } .gs-tiles { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .gs *, .gs-toast { transition: none !important; animation: none !important; } }
+@media print {
+  .gs { background: #fff; padding: 0; }
+  .gs-actions, .gs-add, .gs-tools, .gs-edit, .gs-del-wrap, .gs-toasts, .gs-req { display: none !important; }
+  .gs-row, .gs-cols { grid-template-columns: 2fr 2fr 1fr 1fr; }
+  .gs-row { box-shadow: none; }
+}
+</style>
+
+<div class="gs">
+
+  <div class="gs-head">
+    <div>
+      <h1>Manage Grocery</h1>
+      <p>Track kitchen stock. Kitchen reports an item as out of stock, you restock it here.</p>
+    </div>
+    <div class="gs-actions">
+      <button type="button" class="gs-btn" id="gsExport">Export CSV</button>
+      <button type="button" class="gs-btn" onclick="window.print()">Print</button>
+      <button type="button" class="gs-btn primary" id="gsOpenAdd">Add item</button>
+    </div>
+  </div>
+
+  <!-- kitchen reports (pending) -->
+  <section class="gs-req" aria-label="Pending kitchen reports">
+    <h2>&#128683; Kitchen reports (pending) <span class="gs-req-count">{{ pending_requests|length }}</span></h2>
+    <p class="sub">Kitchen out of stock nu report panna items. Pudhu quantity potu Restock pannunga, kitchen ku message poidum.</p>
+    {% for r in pending_requests %}
+    <div class="gs-req-row">
+      <div>
+        <div class="gs-req-name">{{ r.item.name }}</div>
+        <div class="gs-req-meta">Reported by {{ r.requested_by.username|default:"kitchen" }}</div>
+        {% if r.note %}<span class="gs-req-note">Note: {{ r.note }}</span>{% endif %}
+      </div>
+      <div class="gs-req-left">Now: <b>{{ r.item.quantity }}</b> {{ r.item.unit }}</div>
+      <form class="gs-req-form" method="post" action="{% url 'dashboard:update_grocery' r.item.pk %}">
+        {% csrf_token %}
+        <input type="number" name="quantity" step="0.01" min="0" placeholder="New qty ({{ r.item.unit }})" aria-label="New quantity for {{ r.item.name }}" required>
+        <button type="submit" class="gs-btn primary">Restock</button>
+      </form>
+    </div>
+    {% empty %}
+    <div class="gs-req-empty">Pending reports edhuvum illa. 👍</div>
+    {% endfor %}
+  </section>
+
+  <!-- overview -->
+  <section class="gs-overview" aria-label="Stock overview">
+    <div class="gs-tiles">
+      <button type="button" class="gs-tile t-all active" data-filter="all">
+        <span class="gs-ico">&#128230;</span><span><b id="cAll">0</b><span class="lbl">Total items</span></span>
+      </button>
+      <button type="button" class="gs-tile t-ok" data-filter="ok">
+        <span class="gs-ico">&#9989;</span><span><b id="cOk">0</b><span class="lbl">Healthy stock</span></span>
+      </button>
+      <button type="button" class="gs-tile t-low" data-filter="low">
+        <span class="gs-ico">&#9888;&#65039;</span><span><b id="cLow">0</b><span class="lbl">Low stock</span></span>
+      </button>
+      <button type="button" class="gs-tile t-out" data-filter="out">
+        <span class="gs-ico">&#128683;</span><span><b id="cOut">0</b><span class="lbl">Out of stock</span></span>
+      </button>
+    </div>
+    <div class="gs-seg" role="img" aria-label="Share of healthy, low and out of stock items">
+      <span class="s-ok" id="segOk" style="width:0"></span>
+      <span class="s-low" id="segLow" style="width:0"></span>
+      <span class="s-out" id="segOut" style="width:0"></span>
+    </div>
+  </section>
+
+  <!-- add item -->
+  <section class="gs-add" id="gsAdd">
+    <button type="button" class="gs-add-toggle" id="gsAddToggle" aria-expanded="false">
+      <span>&#10133; Add grocery item</span>
+      <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="gs-add-body">
+      <form method="post" action="{% url 'dashboard:manage_grocery' %}">
+        {% csrf_token %}
+        <div class="gs-add-grid">
+          <div class="span2"><label for="fName">Item name</label><input id="fName" class="gs-field" type="text" name="name" placeholder="e.g. Basmati rice" required></div>
+          <div><label for="fQty">Quantity</label><input id="fQty" class="gs-field" type="number" name="quantity" min="0" step="0.01" value="0" required></div>
+          <div><label for="fUnit">Unit</label>
+            <select id="fUnit" class="gs-field" name="unit">
+              {% for value, label in units %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+            </select>
+          </div>
+          <div><label for="fLimit">Alert limit</label><input id="fLimit" class="gs-field" type="number" name="low_stock_limit" min="0" step="0.01" value="5" required></div>
+          <button class="gs-btn primary" type="submit" style="height:44px">Add item</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <!-- stock list -->
+  <section class="gs-list">
+    <div class="gs-tools">
+      <div class="gs-search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="gsSearch" class="gs-field" type="search" placeholder="Search item name" aria-label="Search item name">
+      </div>
+      <select id="gsSort" class="gs-field" style="width:auto" aria-label="Sort items">
+        <option value="name-asc">Name A-Z</option>
+        <option value="name-desc">Name Z-A</option>
+        <option value="need">Needs attention first</option>
+        <option value="qty-asc">Quantity: low to high</option>
+        <option value="qty-desc">Quantity: high to low</option>
+      </select>
+      <span class="gs-count" id="gsCount"></span>
+    </div>
+
+    <div class="gs-cols" aria-hidden="true">
+      <div>Item</div><div>Stock level (line = alert limit)</div><div>Alert limit</div><div>Status</div><div>Update quantity</div><div></div>
+    </div>
+
+    <div id="gsRows">
+      {% for item in items %}
+      <div class="gs-row" data-name="{{ item.name|lower }}" data-qty="{{ item.quantity|stringformat:'f' }}" data-limit="{{ item.low_stock_limit|stringformat:'f' }}" data-unit="{{ item.unit }}">
+        <div class="gs-name">
+          <span class="gs-av"></span>
+          <div class="gs-nm"><span class="n">{{ item.name }}</span></div>
+        </div>
+
+        <div class="gs-gauge">
+          <div class="gs-gauge-qty"><span class="q"></span> <small>{{ item.unit }}</small></div>
+          <div class="gs-track"><div class="gs-fill"></div><div class="gs-tick" title="Alert limit"></div></div>
+        </div>
+
+        <div class="gs-limit"><span class="l"></span> {{ item.unit }}</div>
+        <div><span class="gs-pill"></span></div>
+
+        <form class="gs-edit" method="post" action="{% url 'dashboard:update_grocery' item.pk %}">
+          {% csrf_token %}
+          <div class="gs-step">
+            <button type="button" data-step="-1" aria-label="Decrease">&minus;</button>
+            <input type="number" name="quantity" step="0.01" min="0" value="{{ item.quantity|stringformat:'.2f' }}" aria-label="Quantity for {{ item.name }}">
+            <button type="button" data-step="1" aria-label="Increase">+</button>
+          </div>
+          <button class="gs-save" type="submit" disabled>Save</button>
+        </form>
+
+        <div class="gs-del-wrap">
+          <form method="post" action="{% url 'dashboard:delete_grocery' item.pk %}" class="gs-del-form">
+            {% csrf_token %}
+            <button class="gs-del" type="button" aria-label="Delete {{ item.name }}" title="Delete">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="gs-empty" id="gsEmpty">
+      <strong>No items match</strong>
+      Try a different search, or clear the filter.
+    </div>
+  </section>
+</div>
+
+<dialog class="gs-dialog" id="gsDialog">
+  <h2>Delete this item?</h2>
+  <p id="gsDialogText">This removes the item from your stock list.</p>
+  <div class="row">
+    <button type="button" class="gs-btn" id="gsCancel">Cancel</button>
+    <button type="button" class="gs-btn danger" id="gsConfirm">Delete</button>
+  </div>
+</dialog>
+
+<div class="gs-toasts" id="gsToasts" aria-live="polite"></div>
+
+<script>
+(function () {
+  var rowsBox = document.getElementById('gsRows');
+  var rows = Array.prototype.slice.call(rowsBox.querySelectorAll('.gs-row'));
+  var state = { filter: 'all', query: '', sort: 'name-asc' };
+  var AV = [
+    'linear-gradient(135deg,#0d9488,#14b8a6)',
+    'linear-gradient(135deg,#6366f1,#8b5cf6)',
+    'linear-gradient(135deg,#f59e0b,#f97316)',
+    'linear-gradient(135deg,#ec4899,#f43f5e)',
+    'linear-gradient(135deg,#0891b2,#3b82f6)',
+    'linear-gradient(135deg,#16a34a,#84cc16)'
+  ];
+
+  function fmt(n) { return (Math.round(n * 100) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function statusOf(qty, limit) { return qty <= 0 ? 'out' : (qty <= limit ? 'low' : 'ok'); }
+  var LABEL = { ok: 'OK', low: 'Low stock', out: 'Out of stock' };
+
+  function hash(s) { var h = 0; for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) >>> 0; } return h; }
+
+  /* keyword -> icon; first match wins, so specific words come before generic ones */
+  var ICONS = [
+    ['bay leaf', '\uD83C\uDF3F'], ['curry leaves', '\uD83C\uDF3F'], ['coriander leaves', '\uD83C\uDF3F'], ['mint', '\uD83C\uDF3F'],
+    ['spring onion', '\uD83E\uDDC5'], ['onion', '\uD83E\uDDC5'], ['garlic', '\uD83E\uDDC4'], ['ginger', '\uD83C\uDF3F'],
+    ['chicken', '\uD83C\uDF57'], ['mutton', '\uD83E\uDD69'], ['goat', '\uD83E\uDD69'], ['fish', '\uD83D\uDC1F'], ['meen', '\uD83D\uDC1F'], ['anchovy', '\uD83D\uDC1F'], ['nethili', '\uD83D\uDC1F'],
+    ['egg', '\uD83E\uDD5A'], ['mushroom', '\uD83C\uDF44'], ['vegetable', '\uD83E\uDD66'], ['capsicum', '\uD83E\uDED1'], ['tomato sauce', '\uD83E\uDD6B'], ['tomato', '\uD83C\uDF45'],
+    ['rice flour', '\uD83C\uDF3E'], ['corn flour', '\uD83C\uDF3D'], ['flour', '\uD83C\uDF3E'], ['rice', '\uD83C\uDF5A'],
+    ['ghee', '\uD83E\uDDC8'], ['curd', '\uD83E\uDD5B'], ['milk', '\uD83E\uDD5B'], ['butter', '\uD83E\uDDC8'],
+    ['lemon', '\uD83C\uDF4B'], ['coconut', '\uD83E\uDD65'], ['tamarind', '\uD83C\uDF30'], ['blueberr', '\uD83E\uDED0'], ['strawberr', '\uD83C\uDF53'],
+    ['mango', '\uD83E\uDD6D'], ['orange', '\uD83C\uDF4A'], ['apple', '\uD83C\uDF4E'], ['banana', '\uD83C\uDF4C'], ['ice', '\uD83E\uDDCA'],
+    ['juice', '\uD83E\uDDC3'], ['soda', '\uD83E\uDD64'], ['crush', '\uD83C\uDF79'], ['syrup', '\uD83C\uDF6F'], ['sugar', '\uD83C\uDF6C'],
+    ['oil', '\uD83D\uDEE2\uFE0F'], ['vinegar', '\uD83C\uDF76'], ['sauce', '\uD83E\uDD6B'], ['salt', '\uD83E\uDDC2'],
+    ['chilli', '\uD83C\uDF36\uFE0F'], ['pepper', '\uD83C\uDF36\uFE0F'], ['turmeric', '\uD83C\uDF36\uFE0F'], ['masala', '\uD83C\uDF36\uFE0F'], ['powder', '\uD83C\uDF36\uFE0F'],
+    ['seeds', '\uD83C\uDF36\uFE0F'], ['cardamom', '\uD83C\uDF36\uFE0F'], ['cloves', '\uD83C\uDF36\uFE0F'], ['cinnamon', '\uD83C\uDF36\uFE0F'], ['anise', '\uD83C\uDF36\uFE0F']
+  ];
+  function iconFor(name) {
+    var n = (name || '').toLowerCase();
+    for (var i = 0; i < ICONS.length; i++) { if (n.indexOf(ICONS[i][0]) !== -1) return ICONS[i][1]; }
+    return '';
+  }
+
+  function paint(row) {
+    var qty = parseFloat(row.dataset.qty) || 0;
+    var limit = parseFloat(row.dataset.limit) || 0;
+    var st = statusOf(qty, limit);
+    row.dataset.status = st;
+    row.classList.remove('ok', 'low', 'out');
+    row.classList.add(st);
+    row.querySelector('.q').textContent = fmt(qty);
+    row.querySelector('.l').textContent = fmt(limit);
+    row.querySelector('.gs-pill').textContent = LABEL[st];
+    var pct = limit > 0 ? Math.min(100, (qty / (limit * 3)) * 100) : (qty > 0 ? 100 : 0);
+    row.querySelector('.gs-fill').style.width = pct + '%';
+    var av = row.querySelector('.gs-av');
+    var icon = iconFor(row.dataset.name);
+    if (icon) {
+      av.textContent = icon;
+      av.style.background = '#eef6f8';
+      av.style.fontSize = '1.5rem';
+      av.style.boxShadow = 'none';
+    } else {
+      av.textContent = (row.querySelector('.n').textContent.trim().charAt(0) || '?').toUpperCase();
+      av.style.background = AV[hash(row.dataset.name) % AV.length];
+    }
+  }
+
+  function markDuplicates() {
+    var seen = {};
+    rows.forEach(function (r) { seen[r.dataset.name] = (seen[r.dataset.name] || 0) + 1; });
+    rows.forEach(function (r) {
+      var old = r.querySelector('.gs-dup');
+      if (old) old.remove();
+      if (seen[r.dataset.name] > 1) {
+        var t = document.createElement('span');
+        t.className = 'gs-dup';
+        t.textContent = 'Duplicate name';
+        r.querySelector('.gs-nm').appendChild(t);
+      }
+    });
+  }
+
+  function overview() {
+    var c = { ok: 0, low: 0, out: 0 };
+    rows.forEach(function (r) { c[r.dataset.status]++; });
+    var total = rows.length || 1;
+    document.getElementById('cAll').textContent = rows.length;
+    document.getElementById('cOk').textContent = c.ok;
+    document.getElementById('cLow').textContent = c.low;
+    document.getElementById('cOut').textContent = c.out;
+    document.getElementById('segOk').style.width = (c.ok / total * 100) + '%';
+    document.getElementById('segLow').style.width = (c.low / total * 100) + '%';
+    document.getElementById('segOut').style.width = (c.out / total * 100) + '%';
+  }
+
+  function render() {
+    var order = { out: 0, low: 1, ok: 2 };
+    var list = rows.slice().sort(function (a, b) {
+      var qa = parseFloat(a.dataset.qty), qb = parseFloat(b.dataset.qty);
+      switch (state.sort) {
+        case 'name-desc': return b.dataset.name.localeCompare(a.dataset.name);
+        case 'need': return order[a.dataset.status] - order[b.dataset.status] || a.dataset.name.localeCompare(b.dataset.name);
+        case 'qty-asc': return qa - qb;
+        case 'qty-desc': return qb - qa;
+        default: return a.dataset.name.localeCompare(b.dataset.name);
+      }
+    });
+    var shown = 0;
+    list.forEach(function (r) {
+      var okFilter = state.filter === 'all' || r.dataset.status === state.filter;
+      var okQuery = !state.query || r.dataset.name.indexOf(state.query) !== -1;
+      var visible = okFilter && okQuery;
+      r.style.display = visible ? '' : 'none';
+      if (visible) shown++;
+      rowsBox.appendChild(r);
+    });
+    document.getElementById('gsCount').textContent = 'Showing ' + shown + ' of ' + rows.length + ' items';
+    document.getElementById('gsEmpty').classList.toggle('show', shown === 0);
+  }
+
+  function toast(msg) {
+    var t = document.createElement('div');
+    t.className = 'gs-toast';
+    t.textContent = msg;
+    document.getElementById('gsToasts').appendChild(t);
+    setTimeout(function () { t.remove(); }, 3500);
+  }
+
+  rows.forEach(function (row) {
+    paint(row);
+    var input = row.querySelector('.gs-step input');
+    var saveBtn = row.querySelector('.gs-save');
+    var original = input.value;
+
+    function dirtyCheck() {
+      var dirty = input.value !== original && input.value !== '';
+      row.classList.toggle('dirty', dirty);
+      saveBtn.disabled = !dirty;
+    }
+    input.addEventListener('input', dirtyCheck);
+    row.querySelectorAll('[data-step]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var v = parseFloat(input.value) || 0;
+        v = Math.max(0, v + parseFloat(b.dataset.step));
+        input.value = (Math.round(v * 100) / 100).toFixed(2);
+        dirtyCheck();
+      });
+    });
+
+    row.querySelector('.gs-del').addEventListener('click', function () {
+      var dlg = document.getElementById('gsDialog');
+      document.getElementById('gsDialogText').textContent = 'Delete "' + row.querySelector('.n').textContent + '" from your stock list? This cannot be undone.';
+      dlg.showModal();
+      document.getElementById('gsConfirm').onclick = function () { row.querySelector('.gs-del-form').submit(); };
+    });
+  });
+  document.getElementById('gsCancel').addEventListener('click', function () { document.getElementById('gsDialog').close(); });
+
+  document.querySelectorAll('[data-filter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      state.filter = b.dataset.filter;
+      document.querySelectorAll('[data-filter]').forEach(function (x) { x.classList.toggle('active', x === b); });
+      render();
+    });
+  });
+  document.getElementById('gsSearch').addEventListener('input', function (e) { state.query = e.target.value.trim().toLowerCase(); render(); });
+  document.getElementById('gsSort').addEventListener('change', function (e) { state.sort = e.target.value; render(); });
+
+  var addBox = document.getElementById('gsAdd');
+  function toggleAdd(force) {
+    var open = typeof force === 'boolean' ? force : !addBox.classList.contains('open');
+    addBox.classList.toggle('open', open);
+    document.getElementById('gsAddToggle').setAttribute('aria-expanded', open);
+    if (open) { document.getElementById('fName').focus(); addBox.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  }
+  document.getElementById('gsAddToggle').addEventListener('click', function () { toggleAdd(); });
+  document.getElementById('gsOpenAdd').addEventListener('click', function () { toggleAdd(true); });
+
+  document.getElementById('gsExport').addEventListener('click', function () {
+    var lines = ['Item,In stock,Unit,Alert limit,Status'];
+    rows.forEach(function (r) {
+      var name = '"' + r.querySelector('.n').textContent.replace(/"/g, '""') + '"';
+      lines.push([name, r.dataset.qty, r.dataset.unit, r.dataset.limit, LABEL[r.dataset.status]].join(','));
+    });
+    var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'grocery-stock.csv';
+    a.click();
+    toast('CSV exported');
+  });
+
+  markDuplicates();
+  overview();
+  render();
+})();
+</script>
+{% endblock %}

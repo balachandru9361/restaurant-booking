@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Store Login</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#111827,#374151); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:16px; }
+  .box { background:#fff; width:100%; max-width:380px; border-radius:20px; padding:32px 28px; box-shadow:0 25px 60px rgba(0,0,0,.35); }
+  h1 { margin:0 0 4px; font-size:1.4rem; } p.sub { margin:0 0 22px; color:#6b7280; font-size:.9rem; }
+  label { display:block; font-size:.75rem; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px; }
+  input { width:100%; padding:11px 13px; border:1px solid #e5e7eb; border-radius:10px; font-size:.95rem; margin-bottom:14px; font-family:inherit; }
+  input:focus { outline:none; border-color:#ff6b6b; box-shadow:0 0 0 3px rgba(255,107,107,.18); }
+  button { width:100%; padding:13px; border:none; border-radius:999px; background:#1f2937; color:#fff; font-weight:700; font-size:.95rem; cursor:pointer; }
+  button:hover { background:#ff6b6b; }
+  .err { background:#fee2e2; color:#991b1b; padding:10px 14px; border-radius:10px; font-size:.85rem; font-weight:600; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>🛒 Store Management</h1>
+  <p class="sub">Staff login for stock and grocery management</p>
+  {% if form.errors %}<div class="err">{% for e in form.non_field_errors %}{{ e }}{% empty %}Please enter a correct username and password.{% endfor %}</div>{% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <label for="id_username">Username</label>
+    <input type="text" name="username" id="id_username" autofocus required autocomplete="username">
+    <label for="id_password">Password</label>
+    <input type="password" name="password" id="id_password" required autocomplete="current-password">
+    <button type="submit">Login</button>
+  </form>
+</div>
+</body>
+</html>

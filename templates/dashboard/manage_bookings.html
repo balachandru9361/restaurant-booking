@@ -38,6 +38,14 @@
     gap: 12px;
     border-left: 4px solid #9b59b6;
   }
+  .mini-stat.s-pending  { border-left-color: #f59e0b; }
+  .mini-stat.s-approved { border-left-color: #22c55e; }
+  .mini-stat.s-rejected { border-left-color: #ef4444; }
+  .mini-stat.s-pending.has-pending { animation: pendingGlow 1.8s ease-in-out infinite; }
+  @keyframes pendingGlow {
+    0%,100% { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+    50% { box-shadow: 0 4px 12px rgba(0,0,0,0.05), 0 0 0 3px rgba(245,158,11,0.35), 0 0 18px rgba(245,158,11,0.3); }
+  }
   .mini-stat .emoji { font-size: 22px; }
   .mini-stat .num { font-size: 19px; font-weight: 800; color: #1a1a2e; line-height: 1; }
   .mini-stat .lbl { font-size: 11.5px; color: #999; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.3px; }
@@ -45,7 +53,7 @@
   .toolbar {
     display: flex;
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 14px;
     flex-wrap: wrap;
   }
   .search-box {
@@ -76,6 +84,17 @@
     opacity: 0.5;
   }
 
+  /* filter tabs */
+  .filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .filter-tab {
+    border: 1.5px solid #e6e6ee; background: #fff; color: #555; font-weight: 700; font-size: 13px;
+    padding: 8px 16px; border-radius: 22px; cursor: pointer; transition: all 0.2s ease;
+  }
+  .filter-tab:hover { border-color: #9b59b6; color: #9b59b6; }
+  .filter-tab.active { background: #1a1a2e; border-color: #1a1a2e; color: #fff; }
+  .filter-tab .c { margin-left: 6px; background: rgba(0,0,0,0.08); padding: 1px 8px; border-radius: 10px; font-size: 11.5px; }
+  .filter-tab.active .c { background: rgba(255,255,255,0.22); }
+
   .bookings-list {
     display: flex;
     flex-direction: column;
@@ -92,8 +111,10 @@
     gap: 18px;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     animation: fadeSlide 0.3s ease backwards;
-    border-left: 5px solid #9b59b6;
+    border-left: 5px solid #22c55e;
   }
+  .booking-card.is-pending  { border-left-color: #f59e0b; background: #fffdf5; }
+  .booking-card.is-rejected { border-left-color: #ef4444; opacity: 0.85; }
   .booking-card:hover {
     transform: translateX(4px);
     box-shadow: 0 8px 22px rgba(0,0,0,0.1);
@@ -120,6 +141,7 @@
     align-items: center;
     gap: 10px;
     margin-bottom: 4px;
+    flex-wrap: wrap;
   }
   .booking-main .name { font-size: 16px; font-weight: 700; color: #1a1a2e; }
   .booking-main .occasion-tag {
@@ -143,6 +165,10 @@
     color: #aaa;
     margin-top: 6px;
     font-style: italic;
+  }
+  .reject-reason {
+    margin-top: 8px; font-size: 12.5px; font-weight: 600; color: #b91c1c;
+    background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 6px 10px; display: inline-block;
   }
 
   .booking-time-badge {
@@ -176,6 +202,9 @@
   .hold-badge.upcoming { background: #eaf4ff; color: #3498db; }
   .hold-badge.completed{ background: #f0f0f3; color: #888; }
   .hold-badge.opened   { background: #e3f9ec; color: #1e8e4e; }
+  .hold-badge.pending  { background: #fef3c7; color: #92400e; animation: blink 1.6s ease-in-out infinite; }
+  .hold-badge.rejected { background: #fee2e2; color: #b91c1c; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
   .table-pill { background: #eef2ff; color: #4f46e5; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
   .open-form { margin: 0; }
   .open-btn {
@@ -183,6 +212,18 @@
     border-radius: 8px; color: #fff; background: linear-gradient(135deg, #2ecc71, #27ae60);
     box-shadow: 0 4px 12px rgba(46,204,113,0.3); white-space: nowrap;
   }
+
+  /* approve / reject */
+  .decide-box { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .btn-approve, .btn-reject {
+    border: none; cursor: pointer; font-size: 12.5px; font-weight: 800; padding: 9px 16px;
+    border-radius: 8px; white-space: nowrap; transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-approve { color: #fff; background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 4px 12px rgba(34,197,94,0.35); }
+  .btn-reject  { color: #b91c1c; background: #fee2e2; }
+  .btn-approve:hover, .btn-reject:hover { transform: translateY(-2px); }
+  .btn-reject:hover { background: #b91c1c; color: #fff; }
+  .btn-approve:disabled, .btn-reject:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
   .empty-state {
     text-align: center;
@@ -194,17 +235,34 @@
   }
   .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
   .empty-state p { font-size: 14.5px; }
+  #filterEmpty { display: none; margin-top: 14px; }
+
+  /* toast */
+  #bkToast {
+    position: fixed; top: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;
+  }
+  .bk-toast {
+    background: #1a1a2e; color: #fff; padding: 14px 18px; border-radius: 12px; font-size: 13.5px; font-weight: 600;
+    border-left: 4px solid #22c55e; box-shadow: 0 10px 28px rgba(0,0,0,0.3); max-width: 340px;
+    animation: bkIn 0.3s ease;
+  }
+  .bk-toast.err { border-left-color: #ef4444; }
+  @keyframes bkIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
 
   @media (max-width: 700px) {
     .booking-card { flex-wrap: wrap; }
     .booking-time-badge, .guests-badge { margin-left: auto; }
+    .decide-box { flex-direction: row; width: 100%; }
+    .decide-box button { flex: 1; }
   }
 </style>
+
+<div id="bkToast"></div>
 
 <div class="page-header">
   <div>
     <h2>📅 Table Bookings</h2>
-    <p>All reservations made by customers</p>
+    <p>Customers book a table, then you approve or reject it here</p>
   </div>
 </div>
 
@@ -212,6 +270,18 @@
   <div class="mini-stat">
     <div class="emoji">📅</div>
     <div><div class="num">{{ bookings|length }}</div><div class="lbl">Total Bookings</div></div>
+  </div>
+  <div class="mini-stat s-pending" id="statPending">
+    <div class="emoji">⏳</div>
+    <div><div class="num" id="numPending">0</div><div class="lbl">Waiting</div></div>
+  </div>
+  <div class="mini-stat s-approved">
+    <div class="emoji">✅</div>
+    <div><div class="num" id="numApproved">0</div><div class="lbl">Approved</div></div>
+  </div>
+  <div class="mini-stat s-rejected">
+    <div class="emoji">❌</div>
+    <div><div class="num" id="numRejected">0</div><div class="lbl">Rejected</div></div>
   </div>
 </div>
 
@@ -221,9 +291,19 @@
   </div>
 </div>
 
+<div class="filter-tabs" id="filterTabs">
+  <button type="button" class="filter-tab active" data-filter="all">All <span class="c" id="cAll">0</span></button>
+  <button type="button" class="filter-tab" data-filter="pending">⏳ Waiting <span class="c" id="cPending">0</span></button>
+  <button type="button" class="filter-tab" data-filter="approved">✅ Approved <span class="c" id="cApproved">0</span></button>
+  <button type="button" class="filter-tab" data-filter="rejected">❌ Rejected <span class="c" id="cRejected">0</span></button>
+</div>
+
 <div class="bookings-list" id="bookingsList">
   {% for booking in bookings %}
-  <div class="booking-card" data-name="{{ booking.name|lower }}" data-phone="{{ booking.phone }}">
+  <div class="booking-card is-{{ booking.status }}"
+       data-name="{{ booking.name|lower }}"
+       data-phone="{{ booking.phone }}"
+       data-status="{{ booking.status }}">
     <div class="occasion-icon">
       {% if booking.occasion == 'birthday' %}🎂
       {% elif booking.occasion == 'anniversary' %}💍
@@ -241,10 +321,15 @@
         {% if booking.occasion and booking.occasion != 'none' %}
           <span class="occasion-tag">{{ booking.get_occasion_display }}</span>
         {% endif %}
-        {% if booking.hold_state == 'active' %}
+
+        {% if booking.status == 'pending' %}
+          <span class="hold-badge pending">⏳ Waiting for approval</span>
+        {% elif booking.status == 'rejected' %}
+          <span class="hold-badge rejected">❌ Rejected</span>
+        {% elif booking.hold_state == 'active' %}
           <span class="hold-badge active">🔒 Table held until {{ booking.hold_end|time:"g:i A" }}</span>
         {% elif booking.hold_state == 'upcoming' %}
-          <span class="hold-badge upcoming">⏳ Upcoming</span>
+          <span class="hold-badge upcoming">✅ Approved · Upcoming</span>
         {% elif booking.hold_state == 'opened' %}
           <span class="hold-badge opened">🔓 Opened by admin</span>
         {% else %}
@@ -252,8 +337,9 @@
         {% endif %}
       </div>
       <div class="meta">
-        {% if booking.table %}<span class="table-pill">🪑 Table {{ booking.table.number }}</span>{% endif %}
+        {% if booking.table and booking.status != 'rejected' %}<span class="table-pill">🪑 Table {{ booking.table.number }}</span>{% endif %}
         <span>📞 {{ booking.phone }}</span>
+        <span>🗓️ Requested {{ booking.created_at|date:"d M, g:i A" }}</span>
         {% if booking.special_request %}
           <span>📝 Has notes</span>
         {% endif %}
@@ -261,11 +347,23 @@
       {% if booking.special_request %}
         <div class="note">"{{ booking.special_request|truncatechars:80 }}"</div>
       {% endif %}
+      {% if booking.status == 'rejected' and booking.reject_reason %}
+        <div class="reject-reason">Reason: {{ booking.reject_reason }}</div>
+      {% endif %}
     </div>
 
     <div class="guests-badge">👥 {{ booking.guests }}</div>
 
-    {% if booking.hold_state == 'active' and booking.table %}
+    {% if booking.status == 'pending' %}
+    <div class="decide-box"
+         data-approve-url="{% url 'dashboard:approve_booking' booking.pk %}"
+         data-reject-url="{% url 'dashboard:reject_booking' booking.pk %}">
+      <button type="button" class="btn-approve">✅ Approve</button>
+      <button type="button" class="btn-reject">❌ Reject</button>
+    </div>
+    {% endif %}
+
+    {% if booking.status == 'approved' and booking.hold_state == 'active' and booking.table %}
     <form method="post" action="{% url 'dashboard:open_table' booking.table.pk %}" class="open-form">
       {% csrf_token %}
       <input type="hidden" name="next" value="manage_bookings">
@@ -286,18 +384,108 @@
   {% endfor %}
 </div>
 
+<div class="empty-state" id="filterEmpty">
+  <div class="big-emoji">🔍</div>
+  <p>No bookings match this filter.</p>
+</div>
+
 <script>
+  const CSRF_TOKEN = '{{ csrf_token }}';
   const searchInput = document.getElementById('bookingSearch');
   const cards = document.querySelectorAll('#bookingsList .booking-card');
+  const tabs = document.querySelectorAll('.filter-tab');
+  const filterEmpty = document.getElementById('filterEmpty');
+  let activeFilter = 'all';
 
-  if (searchInput) {
-    searchInput.addEventListener('input', function () {
-      const q = this.value.toLowerCase();
-      cards.forEach(card => {
-        const match = card.dataset.name.includes(q) || card.dataset.phone.includes(q);
-        card.style.display = match ? '' : 'none';
-      });
+  // ---- counts ----
+  (function () {
+    const c = { pending: 0, approved: 0, rejected: 0 };
+    cards.forEach(card => { const s = card.dataset.status; if (c.hasOwnProperty(s)) c[s]++; });
+    document.getElementById('numPending').textContent = c.pending;
+    document.getElementById('numApproved').textContent = c.approved;
+    document.getElementById('numRejected').textContent = c.rejected;
+    document.getElementById('cAll').textContent = cards.length;
+    document.getElementById('cPending').textContent = c.pending;
+    document.getElementById('cApproved').textContent = c.approved;
+    document.getElementById('cRejected').textContent = c.rejected;
+    if (c.pending > 0) document.getElementById('statPending').classList.add('has-pending');
+  })();
+
+  // ---- search + filter together ----
+  function applyFilters() {
+    const q = searchInput ? searchInput.value.toLowerCase() : '';
+    let shown = 0;
+    cards.forEach(card => {
+      const matchText = card.dataset.name.includes(q) || card.dataset.phone.includes(q);
+      const matchStatus = activeFilter === 'all' || card.dataset.status === activeFilter;
+      const show = matchText && matchStatus;
+      card.style.display = show ? '' : 'none';
+      if (show) shown++;
     });
+    if (filterEmpty) filterEmpty.style.display = (cards.length > 0 && shown === 0) ? 'block' : 'none';
   }
+
+  if (searchInput) searchInput.addEventListener('input', applyFilters);
+  tabs.forEach(t => t.addEventListener('click', function () {
+    tabs.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    activeFilter = t.dataset.filter;
+    applyFilters();
+  }));
+
+  // ---- toast ----
+  function toast(msg, isError) {
+    const box = document.getElementById('bkToast');
+    const el = document.createElement('div');
+    el.className = 'bk-toast' + (isError ? ' err' : '');
+    el.textContent = msg;
+    box.appendChild(el);
+    setTimeout(() => el.remove(), 5000);
+  }
+
+  // ---- approve / reject ----
+  function decide(url, params, btnBox) {
+    const buttons = btnBox.querySelectorAll('button');
+    buttons.forEach(b => b.disabled = true);
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': CSRF_TOKEN, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(res => {
+        if (!res.ok || !res.data.ok) {
+          buttons.forEach(b => b.disabled = false);
+          toast((res.data && res.data.error) || 'Something went wrong', true);
+          return;
+        }
+        toast(res.data.message || 'Done');
+        setTimeout(() => window.location.reload(), 700);
+      })
+      .catch(() => {
+        buttons.forEach(b => b.disabled = false);
+        toast('Network error. Please try again.', true);
+      });
+  }
+
+  document.addEventListener('click', function (e) {
+    const approve = e.target.closest('.btn-approve');
+    const reject = e.target.closest('.btn-reject');
+    if (!approve && !reject) return;
+    const box = e.target.closest('.decide-box');
+    if (!box) return;
+
+    if (approve) {
+      if (!confirm('Approve this booking? The customer will get an email.')) return;
+      decide(box.dataset.approveUrl, new URLSearchParams(), box);
+    } else {
+      const reason = prompt('Reason for rejecting (optional, the customer will see it):');
+      if (reason === null) return;
+      const p = new URLSearchParams();
+      p.set('reason', reason);
+      decide(box.dataset.rejectUrl, p, box);
+    }
+  });
 </script>
 {% endblock %}

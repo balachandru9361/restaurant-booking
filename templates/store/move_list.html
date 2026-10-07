@@ -1,0 +1,32 @@
+{% extends 'store/store_base.html' %}
+{% block title %}{{ cfg.title }}{% endblock %}
+{% block content %}
+<h1>{{ cfg.title }}</h1>
+<p class="muted">{{ cfg.hint }}</p>
+
+<form method="get" class="toolbar">
+  <input type="text" name="q" value="{{ q }}" placeholder="Search item...">
+  <button class="btn" type="submit">Search</button>
+  <a class="btn light" href="{% url cfg.list_url %}">Reset</a>
+  <a class="btn" href="{% url cfg.add_url %}" style="margin-left:auto">➕ Add {{ cfg.title }}</a>
+</form>
+
+<div class="card table-wrap">
+  <table>
+    <tr><th>Date</th><th>Item</th><th>Type</th><th>Quantity</th><th>Stock after</th><th>Note</th><th>By</th></tr>
+    {% for m in rows %}
+    <tr>
+      <td>{{ m.created_at|date:"d M Y, H:i" }}</td>
+      <td>{{ m.item.name }}</td>
+      <td><span class="badge">{{ m.movement_type }}</span></td>
+      <td>{{ m.change|floatformat:"-3" }} {{ m.item.unit }}</td>
+      <td>{{ m.stock_after|floatformat:"-3" }} {{ m.item.unit }}</td>
+      <td>{{ m.note }}</td>
+      <td>{{ m.created_by.username|default:"-" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="muted">No entries yet.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

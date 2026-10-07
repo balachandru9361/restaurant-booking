@@ -9,10 +9,10 @@ from django.http import JsonResponse
 from django.db import transaction
 from django.core.mail import send_mail
 from django.conf import settings
-from .forms import TableBookingForm
+from .forms import TableBookingForm, SEATS_PER_TABLE, MAX_GUESTS, tables_needed
 from .models import TableBooking, Table
 from .availability import (
-    booking_window, busy_table_ids_for_slot, free_tables_for_slot,
+    booking_window, busy_table_ids_for_slot, free_tables_for_slot, pick_tables_for_party,
 )
 
 logger = logging.getLogger(__name__)
@@ -35,60 +35,72 @@ def book_table(request):
         if form.is_valid():
             booking = form.save(commit=False)
 
-            # Hard cap: max 6 guests per table booking
-            if booking.guests > 6:
-                messages.error(request, 'Max 6 guests allowed per table. Please choose 6 or fewer.')
+            # Safety check (the form already limits this)
+            if booking.guests > MAX_GUESTS:
+                messages.error(request, f'Max {MAX_GUESTS} guests allowed per booking.')
                 return render(request, 'booking/booking_form.html', {'form': form})
 
             # The JS table-grid sends the table the customer clicked (optional).
+            # For parties above 6 the form ignores it (several tables are given instead).
             selected_table = form.cleaned_data.get('table')
 
-            # Server-side availability double-check + assign a table.
+            # Server-side availability double-check + assign tables.
             # A booked table is held for 2 hours from the booked time.
             with transaction.atomic():
                 slot_start = timezone.make_aware(
                     datetime.combine(booking.booking_date, booking.booking_time)
                 )
-                free_tables = free_tables_for_slot(slot_start, booking.guests)
 
-                if not free_tables:
-                    messages.error(
-                        request,
-                        'Sorry, no table is free for this time slot. Please choose another time or reduce guests.'
-                    )
-                    return render(request, 'booking/booking_form.html', {'form': form})
-
-                if selected_table:
+                if selected_table and booking.guests <= SEATS_PER_TABLE:
                     # Re-check the customer's chosen table is still free and big
                     # enough - someone else may have booked it in the meantime.
-                    if selected_table not in free_tables:
+                    busy_ids = busy_table_ids_for_slot(slot_start)
+                    if selected_table.id in busy_ids or selected_table.capacity < booking.guests:
                         messages.error(
                             request,
                             f'Sorry, Table #{selected_table.number} was just booked or is too small. '
                             'Please pick another table.'
                         )
                         return render(request, 'booking/booking_form.html', {'form': form})
-                    booking.table = selected_table
-                else:
-                    booking.table = free_tables[0]  # best fit: smallest table that fits the group
+
+                chosen = pick_tables_for_party(slot_start, booking.guests, preferred=selected_table)
+
+                if not chosen:
+                    if booking.guests > SEATS_PER_TABLE:
+                        msg = (f'Sorry, {tables_needed(booking.guests)} tables are needed for '
+                               f'{booking.guests} guests, but not enough tables are free for this time slot. '
+                               'Please choose another time or reduce guests.')
+                    else:
+                        msg = ('Sorry, no table is free for this time slot. '
+                               'Please choose another time or reduce guests.')
+                    messages.error(request, msg)
+                    return render(request, 'booking/booking_form.html', {'form': form})
 
                 booking.user = request.user
+                booking.table = chosen[0]
+                # The booking waits for the admin. It is NOT confirmed yet.
+                booking.status = 'pending'
                 booking.save()
+                booking.extra_tables.set(chosen[1:])
 
-            # --- Send booking confirmation email (never fail the booking if mail is down) ---
+            # --- Tell the customer the request was received (never fail the booking if mail is down) ---
             if request.user.email:
                 try:
+                    table_line = ''
+                    if len(chosen) > 1:
+                        table_line = f"Tables reserved: {len(chosen)}\n"
                     send_mail(
-                        subject=f'Table Booking Confirmed - {booking.booking_date}',
+                        subject=f'Table Booking Request Received - {booking.booking_date}',
                         message=(
                             f"Hi {booking.name},\n\n"
-                            f"Your table booking is confirmed!\n\n"
+                            f"We received your table booking request. It is waiting for admin approval.\n"
+                            f"You will get another email as soon as it is approved.\n\n"
                             f"Date: {booking.booking_date}\n"
                             f"Time: {booking.booking_time.strftime('%I:%M %p')}\n"
                             f"Guests: {booking.guests}\n"
-                            f"Table: #{booking.table.number} (held for 2 hours)\n"
+                            f"{table_line}"
                             f"Occasion: {booking.get_occasion_display()}\n\n"
-                            f"We look forward to hosting you at Chandru Restaurant!"
+                            f"Chandru Restaurant"
                         ),
                         from_email=settings.DEFAULT_FROM_EMAIL,
                         recipient_list=[request.user.email],
@@ -97,7 +109,7 @@ def book_table(request):
                 except Exception:
                     logger.exception('Could not send booking email for booking %s', booking.id)
 
-            messages.success(request, f'Table #{booking.table.number} booked successfully! It is reserved for you for 2 hours.')
+            messages.success(request, 'Your booking request is sent. Waiting for admin approval.')
             request.session['last_booking_id'] = booking.id
             return redirect('booking_success')
     else:
@@ -108,8 +120,9 @@ def book_table(request):
 
 @login_required
 def check_availability(request):
-    """AJAX endpoint: is a table free for this date + time + guests?
-    A booking holds a table for 2 hours, so slots that overlap are checked too."""
+    """AJAX endpoint: are tables free for this date + time + guests?
+    A booking holds a table for 2 hours, so slots that overlap are checked too.
+    One table seats 6, so a bigger party needs several free tables."""
     date = request.GET.get('date')
     time = request.GET.get('time')
     guests = request.GET.get('guests', 1)
@@ -122,32 +135,52 @@ def check_availability(request):
     if not date or not time:
         return JsonResponse({'available': False, 'message': 'Date and time required'})
 
-    # Hard cap: max 6 guests per table booking
-    if guests > 6:
+    if guests > MAX_GUESTS:
         return JsonResponse({
             'available': False,
-            'message': '⚠️ Max 6 guests allowed per table. Please choose 6 or fewer, or split into multiple bookings.'
+            'message': f'⚠️ Max {MAX_GUESTS} guests allowed per booking.'
         })
 
     slot_start = _parse_slot(date, time)
     if slot_start is None:
         return JsonResponse({'available': False, 'message': 'Invalid date or time'})
 
-    free_tables = free_tables_for_slot(slot_start, guests)
-    free_seats = sum(t.capacity for t in free_tables)
+    needed = tables_needed(guests)
 
-    if not free_tables:
+    if guests <= SEATS_PER_TABLE:
+        free_tables = free_tables_for_slot(slot_start, guests)
+    else:
+        busy_ids = busy_table_ids_for_slot(slot_start)
+        free_tables = [t for t in Table.objects.all().order_by('number') if t.id not in busy_ids]
+
+    free_seats = sum(t.capacity for t in free_tables)
+    n = len(free_tables)
+
+    if n < needed:
+        if needed == 1:
+            msg = '❌ No table free for this time (each booking holds a table for 2 hours). Try another slot.'
+        else:
+            msg = (f'❌ {guests} guests need {needed} tables (one table seats {SEATS_PER_TABLE}), '
+                   f'but only {n} free for this slot. Try another time or fewer guests.')
         return JsonResponse({
             'available': False,
-            'remaining': 0,
-            'message': '❌ No table free for this time (each booking holds a table for 2 hours). Try another slot.'
+            'remaining': free_seats,
+            'tables_needed': needed,
+            'message': msg,
         })
 
-    n = len(free_tables)
+    if needed == 1:
+        msg = (f'✅ Available! {n} table{"s" if n != 1 else ""} free for this slot. '
+               'Your booking will be confirmed after admin approval.')
+    else:
+        msg = (f'✅ Available! {guests} guests will get {needed} tables '
+               f'(one table seats {SEATS_PER_TABLE}). '
+               'Your booking will be confirmed after admin approval.')
     return JsonResponse({
         'available': True,
         'remaining': free_seats,
-        'message': f'✅ Available! {n} table{"s" if n != 1 else ""} free for this slot (held for 2 hours once booked).'
+        'tables_needed': needed,
+        'message': msg,
     })
 
 
@@ -155,7 +188,9 @@ def check_availability(request):
 def table_status_for_slot(request):
     """AJAX endpoint: per-table free/booked status for a given date + time
     (+ optional guests, to flag tables too small for the party), so the
-    booking page can render a table grid like the cart page does."""
+    booking page can render a table grid like the cart page does.
+    For parties above 6 guests every free table counts as fitting, because
+    several tables are given together."""
     date = request.GET.get('date')
     time = request.GET.get('time')
     guests = request.GET.get('guests', 1)
@@ -170,6 +205,7 @@ def table_status_for_slot(request):
         return JsonResponse({'tables': []})
 
     busy_ids = busy_table_ids_for_slot(slot_start)
+    big_party = guests > SEATS_PER_TABLE
 
     tables = Table.objects.all().order_by('number')
     data = [
@@ -178,11 +214,15 @@ def table_status_for_slot(request):
             'number': t.number,
             'capacity': t.capacity,
             'busy': t.id in busy_ids,
-            'fits': t.capacity >= guests,
+            'fits': True if big_party else t.capacity >= guests,
         }
         for t in tables
     ]
-    return JsonResponse({'tables': data})
+    return JsonResponse({
+        'tables': data,
+        'tables_needed': tables_needed(guests),
+        'seats_per_table': SEATS_PER_TABLE,
+    })
 
 
 @login_required
@@ -201,7 +241,11 @@ def bookings_for_date(request):
             'remaining': 0,
         })
 
-    bookings = TableBooking.objects.filter(booking_date=date).order_by('booking_time')
+    # Rejected bookings are not shown (they do not hold a table)
+    bookings = (TableBooking.objects.filter(booking_date=date)
+                .exclude(status='rejected')
+                .prefetch_related('extra_tables')
+                .order_by('booking_time'))
 
     data = []
     for b in bookings:
@@ -211,8 +255,10 @@ def bookings_for_date(request):
             'time': b.booking_time.strftime('%I:%M %p'),
             'until': timezone.localtime(end).strftime('%I:%M %p'),
             'guests': b.guests,
+            'tables_count': 1 + len(b.extra_tables.all()),
             'occasion': b.get_occasion_display(),
             'opened': b.released,
+            'status': b.status,
         })
 
     tables = list(Table.objects.values('id', 'capacity'))

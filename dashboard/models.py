@@ -1,12 +1,23 @@
 from django.db import models
 from django.contrib.auth.models import User
+from decimal import Decimal
+from django.db.models.signals import pre_save, post_save
+from django.dispatch import receiver
+from django.utils import timezone
 
 
 class Notification(models.Model):
-    """Messages shown on the admin dashboard (e.g. when a waiter serves an order)."""
+    """Messages shown on the admin dashboard (e.g. when a waiter serves an order)
+    and the rejection reasons shown to customers on My Orders."""
 
     KIND_CHOICES = [
         ('served', 'Order served'),
+        ('rejected', 'Order rejected'),            # message format: 'Order #444 rejected: <reason>'
+        ('ready', 'Order ready'),                  # kitchen marked the order ready
+        ('out_for_delivery', 'Out for delivery'),  # delivery staff picked up the order
+        ('stock', 'Kitchen stock update'),
+        ('stock_in', 'Store stock update'),        # used by update_grocery in dashboard/views.py
+        ('stock_out', 'Out of stock alert'),
     ]
 
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, default='served')
@@ -25,3 +36,109 @@ class Notification(models.Model):
 
     def __str__(self):
         return self.message
+
+
+class GroceryItem(models.Model):
+    UNIT_CHOICES = [
+        ('kg', 'kg'),
+        ('g', 'g'),
+        ('l', 'L'),
+        ('ml', 'ml'),
+        ('pcs', 'pcs'),
+        ('packet', 'Packet'),
+    ]
+
+    name = models.CharField(max_length=100)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default='kg')
+    low_stock_limit = models.DecimalField(max_digits=10, decimal_places=2, default=5)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    @property
+    def is_low(self):
+        return self.quantity <= self.low_stock_limit
+
+    def __str__(self):
+        return f'{self.name} ({self.quantity} {self.unit})'
+
+
+class RecipeIngredient(models.Model):
+    """How much of a grocery item ONE serving of a food item uses."""
+
+    food_item = models.ForeignKey(
+        'menu.FoodItem', on_delete=models.CASCADE, related_name='recipe')
+    grocery = models.ForeignKey(
+        'GroceryItem', on_delete=models.CASCADE, related_name='used_in')
+    store_item = models.ForeignKey(
+        'store.GroceryItem', null=True, blank=True, on_delete=models.SET_NULL, related_name='recipe_uses')
+    qty_per_serving = models.DecimalField(
+        max_digits=8, decimal_places=3,
+        help_text="In the grocery item's own unit (e.g. 0.250 for 250 g if unit is kg)")
+
+    class Meta:
+        unique_together = ('food_item', 'grocery')
+
+    def __str__(self):
+        return f'{self.food_item} -> {self.qty_per_serving} {self.grocery.unit} {self.grocery.name}'
+
+
+class StockRequest(models.Model):
+    """Kitchen reports an item as out of stock; store restocks it; kitchen is notified."""
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('restocked', 'Restocked'),
+    ]
+
+    item = models.ForeignKey(GroceryItem, on_delete=models.CASCADE, related_name='stock_requests')
+    store_item = models.ForeignKey(
+        'store.GroceryItem', null=True, blank=True, on_delete=models.SET_NULL, related_name='stock_reports')
+    note = models.CharField(max_length=120, blank=True)
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default='pending')
+    requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+    restocked_at = models.DateTimeField(null=True, blank=True)
+    restocked_message = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        ordering = ['-id']
+
+    def __str__(self):
+        return f'{self.item.name} ({self.status})'
+
+
+@receiver(pre_save, sender=GroceryItem)
+def remember_old_quantity(sender, instance, **kwargs):
+    old = None
+    if instance.pk:
+        old = GroceryItem.objects.filter(pk=instance.pk).values_list('quantity', flat=True).first()
+    instance._old_quantity = old
+
+
+@receiver(post_save, sender=GroceryItem)
+def resolve_stock_requests(sender, instance, created, **kwargs):
+    """When the quantity goes up, close the pending out-of-stock requests for this item."""
+    old = getattr(instance, '_old_quantity', None)
+    if created or old is None:
+        return
+    new_qty = Decimal(str(instance.quantity))
+    if new_qty <= Decimal(str(old)):
+        return
+    pending = StockRequest.objects.filter(item=instance, status='pending')
+    if not pending.exists():
+        return
+    if getattr(instance, '_by_kitchen', False):
+        message = ''  # the chef added the stock himself: close silently, no notification
+    else:
+        message = f'✅ Store restocked {instance.name}: now {new_qty.normalize():f} {instance.unit}'
+    pending.update(status='restocked', restocked_at=timezone.now(), restocked_message=message[:255])
+
+
+@receiver(post_save, sender=GroceryItem)
+def auto_block_menu_items(sender, instance, **kwargs):
+    """Whenever grocery stock changes, block or re-open the dishes that use it."""
+    from .utils import sync_menu_availability
+    sync_menu_availability(instance)

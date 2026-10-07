@@ -7,6 +7,7 @@ from django.utils import timezone
 HOLD_DURATION = timedelta(hours=2)
 PENDING_HOLD = timedelta(minutes=15)
 WALKIN_BUFFER = timedelta(minutes=30)
+STALE_ORDER_LIMIT = timedelta(hours=24)
 
 
 @dataclass
@@ -30,6 +31,11 @@ def booking_window(booking):
     return start, start + HOLD_DURATION
 
 
+def _is_confirmed_booking(hold):
+    """True for an admin-approved booking hold."""
+    return hold.kind == 'booking' and getattr(hold.obj, 'status', 'approved') == 'approved'
+
+
 def get_holds():
     """All holds that have not expired yet and were not opened by the admin."""
     from orders.models import Order
@@ -38,28 +44,52 @@ def get_holds():
     now = timezone.now()
     holds = []
 
-    bookings = TableBooking.objects.filter(
-        table__isnull=False,
-        released=False,
-        booking_date__gte=timezone.localdate() - timedelta(days=1),
-    ).select_related('table', 'user')
+    # Rejected bookings never hold a table.
+    # Pending bookings hold the slot (so two customers cannot request the same table),
+    # but they are labelled and are NOT treated as confirmed (see is_table_busy_now).
+    # CHANGED: a booking for a big party also holds its extra tables.
+    bookings = (
+        TableBooking.objects.filter(
+            table__isnull=False,
+            released=False,
+            booking_date__gte=timezone.localdate() - timedelta(days=1),
+        )
+        .exclude(status='rejected')
+        .select_related('table', 'user')
+        .prefetch_related('extra_tables')
+    )
     for b in bookings:
         start, end = booking_window(b)
         if end > now:
-            holds.append(Hold('booking', b.table_id, start, end, b.user_id,
-                              f"Reserved by {b.name}", b))
+            label = f"Reserved by {b.name}"
+            if b.status == 'pending':
+                label = f"Waiting for approval: {b.name}"
+            table_ids = [b.table_id]
+            for t in b.extra_tables.all():
+                if t.id not in table_ids:
+                    table_ids.append(t.id)
+            for tid in table_ids:
+                holds.append(Hold('booking', tid, start, end, b.user_id, label, b))
 
+    # Orders: a table given to an order (by the customer or by the admin) stays
+    # closed until the order is delivered / cancelled / opened by the admin.
     orders = (
         Order.objects.filter(
             table__isnull=False,
             table_released=False,
-            created_at__gte=now - HOLD_DURATION,
+            created_at__gte=now - STALE_ORDER_LIMIT,
         )
-        .exclude(status='cancelled')
+        .exclude(status__in=['cancelled', 'delivered'])
         .select_related('user')
     )
     for o in orders:
-        end = o.created_at + (PENDING_HOLD if o.status == 'pending' else HOLD_DURATION)
+        unpaid_checkout = (o.status == 'pending' and o.payment_status == 'pending')
+        if unpaid_checkout:
+            # customer still on the payment step: short hold only
+            end = o.created_at + PENDING_HOLD
+        else:
+            # live order: keep the table closed until the order is finished
+            end = now + HOLD_DURATION
         if end > now:
             holds.append(Hold('order', o.table_id, o.created_at, end, o.user_id,
                               f"Order #{o.id} ({o.user.username})", o))
@@ -107,20 +137,25 @@ def upcoming_status_map(holds=None):
 def is_table_busy_now(table_id, user=None, buffer=WALKIN_BUFFER):
     """True if someone other than `user` holds the table right now, OR if a
     confirmed booking for this table starts within `buffer` time from now
-    (so walk-ins don't get seated right before a reservation arrives)."""
+    (so walk-ins don't get seated right before a reservation arrives).
+
+    A booking that is still waiting for admin approval does not
+    block the table for walk-ins. Only approved bookings do."""
     now = timezone.now()
 
-    # 1. Currently active hold (booking window has started, or an order is open)
+    # 1. Currently active hold (approved booking window has started, or an order is open)
     for h in active_holds():
+        if h.kind == 'booking' and not _is_confirmed_booking(h):
+            continue
         if h.table_id == table_id and not (user is not None and h.user_id == user.id):
             return True
 
-    # 2. Upcoming reservation starting soon - block walk-ins so it doesn't
-    #    clash with the reserved customer arriving.
+    # 2. Upcoming approved reservation starting soon - block walk-ins so it
+    #    doesn't clash with the reserved customer arriving.
     for h in upcoming_holds():
         if (
             h.table_id == table_id
-            and h.kind == 'booking'
+            and _is_confirmed_booking(h)
             and h.start - now <= buffer
             and not (user is not None and h.user_id == user.id)
         ):
@@ -147,9 +182,43 @@ def free_tables_for_slot(start, guests=1):
     ]
 
 
+def pick_tables_for_party(start, guests, preferred=None):
+    """NEW: tables for a party at this slot. One table seats 6 guests.
+
+    Up to 6 guests: one free table that is big enough (the preferred one if it is free).
+    7+ guests: as many free tables as needed (7-12 = 2, 13-18 = 3 ... 30 = 5).
+    Returns a list of Table objects (main table first), or None if there are not enough free tables."""
+    from .models import Table
+    from .forms import SEATS_PER_TABLE, tables_needed
+
+    busy = busy_table_ids_for_slot(start)
+
+    if guests <= SEATS_PER_TABLE:
+        free = free_tables_for_slot(start, guests)
+        if preferred is not None and preferred.capacity >= guests and preferred.id not in busy:
+            return [preferred]
+        return free[:1] or None
+
+    needed = tables_needed(guests)
+    free = [t for t in Table.objects.all().order_by('capacity', 'number') if t.id not in busy]
+    # Prefer tables that really seat a full group of 6, smaller tables only if we run short
+    full = [t for t in free if t.capacity >= SEATS_PER_TABLE]
+    small = [t for t in free if t.capacity < SEATS_PER_TABLE]
+    chosen = []
+    if preferred is not None and preferred.id not in busy:
+        chosen.append(preferred)
+    for t in full + small:
+        if len(chosen) >= needed:
+            break
+        if t.id not in {c.id for c in chosen}:
+            chosen.append(t)
+    return chosen if len(chosen) >= needed else None
+
+
 def release_table(table_id):
     """Admin 'Open Table': lift every hold that is active on this table right now.
-    Returns how many holds were lifted."""
+    Returns how many holds were lifted.
+    For a multi-table booking this opens the whole booking (all its tables)."""
     now = timezone.now()
     count = 0
     for h in active_holds():

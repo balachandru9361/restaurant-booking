@@ -20,7 +20,7 @@ class SignupForm(UserCreationForm):
 
 
 class StaffCreationForm(UserCreationForm):
-    """Used by the admin to create a Kitchen or Server login."""
+    """Used by the admin to create a Kitchen, Server or Store login."""
     email = forms.EmailField(required=False)
     role = forms.ChoiceField(
         choices=Profile.ROLE_CHOICES,

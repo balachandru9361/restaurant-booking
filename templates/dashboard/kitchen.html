@@ -441,6 +441,8 @@
 
 <div id="toastStack"></div>
 
+{% include "includes/thermal_print.html" %}
+
 <div class="kitchen-header">
   <div>
     <h1>👨‍🍳 Kitchen Dashboard</h1>
@@ -467,7 +469,7 @@
     <div class="stat-label">✅ Ready</div>
   </div>
   <div class="stat-box" style="border-left-color:#0d1b2a;">
-    <div class="stat-num">{{ confirmed_orders|length|add:preparing_orders|length|add:ready_orders|length }}</div>
+    <div class="stat-num">{% with c=confirmed_orders|length p=preparing_orders|length r=ready_orders|length %}{{ c|add:p|add:r }}{% endwith %}</div>
     <div class="stat-label">📦 Total Active</div>
   </div>
 </div>
@@ -477,7 +479,7 @@
     <input type="text" id="orderSearch" placeholder="Search by Order # or customer name..." onkeyup="filterOrders()">
   </div>
   <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Now</button>
-  <span class="refresh-timer">Full refresh in <span id="countdown">5</span>s</span>
+  <span class="refresh-timer" id="refreshTimer">Full refresh in <span id="countdown">5</span>s</span>
 </div>
 
 <div class="kitchen-board">
@@ -498,21 +500,22 @@
           {% if order.table %}
             <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
           {% else %}
-            <span class="order-table-badge takeaway">🥡 Takeaway</span>
+            {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
           {% endif %}
         </div>
+        {% include 'dashboard/_order_meta.html' %}
         <ul class="order-items">
           {% for item in order.items.all %}
             <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
           {% endfor %}
         </ul>
-        <div class="order-total">₹{{ order.total_amount }}</div>
+        <div class="order-total">₹{{ order.total_amount|inr }}</div>
         <div class="order-actions">
           <form method="post" action="{% url 'dashboard:update_order_status' order.id 'preparing' %}">
             {% csrf_token %}
             <button type="submit" class="order-action-btn btn-to-preparing">Start Preparing →</button>
           </form>
-          <a href="javascript:window.print()" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
+          <a href="#" onclick="printKitchenTicket(this); return false;" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
         </div>
       </div>
     {% empty %}
@@ -536,21 +539,22 @@
           {% if order.table %}
             <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
           {% else %}
-            <span class="order-table-badge takeaway">🥡 Takeaway</span>
+            {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
           {% endif %}
         </div>
+        {% include 'dashboard/_order_meta.html' %}
         <ul class="order-items">
           {% for item in order.items.all %}
             <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
           {% endfor %}
         </ul>
-        <div class="order-total">₹{{ order.total_amount }}</div>
+        <div class="order-total">₹{{ order.total_amount|inr }}</div>
         <div class="order-actions">
           <form method="post" action="{% url 'dashboard:update_order_status' order.id 'ready' %}">
             {% csrf_token %}
             <button type="submit" class="order-action-btn btn-to-ready">Mark Ready →</button>
           </form>
-          <a href="javascript:window.print()" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
+          <a href="#" onclick="printKitchenTicket(this); return false;" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
         </div>
       </div>
     {% empty %}
@@ -574,18 +578,19 @@
           {% if order.table %}
             <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
           {% else %}
-            <span class="order-table-badge takeaway">🥡 Takeaway</span>
+            {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
           {% endif %}
         </div>
+        {% include 'dashboard/_order_meta.html' %}
         <ul class="order-items">
           {% for item in order.items.all %}
             <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
           {% endfor %}
         </ul>
-        <div class="order-total">₹{{ order.total_amount }}</div>
+        <div class="order-total">₹{{ order.total_amount|inr }}</div>
         <div class="order-actions">
           <div class="btn-waiting">🛎️ Sent to waiter — waiting to be served</div>
-          <a href="javascript:window.print()" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
+          <a href="#" onclick="printKitchenTicket(this); return false;" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
         </div>
       </div>
     {% empty %}
@@ -634,6 +639,42 @@
     document.querySelectorAll('.order-card').forEach(card => {
       const match = card.getAttribute('data-search').includes(q);
       card.style.display = match ? '' : 'none';
+    });
+  }
+
+  // ---- Thermal kitchen ticket: reads the order card and prints an 80mm/58mm ticket ----
+  function printKitchenTicket(el) {
+    const card = el.closest('.order-card');
+    if (!card) return;
+
+    const meta = card.querySelector('.order-meta');
+    const orderType = meta ? meta.dataset.type : '';
+    const arrival = meta ? meta.dataset.arrival : '';
+    const note = meta ? meta.dataset.note : '';
+    const badge = card.querySelector('.order-table-badge');
+    let target = orderType === 'takeaway' ? 'TAKEAWAY' : 'DINE-IN';
+    if (orderType !== 'takeaway' && badge) {
+      const m = badge.textContent.match(/Table\s+(\d\S*)/i);
+      if (m) target = 'TABLE ' + m[1];
+    }
+
+    const userSpan = card.querySelector('.order-user span');
+    const customer = userSpan ? userSpan.textContent.replace('👤', '').trim() : '';
+
+    const items = Array.from(card.querySelectorAll('.order-items li')).map(li => {
+      const text = li.textContent.trim();
+      const m = text.match(/^(.*)\s+x(\d+)$/);
+      return m ? { name: m[1].trim(), qty: parseInt(m[2], 10) } : { name: text, qty: 1 };
+    });
+
+    printThermal({
+      type: 'kitchen',
+      orderId: card.getAttribute('data-order-id'),
+      target: target,
+      customer: customer,
+      items: items,
+      arrival: arrival,
+      note: note
     });
   }
 
@@ -837,7 +878,7 @@
 
   // Chrome/browser autoplay policy blocks audio (beep + speech) until the
   // page has had at least one real user gesture (click/tap/keypress).
-  // Because this dashboard auto-reloads every 2 minutes, each fresh reload
+  // Because this dashboard auto-reloads every few seconds, each fresh reload
   // starts "locked" again — so a new order arriving before the chef
   // clicks anything would play silently. This unlocks audio on the very
   // first interaction so all later beeps/voice announcements work.
@@ -866,10 +907,16 @@
   renderSoundToggle();
   checkForNewOrders();
 
-  // Full board refresh every 5 seconds (columns, stats, everything)
+  // Full board refresh every 5 seconds (columns, stats, everything).
+  // Paused while a thermal ticket is being printed so the reload can't cut it off.
   let seconds = 5;
   const countdownEl = document.getElementById('countdown');
   setInterval(() => {
+    if (window.thermalPrinting) {
+      seconds = 5;
+      countdownEl.textContent = seconds;
+      return;
+    }
     seconds--;
     if (seconds <= 0) {
       location.reload();

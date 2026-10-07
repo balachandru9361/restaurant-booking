@@ -299,11 +299,13 @@
   <div class="filter-chip" data-filter="customer" onclick="setFilter('customer')">Customers</div>
 </div>
 
+{% csrf_token %}
 <div class="bulk-bar" id="bulkBar">
   <span id="bulkCount">0 selected</span>
   <div style="display:flex; gap:8px;">
     <button onclick="clearSelection()">Clear</button>
-    <button onclick="alert('Hook this up to a bulk-action view')">Deactivate Selected</button>
+    <button onclick="bulkUserAction('activate')">Activate Selected</button>
+    <button onclick="bulkUserAction('deactivate')">Deactivate Selected</button>
   </div>
 </div>
 
@@ -329,7 +331,7 @@
           data-email="{{ user.email|lower }}"
           onclick="toggleDetail(event, {{ forloop.counter }})">
         <td class="checkbox-cell" onclick="event.stopPropagation()">
-          <input type="checkbox" class="row-check" onchange="updateBulkBar()">
+          <input type="checkbox" class="row-check" value="{{ user.id }}" onchange="updateBulkBar()">
         </td>
         <td>
           <div class="user-cell">
@@ -417,8 +419,10 @@
       const filterMatch = currentFilter === 'all' || row.dataset.role === currentFilter || row.dataset.active === currentFilter;
       const show = textMatch && filterMatch;
       row.style.display = show ? '' : 'none';
-      const detail = document.getElementById('detail-' + row.rowIndex);
-      if (detail && !show) detail.style.display = 'none';
+      const detail = row.nextElementSibling;
+      if (detail && detail.classList.contains('detail-row')) {
+        detail.style.display = show ? '' : 'none';
+      }
     });
   }
 
@@ -493,6 +497,27 @@
     link.href = URL.createObjectURL(blob);
     link.download = 'users.csv';
     link.click();
+  }
+
+  function bulkUserAction(action) {
+    const ids = [...document.querySelectorAll('.row-check:checked')].map(c => c.value);
+    if (!ids.length) return alert('Select at least one user');
+    if (!confirm(action + ' ' + ids.length + ' user(s)?')) return;
+
+    const token = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    fetch("{% url 'dashboard:bulk_user_action' %}", {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': token},
+      body: JSON.stringify({ids: ids, action: action})
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) return alert(d.error || 'Failed');
+      if (d.skipped) alert(d.skipped + ' user(s) skipped (your own account / superuser).');
+      location.reload();
+    })
+    .catch(() => alert('Network error'));
   }
 </script>
 {% endblock %}

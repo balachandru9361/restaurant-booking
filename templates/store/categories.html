@@ -1,0 +1,29 @@
+{% extends 'store/store_base.html' %}
+{% block title %}Categories{% endblock %}
+{% block content %}
+<h1>Grocery Categories</h1>
+<div class="grid2">
+  <div class="card">
+    <h3 style="margin-top:0">Add category</h3>
+    <form method="post">
+      {% csrf_token %}
+      <div class="field">
+        <input type="text" name="name" placeholder="e.g. Vegetables, Spices, Dairy" required maxlength="80">
+        {{ form.name.errors }}
+      </div>
+      <button class="btn" type="submit">Add</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">All categories</h3>
+    {% for c in categories %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f1f4;">
+        <span>{{ c.name }} <span class="muted">({{ c.items.count }} items)</span></span>
+        <form method="post" action="{% url 'store:category_delete' c.pk %}" onsubmit="return confirm('Delete {{ c.name|escapejs }}? Items stay, just uncategorised.')">
+          {% csrf_token %}<button class="btn small danger" type="submit">Delete</button>
+        </form>
+      </div>
+    {% empty %}<p class="muted">No categories yet.</p>{% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+<div class="order-meta" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 6px;">
+  {% if order.is_takeaway %}
+    <span style="background:#fff1e6;color:#b45309;border:1px solid #fdba74;border-radius:999px;padding:3px 10px;font-size:.78rem;font-weight:700;">🥡 Take away</span>
+  {% else %}
+    <span style="background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;border-radius:999px;padding:3px 10px;font-size:.78rem;font-weight:700;">🍽️ Dine-in</span>
+  {% endif %}
+  {% if order.arrival_time %}
+    <span style="background:#ecfdf5;color:#047857;border:1px solid #6ee7b7;border-radius:999px;padding:3px 10px;font-size:.78rem;font-weight:700;">🕒 Arrives {{ order.arrival_time|date:"g:i A" }}</span>
+  {% else %}
+    <span style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:999px;padding:3px 10px;font-size:.78rem;font-weight:700;">⚡ ASAP</span>
+  {% endif %}
+</div>
+{% if order.note %}
+<div class="order-note" style="background:#fef9c3;color:#713f12;border-left:4px solid #eab308;border-radius:8px;padding:6px 10px;margin:0 0 8px;font-size:.84rem;font-weight:600;">📝 {{ order.note }}</div>
+{% endif %}

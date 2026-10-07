@@ -1,0 +1,59 @@
+from django.contrib.auth.decorators import user_passes_test
+
+STORE_GROUP = "Store Manager"
+
+
+def _has_role(user, role):
+    """True if user is that staff role, or is a superuser (admin can see everything)."""
+    if user.is_superuser:
+        return True
+    profile = getattr(user, 'profile', None)
+    return bool(profile and profile.role == role)
+
+
+def _is_store_manager(user):
+    """Member of the 'Store Manager' group (superuser alone does NOT count here)."""
+    return bool(user.is_authenticated and user.is_active
+                and user.groups.filter(name=STORE_GROUP).exists())
+
+
+def _is_kitchen_staff(user):
+    """Chef role only (superuser NOT included)."""
+    if not (user.is_authenticated and user.is_active):
+        return False
+    profile = getattr(user, 'profile', None)
+    return bool(profile and profile.role == 'kitchen')
+
+
+def admin_required(view_func):
+    """Full admin only — superusers. Chefs/Servers (is_staff but not superuser) are blocked."""
+    return user_passes_test(lambda u: u.is_active and u.is_superuser, login_url='accounts:login')(view_func)
+
+
+def kitchen_access_required(view_func):
+    """Admin or chef — anyone with is_staff (superuser included) can access.
+    Used for shared actions like updating order status."""
+    return user_passes_test(lambda u: u.is_active and u.is_staff, login_url='accounts:login')(view_func)
+
+
+def kitchen_required(view_func):
+    """Kitchen dashboard: admins and kitchen-role staff only (servers are blocked)."""
+    return user_passes_test(lambda u: u.is_active and _has_role(u, 'kitchen'), login_url='accounts:login')(view_func)
+
+
+def server_required(view_func):
+    """Server dashboard: admins and server-role staff only (kitchen staff are blocked)."""
+    return user_passes_test(lambda u: u.is_active and _has_role(u, 'server'), login_url='accounts:login')(view_func)
+
+
+def store_required(view_func):
+    """Store Manager group only. Admin (superuser) and chefs are blocked."""
+    return user_passes_test(_is_store_manager, login_url='inventory:login')(view_func)
+
+
+def store_or_kitchen_required(view_func):
+    """Kitchen <-> Store link: chef role or Store Manager group only. Admin is blocked."""
+    return user_passes_test(
+        lambda u: _is_store_manager(u) or _is_kitchen_staff(u),
+        login_url='accounts:login',
+    )(view_func)

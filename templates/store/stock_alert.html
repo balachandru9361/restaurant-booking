@@ -1,0 +1,40 @@
+{% extends 'store/store_base.html' %}
+{% block title %}Stock Alert{% endblock %}
+{% block content %}
+<h1>Stock Alert</h1>
+
+<h3>Out of stock ({{ out_items|length }})</h3>
+<div class="card table-wrap">
+  <table>
+    <tr><th>Item</th><th>Category</th><th>Stock</th><th></th></tr>
+    {% for i in out_items %}
+    <tr>
+      <td>{{ i.name }}</td>
+      <td>{{ i.category.name|default:"-" }}</td>
+      <td>{{ i.current_stock|floatformat:"-3" }} {{ i.unit }}</td>
+      <td><a class="btn small" href="{% url 'store:stock_in_add' %}?item={{ i.pk }}">Add Stock In</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" class="muted">Nothing is out of stock.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+
+<h3 style="margin-top:24px">Low stock ({{ low_items|length }})</h3>
+<div class="card table-wrap">
+  <table>
+    <tr><th>Item</th><th>Category</th><th>Stock</th><th>Reorder at</th><th></th></tr>
+    {% for i in low_items %}
+    <tr>
+      <td>{{ i.name }}</td>
+      <td>{{ i.category.name|default:"-" }}</td>
+      <td>{{ i.current_stock|floatformat:"-3" }} {{ i.unit }}</td>
+      <td>{{ i.reorder_level|floatformat:"-3" }} {{ i.unit }}</td>
+      <td><a class="btn small" href="{% url 'store:stock_in_add' %}?item={{ i.pk }}">Add Stock In</a></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="muted">No low stock items.</td></tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

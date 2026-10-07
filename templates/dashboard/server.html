@@ -42,7 +42,7 @@
 
   .kitchen-stats {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 14px;
     margin-bottom: 22px;
   }
@@ -62,6 +62,11 @@
     0%,100% { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
     50% { box-shadow: 0 2px 10px rgba(0,0,0,0.06), 0 0 0 3px rgba(15,118,110,0.3), 0 0 18px rgba(15,118,110,0.25); }
   }
+  .stat-box.has-new { animation: newPulse 1.6s ease-in-out infinite; }
+  @keyframes newPulse {
+    0%,100% { box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+    50% { box-shadow: 0 2px 10px rgba(0,0,0,0.06), 0 0 0 3px rgba(245,158,11,0.35), 0 0 18px rgba(245,158,11,0.3); }
+  }
 
   .server-board {
     display: grid;
@@ -75,6 +80,8 @@
     padding: 16px;
     min-height: 260px;
   }
+  .board-col.new-col { min-height: 0; margin-bottom: 20px; }
+  .board-col.dining-col { min-height: 0; margin-top: 20px; }
   .board-col-header {
     display: flex;
     align-items: center;
@@ -83,6 +90,8 @@
     padding-bottom: 10px;
     border-bottom: 2px solid #0f766e;
   }
+  .new-col .board-col-header { border-bottom-color: #f59e0b; }
+  .dining-col .board-col-header { border-bottom-color: #6366f1; }
   .board-col-header h3 { font-family: 'Sora', sans-serif; font-size: 15px; color: #0d1b2a; }
   .board-count {
     background: #fff; border-radius: 20px; padding: 2px 10px; font-size: 12px;
@@ -97,7 +106,9 @@
     box-shadow: 0 2px 10px rgba(0,0,0,0.07);
     border-left: 4px solid #0f766e;
   }
-  .order-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .order-card.new-order { border-left-color: #f59e0b; }
+  .order-card.dining { border-left-color: #6366f1; }
+  .order-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
   .order-id { font-family: 'Sora', sans-serif; font-weight: 700; color: #0d1b2a; font-size: 14px; }
   .order-user { font-size: 13px; color: #374151; margin-bottom: 6px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
   .order-table-badge {
@@ -107,6 +118,17 @@
     padding: 3px 10px; border-radius: 20px; border: 1px solid #d4af37; white-space: nowrap;
   }
   .order-table-badge.takeaway { background: #eef1f5; color: #6b7280; border-color: #d1d5db; }
+
+  /* QR table badge */
+  .badge-group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .qr-tag {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #ecfdf5; color: #047857; border: 1px solid #10b981;
+    font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 20px; white-space: nowrap;
+  }
+  .order-table-badge.warn { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; animation: warnPulse 1.8s ease-in-out infinite; }
+  @keyframes warnPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
   .order-items { list-style: none; padding: 0; margin: 0 0 10px 0; font-size: 12.5px; color: #4b5563; }
   .order-items li { display: flex; justify-content: space-between; padding: 3px 0; }
   .order-total {
@@ -128,6 +150,37 @@
   }
   .btn-to-delivered:hover { background: #147a3d; color: #fff; }
 
+  /* New Orders (server -> kitchen) */
+  .pay-badge {
+    font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px; white-space: nowrap;
+    background: #fef3c7; color: #92400e;
+  }
+  .pay-badge.paid { background: #dcfce7; color: #166534; }
+  .table-select {
+    width: 100%; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 8px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: #0d1b2a;
+    margin-bottom: 10px; box-sizing: border-box; background: #fff;
+  }
+  .btn-send, .btn-reject {
+    border: 0; cursor: pointer; padding: 10px; border-radius: 8px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; transition: all 0.2s ease;
+  }
+  .btn-send { flex: 2; background: #fef3c7; color: #92400e; }
+  .btn-send:hover { background: #f59e0b; color: #fff; }
+  .btn-reject { flex: 1; background: #fee2e2; color: #b91c1c; }
+  .btn-reject:hover { background: #b91c1c; color: #fff; }
+  .btn-send:disabled, .btn-reject:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  /* Dining Now + Free Table */
+  .dining-since { font-size: 12px; color: #6b7280; margin-bottom: 10px; }
+  .btn-free-table {
+    border: 0; cursor: pointer; width: 100%; padding: 10px; border-radius: 8px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700;
+    background: #e0e7ff; color: #3730a3; transition: all 0.2s ease;
+  }
+  .btn-free-table:hover { background: #3730a3; color: #fff; }
+  .btn-free-table:disabled { opacity: 0.6; cursor: not-allowed; }
+
   .booking-row {
     background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
     display: flex; justify-content: space-between; align-items: center;
@@ -142,6 +195,7 @@
 
   .empty-col { text-align: center; color: #9ca3af; font-size: 13px; padding: 40px 0; }
   .empty-col .empty-icon { font-size: 30px; display: block; margin-bottom: 8px; opacity: 0.5; }
+  .new-col .empty-col, .dining-col .empty-col { padding: 24px 0; }
 
   /* --- Attractive toast notification (matches Kitchen Dashboard style) --- */
   #toastStack {
@@ -168,6 +222,7 @@
     border-left: 4px solid #d4af37;
     animation: toastIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), toastGlow 1.6s ease-in-out 0.35s 3, toastOut 0.35s ease 6.6s forwards;
   }
+  .server-toast.is-error { border-left-color: #ef4444; }
   .server-toast .toast-bell {
     font-size: 24px;
     flex-shrink: 0;
@@ -217,21 +272,196 @@
     60% { transform: rotate(-9deg); }
     80% { transform: rotate(5deg); }
   }
+
+  /* --- Take Order (server places order for a table) --- */
+  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .btn-take-order {
+    border: 0; cursor: pointer; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 700;
+    background: linear-gradient(135deg, #d4af37, #f0cd6b); color: #0d1b2a;
+    padding: 10px 18px; border-radius: 10px; box-shadow: 0 4px 14px rgba(212,175,55,0.4);
+    transition: transform 0.15s ease;
+  }
+  .btn-take-order:hover { transform: translateY(-1px); }
+  .to-overlay {
+    position: fixed; inset: 0; background: rgba(13,27,42,0.6); z-index: 9000;
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .to-overlay.open { display: flex; }
+  .to-modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 720px; max-height: 92vh;
+    display: flex; flex-direction: column; overflow: hidden; font-family: 'Inter', sans-serif;
+  }
+  .to-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px; background: #0d1b2a; color: #d4af37;
+  }
+  .to-head h2 { font-family: 'Sora', sans-serif; font-size: 18px; margin: 0; }
+  .to-close { background: none; border: 0; color: #fff; font-size: 22px; cursor: pointer; }
+  .to-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+  .to-label { font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+  .to-tables { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .to-chip {
+    border: 2px solid #e5e7eb; background: #fff; border-radius: 10px; padding: 8px 14px;
+    font-weight: 700; font-size: 13px; cursor: pointer; color: #374151;
+  }
+  .to-chip.active { border-color: #0f766e; background: #e6f6f4; color: #0f766e; }
+  /* occupied / booked table chip */
+  .to-chip small { display: block; font-size: 10.5px; font-weight: 700; margin-top: 2px; }
+  .to-chip.occupied {
+    background: #fef2f2; border-color: #fecaca; color: #b91c1c;
+    cursor: not-allowed; opacity: 0.9;
+  }
+  .to-search {
+    width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px;
+    font-size: 14px; margin-bottom: 12px; box-sizing: border-box;
+  }
+  .to-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 10px 12px; border: 1px solid #eef0f3; border-radius: 10px; margin-bottom: 8px;
+  }
+  .to-item-name { font-weight: 700; color: #0d1b2a; font-size: 14px; }
+  .to-item-price { font-size: 12.5px; color: #6b7280; }
+  .to-qty { display: flex; align-items: center; gap: 10px; }
+  .to-qty button {
+    width: 32px; height: 32px; border-radius: 8px; border: 0; cursor: pointer;
+    font-size: 18px; font-weight: 700; background: #eef1f5; color: #0d1b2a;
+  }
+  .to-qty button.plus { background: #0f766e; color: #fff; }
+  .to-qty .num { min-width: 22px; text-align: center; font-weight: 700; }
+  .to-foot {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 14px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb;
+  }
+  .to-total { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 18px; color: #0d1b2a; }
+  .to-total small { display: block; font-family: 'Inter', sans-serif; font-size: 11.5px; font-weight: 600; color: #6b7280; }
+  .btn-place {
+    border: 0; cursor: pointer; padding: 12px 22px; border-radius: 10px; font-weight: 700;
+    font-size: 14px; background: #0f766e; color: #fff;
+  }
+  .btn-place:disabled { background: #9ca3af; cursor: not-allowed; }
+  .to-error { color: #b91c1c; font-size: 13px; font-weight: 600; margin-top: 8px; display: none; }
+
+  /* --- Mobile / tablet responsive --- */
+  .server-board > * { min-width: 0; }
+  @media (max-width: 1100px) {
+    .kitchen-stats { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 900px) {
+    .server-board { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .kitchen-header { flex-direction: column; align-items: stretch; }
+    .kitchen-header h1 { font-size: 22px; }
+    .header-right { width: 100%; justify-content: space-between; }
+    .btn-take-order { flex: 1; padding: 12px 14px; }
+    .kitchen-clock { padding: 10px 12px; white-space: nowrap; }
+    .kitchen-stats { gap: 8px; }
+    .stat-box { padding: 10px 10px; }
+    .stat-box .stat-num { font-size: 18px; }
+    .stat-box .stat-label { font-size: 11px; }
+    .board-col { padding: 12px; }
+    .order-user { flex-wrap: wrap; }
+    .booking-row { gap: 8px; }
+    .btn-to-delivered { padding: 12px; font-size: 14px; }
+    .btn-send, .btn-reject, .btn-free-table { padding: 12px; font-size: 14px; }
+
+    #toastStack { top: 10px; left: 10px; right: 10px; }
+    .server-toast { min-width: 0; max-width: none; width: 100%; box-sizing: border-box; }
+
+    .to-overlay { padding: 0; align-items: flex-end; }
+    .to-modal { max-width: none; max-height: 96vh; border-radius: 16px 16px 0 0; }
+    .to-body { padding: 14px; }
+    .to-chip { padding: 10px 14px; }
+    .to-qty button { width: 38px; height: 38px; font-size: 20px; }
+    .to-foot { padding: 12px 14px; }
+    .btn-place { padding: 14px 16px; font-size: 14px; flex: 1; }
+  }
+
+  /* Keep the modal inside the screen no matter what the page layout does */
+  .to-overlay { overflow: hidden; }
+  .to-modal { box-sizing: border-box; min-width: 0; max-width: 100%; }
+  .to-body { overflow-x: hidden; }
+  .to-tables { min-width: 0; }
+  .to-search { max-width: 100%; }
+  .to-item > div:first-child { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+  .to-qty { flex-shrink: 0; }
 </style>
 
 <div id="toastStack"></div>
 
+<div class="to-overlay" id="toOverlay">
+  <div class="to-modal">
+    <div class="to-head">
+      <h2>➕ Take Order</h2>
+      <button type="button" class="to-close" id="toClose">✕</button>
+    </div>
+    <div class="to-body">
+      <p class="to-label">1. Select Table</p>
+      <div class="to-tables" id="toTables">
+        {% for t in tables_info %}
+          {% if t.held_by %}
+            <button type="button" class="to-chip occupied" disabled>
+              🪑 Table {{ t.number }}<small>🔴 Occupied · Order #{{ t.held_by }}</small>
+            </button>
+          {% elif t.busy %}
+            <button type="button" class="to-chip occupied" disabled>
+              🪑 Table {{ t.number }}<small>📅 Booked now</small>
+            </button>
+          {% else %}
+            <button type="button" class="to-chip" data-table="{{ t.id }}" data-label="TABLE {{ t.number }}">🪑 Table {{ t.number }}</button>
+          {% endif %}
+        {% endfor %}
+        <button type="button" class="to-chip" data-table="takeaway" data-label="TAKEAWAY">🥡 Takeaway</button>
+      </div>
+
+      <p class="to-label">2. Add Items</p>
+      <input type="text" class="to-search" id="toSearch" placeholder="🔍 Search menu...">
+      <div id="toMenu">
+        {% for item in food_items %}
+          <div class="to-item" data-id="{{ item.id }}" data-price="{{ item.price|stringformat:'s' }}" data-name="{{ item.name|lower }}">
+            <div>
+              <div class="to-item-name">{{ item.name }}</div>
+              <div class="to-item-price">₹{{ item.price|inr }}</div>
+            </div>
+            <div class="to-qty">
+              <button type="button" class="minus">−</button>
+              <span class="num">0</span>
+              <button type="button" class="plus">+</button>
+            </div>
+          </div>
+        {% empty %}
+          <div class="empty-col">No menu items available</div>
+        {% endfor %}
+      </div>
+      <div class="to-error" id="toError"></div>
+    </div>
+    <div class="to-foot">
+      <div class="to-total"><small id="toCount">0 items · Cash payment</small>₹<span id="toTotal">0</span></div>
+      <button type="button" class="btn-place" id="toPlace" disabled>Place Order → Kitchen</button>
+    </div>
+  </div>
+</div>
+
 <div class="kitchen-header">
   <div>
     <h1>🛎️ Server Dashboard</h1>
-    <p>Orders finished by the kitchen appear here automatically. Serve the table, then mark it served — the admin gets the message.</p>
+    <p>New customer orders come here first. Send them to the kitchen, then serve the table when the kitchen marks them ready — the admin gets the message.</p>
   </div>
-  <div class="kitchen-clock"><span class="dot"></span> <span id="liveClock"></span></div>
+  <div class="header-right">
+    <button type="button" class="btn-take-order" id="toOpen">➕ Take Order</button>
+    <div class="kitchen-clock"><span class="dot"></span> <span id="liveClock"></span></div>
+  </div>
 </div>
 
-<div id="liveRegion" data-ready-ids="{% for o in ready_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+<div id="liveRegion"
+     data-new-ids="{% for o in new_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+     data-ready-ids="{% for o in ready_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
 
 <div class="kitchen-stats">
+  <div class="stat-box{% if new_orders|length > 0 %} has-new{% endif %}" style="border-left-color:#f59e0b;">
+    <div class="stat-num">{{ new_orders|length }}</div>
+    <div class="stat-label">🆕 New Orders</div>
+  </div>
   <div class="stat-box{% if ready_orders|length > 0 %} has-ready{% endif %}" style="border-left-color:#0f766e;">
     <div class="stat-num">{{ ready_orders|length }}</div>
     <div class="stat-label">✅ Ready to Serve</div>
@@ -248,40 +478,120 @@
 
 <div class="server-board">
 
-  <div class="board-col">
-    <div class="board-col-header">
-      <h3>✅ Ready to Serve</h3>
-      <span class="board-count">{{ ready_orders|length }}</span>
-    </div>
-    {% for order in ready_orders %}
-      <div class="order-card" data-order-id="{{ order.id }}">
-        <div class="order-card-top">
-          <span class="order-id">Order #{{ order.id }}</span>
-        </div>
-        <div class="order-user">
-          <span>👤 {{ order.user.username }}</span>
-          {% if order.table %}
-            <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
-          {% else %}
-            <span class="order-table-badge takeaway">🥡 Takeaway</span>
-          {% endif %}
-        </div>
-        <ul class="order-items">
-          {% for item in order.items.all %}
-            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
-          {% endfor %}
-        </ul>
-        <div class="order-total">₹{{ order.total_amount }}</div>
-        <div class="order-actions">
-          <form method="post" action="{% url 'dashboard:update_order_status' order.id 'delivered' %}">
-            {% csrf_token %}
-            <button type="submit" class="btn-to-delivered">🍽️ Mark Served ✓</button>
-          </form>
-        </div>
+  <div>
+
+    <!-- customer orders waiting for the server -->
+    <div class="board-col new-col">
+      <div class="board-col-header">
+        <h3>🆕 New Orders — Send to Kitchen</h3>
+        <span class="board-count">{{ new_orders|length }}</span>
       </div>
-    {% empty %}
-      <div class="empty-col"><span class="empty-icon">🛎️</span>No orders ready to serve right now</div>
-    {% endfor %}
+      {% for order in new_orders %}
+        <div class="order-card new-order"
+             data-order-id="{{ order.id }}"
+             data-send-url="{% url 'dashboard:server_send_to_kitchen' order.id %}"
+             data-reject-url="{% url 'dashboard:server_reject_order' order.id %}">
+          <div class="order-card-top">
+            <span class="order-id">Order #{{ order.id }}</span>
+            {% if order.payment_status == 'paid' %}
+              <span class="pay-badge paid">💳 PAID ONLINE</span>
+            {% else %}
+              <span class="pay-badge">💵 CASH</span>
+            {% endif %}
+          </div>
+          <div class="order-user">
+            <span>👤 {{ order.user.username }}</span>
+            {# table from QR scan shows a green QR tag; orders without a table show no badge #}
+            {% if order.table %}
+              <span class="badge-group">
+                <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
+                <span class="qr-tag" title="Customer scanned the table QR, so the table is already set">📱 QR</span>
+              </span>
+            {% elif order.is_takeaway %}
+              <span class="order-table-badge takeaway">🥡 Takeaway</span>
+            {% elif order.is_delivery %}
+              <span class="order-table-badge takeaway">🛵 Home delivery</span>
+            {% endif %}
+          </div>
+          {% include 'dashboard/_order_meta.html' %}
+          <ul class="order-items">
+            {% for item in order.items.all %}
+              <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+            {% endfor %}
+          </ul>
+          <div class="order-total">₹{{ order.total_amount|inr }}</div>
+
+          <div class="order-actions">
+            <button type="button" class="btn-send">👨‍🍳 Send to Kitchen</button>
+            <button type="button" class="btn-reject">❌ Reject</button>
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty-col"><span class="empty-icon">🆕</span>No new orders right now</div>
+      {% endfor %}
+    </div>
+
+    <div class="board-col">
+      <div class="board-col-header">
+        <h3>✅ Ready to Serve</h3>
+        <span class="board-count">{{ ready_orders|length }}</span>
+      </div>
+      {% for order in ready_orders %}
+        <div class="order-card" data-order-id="{{ order.id }}">
+          <div class="order-card-top">
+            <span class="order-id">Order #{{ order.id }}</span>
+          </div>
+          <div class="order-user">
+            <span>👤 {{ order.user.username }}</span>
+            {% if order.table %}
+              <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
+            {% else %}
+              {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
+            {% endif %}
+          </div>
+          {% include 'dashboard/_order_meta.html' %}
+          <ul class="order-items">
+            {% for item in order.items.all %}
+              <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+            {% endfor %}
+          </ul>
+          <div class="order-total">₹{{ order.total_amount|inr }}</div>
+          <div class="order-actions">
+            <form method="post" action="{% url 'dashboard:update_order_status' order.id 'delivered' %}">
+              {% csrf_token %}
+              <button type="submit" class="btn-to-delivered">🍽️ Mark Served ✓</button>
+            </form>
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty-col"><span class="empty-icon">🛎️</span>No orders ready to serve right now</div>
+      {% endfor %}
+    </div>
+
+    <!-- customers still eating -> server frees the table -->
+    <div class="board-col dining-col">
+      <div class="board-col-header">
+        <h3>🍴 Dining Now — Free Table</h3>
+        <span class="board-count">{{ dining_orders|length }}</span>
+      </div>
+      {% for order in dining_orders %}
+        <div class="order-card dining" data-order-id="{{ order.id }}">
+          <div class="order-card-top">
+            <span class="order-id">Order #{{ order.id }}</span>
+            <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
+          </div>
+          <div class="order-user"><span>👤 {{ order.user.username }}</span></div>
+          <div class="dining-since">Served · customer is still eating</div>
+          <button type="button" class="btn-free-table"
+                  data-url="{% url 'dashboard:server_free_table' order.id %}"
+                  data-table="{{ order.table.number }}"
+                  data-order="{{ order.id }}">✅ Customer Left — Free Table {{ order.table.number }}</button>
+        </div>
+      {% empty %}
+        <div class="empty-col"><span class="empty-icon">🍴</span>No one is dining right now</div>
+      {% endfor %}
+    </div>
+
   </div>
 
   <div>
@@ -316,7 +626,7 @@
           <div>
             <div class="booking-name">Order #{{ order.id }} · {{ order.user.username }}</div>
             <div class="booking-meta">
-              {% if order.table %}Table {{ order.table.number }}{% else %}Takeaway{% endif %} · ₹{{ order.total_amount }}
+              {% if order.table %}Table {{ order.table.number }}{% elif order.is_takeaway %}Takeaway{% else %}Dine-in{% endif %} · ₹{{ order.total_amount|inr }}
             </div>
           </div>
         </div>
@@ -331,13 +641,15 @@
 </div>
 
 <script>
+  const CSRF_TOKEN = '{{ csrf_token }}';
+
   function updateClock() {
     document.getElementById('liveClock').textContent = new Date().toLocaleTimeString();
   }
   setInterval(updateClock, 1000);
   updateClock();
 
-  // ---- Rich bell chime (Web Audio API) — same premium chime as Kitchen ----
+  // ---- Rich bell chime (Web Audio API) - same premium chime as Kitchen ----
   let sharedAudioCtx = null;
   function getAudioCtx() {
     if (!sharedAudioCtx) {
@@ -353,9 +665,6 @@
     try {
       const ctx = getAudioCtx();
 
-      // If Chrome auto-suspended the context (its battery-saving policy
-      // after ~30s of silence), resume() is async — scheduling sound
-      // before it finishes can silently fail. Wait for resume, then play.
       const playChime = () => {
         const now = ctx.currentTime;
 
@@ -408,11 +717,9 @@
       } else {
         playChime();
       }
-    } catch (e) { /* audio blocked until user interacts once — safe to ignore */ }
+    } catch (e) { /* audio blocked until user interacts once - safe to ignore */ }
   }
 
-  // Unlock audio on first interaction (autoplay policy) so the chime
-  // isn't silently blocked before the server has clicked anything.
   let audioUnlocked = false;
   function unlockAudioOnce() {
     if (audioUnlocked) return;
@@ -426,28 +733,25 @@
   document.addEventListener('keydown', unlockAudioOnce);
   document.addEventListener('touchstart', unlockAudioOnce);
 
-  // ---- Attractive toast notification: big color-coded table/takeaway
-  // label so a server glancing from across the room can read it at once ----
-  function showToast(orderId, target, isTakeaway) {
+  // Generic toast (title / big text / sub text / icon)
+  function showToast(title, target, sub, icon, opts) {
+    opts = opts || {};
     const stack = document.getElementById('toastStack');
     const toast = document.createElement('div');
-    toast.className = 'server-toast' + (isTakeaway ? ' is-takeaway' : '');
+    toast.className = 'server-toast' + (opts.takeaway ? ' is-takeaway' : '') + (opts.error ? ' is-error' : '');
     toast.innerHTML = `
-      <span class="toast-bell">🔔</span>
+      <span class="toast-bell">${icon || '🔔'}</span>
       <span>
-        <span class="toast-title">Order Ready</span>
+        <span class="toast-title">${title}</span>
         <span class="toast-target">${target}</span>
-        <span class="toast-sub">Order #${orderId}</span>
+        <span class="toast-sub">${sub || ''}</span>
       </span>`;
     stack.appendChild(toast);
     setTimeout(() => toast.remove(), 7000);
   }
 
-  // ---- FIX: refreshLive() was being called but never defined, so the
-  // Ready-to-Serve column, stat counters and Served-Today list never
-  // actually updated in the DOM (only the toast + sound fired).
-  // This re-fetches the current page's HTML, pulls out the fresh
-  // #liveRegion markup, and swaps it in. No new backend endpoint needed. ----
+  // Re-fetches the current page, swaps in the fresh #liveRegion markup.
+  // Also refreshes the Take Order table chips (occupied / free).
   function refreshLive() {
     return fetch(window.location.href, { credentials: 'same-origin' })
       .then(r => r.text())
@@ -459,35 +763,70 @@
         if (freshRegion && currentRegion) {
           currentRegion.innerHTML = freshRegion.innerHTML;
           currentRegion.dataset.readyIds = freshRegion.dataset.readyIds;
+          currentRegion.dataset.newIds = freshRegion.dataset.newIds;
+
+          // refresh Take Order table chips (occupied / free)
+          const curTables = document.getElementById('toTables');
+          const freshTables = freshDoc.getElementById('toTables');
+          if (curTables && freshTables) {
+            const act = curTables.querySelector('.to-chip.active');
+            const actId = act && act.dataset.table;
+            curTables.innerHTML = freshTables.innerHTML;
+            if (actId) {
+              const c = curTables.querySelector('.to-chip[data-table="' + actId + '"]');
+              if (c) c.classList.add('active');
+            }
+          }
         }
       })
       .catch(() => { /* keep old DOM if refresh fails; next poll will retry */ });
   }
 
-  // ---- Live message when the kitchen marks an order Ready ----
+  // ---- Live messages: new customer order + kitchen marked Ready ----
   (function () {
     const region = () => document.getElementById('liveRegion');
-    let known = new Set((region().dataset.readyIds || '').split(',').filter(Boolean).map(Number));
+    const toSet = str => new Set((str || '').split(',').filter(Boolean).map(Number));
+    let knownReady = toSet(region().dataset.readyIds);
+    let knownNew = toSet(region().dataset.newIds);
 
     function poll() {
       fetch("{% url 'dashboard:server_poll' %}", { credentials: 'same-origin' })
         .then(r => r.json())
         .then(data => {
-          const current = data.orders;
-          const currentIds = new Set(current.map(o => o.id));
-          const fresh = current.filter(o => !known.has(o.id));
-          const removed = [...known].some(id => !currentIds.has(id));
+          const ready = data.orders || [];
+          const fresh = data.new_orders || [];
 
-          if (fresh.length || removed) {
-            fresh.forEach(o => showToast(
-              o.id,
-              o.table ? '🪑 TABLE ' + o.table : '🥡 TAKEAWAY',
-              !o.table
+          const readyIds = new Set(ready.map(o => o.id));
+          const newIds = new Set(fresh.map(o => o.id));
+
+          const freshReady = ready.filter(o => !knownReady.has(o.id));
+          const freshNew = fresh.filter(o => !knownNew.has(o.id));
+
+          const removedReady = [...knownReady].some(id => !readyIds.has(id));
+          const removedNew = [...knownNew].some(id => !newIds.has(id));
+
+          if (freshReady.length || freshNew.length || removedReady || removedNew) {
+            freshNew.forEach(o => showToast(
+              'New Order',
+              o.table ? '🪑 TABLE ' + o.table : '🆕 NEW ORDER',
+              'Order #' + o.id + ' - send to kitchen',
+              '🆕',
+              { takeaway: !o.table }
             ));
-            if (fresh.length) beep();
-            known = currentIds;
+            freshReady.forEach(o => showToast(
+              'Order Ready',
+              o.table ? '🪑 TABLE ' + o.table : '🥡 TAKEAWAY',
+              'Order #' + o.id,
+              '🔔',
+              { takeaway: !o.table }
+            ));
+            if (freshReady.length || freshNew.length) beep();
+
+            knownReady = readyIds;
+            knownNew = newIds;
+
             refreshLive().then(() => {
-              fresh.forEach(o => {
+              [...freshReady, ...freshNew].forEach(o => {
                 const card = document.querySelector('[data-order-id="' + o.id + '"]');
                 if (card) card.classList.add('is-new');
               });
@@ -497,6 +836,234 @@
         .catch(() => {});
     }
     setInterval(poll, 6000);
+  })();
+
+  // ---- Send to Kitchen / Reject (event delegation, because liveRegion gets re-rendered) ----
+  (function () {
+    function post(url, params) {
+      return fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-CSRFToken': CSRF_TOKEN,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+      }).then(r => r.json().then(d => ({ status: r.status, ok: r.ok, data: d })));
+    }
+
+    function sendToKitchen(card, force) {
+      const btn = card.querySelector('.btn-send');
+      const rej = card.querySelector('.btn-reject');
+      const orderId = card.dataset.orderId;
+
+      const params = new URLSearchParams();
+      if (force) params.set('force', '1');
+
+      btn.disabled = true; rej.disabled = true;
+      btn.textContent = 'Sending...';
+
+      post(card.dataset.sendUrl, params)
+        .then(res => {
+          if (res.data && res.data.ok) {
+            showToast('Sent to Kitchen', '👨‍🍳 Order #' + orderId, 'Kitchen will start preparing', '👨‍🍳');
+            return refreshLive();
+          }
+          if (res.status === 409 && res.data && res.data.short) {
+            btn.disabled = false; rej.disabled = false;
+            btn.textContent = '👨‍🍳 Send to Kitchen';
+            if (confirm(res.data.error + '\n\nSend to kitchen anyway?')) {
+              sendToKitchen(card, true);
+            }
+            return;
+          }
+          showToast('Could not send', (res.data && res.data.error) || 'Something went wrong', 'Order #' + orderId, '⚠️', { error: true });
+          btn.disabled = false; rej.disabled = false;
+          btn.textContent = '👨‍🍳 Send to Kitchen';
+          if (res.status === 409) refreshLive();
+        })
+        .catch(() => {
+          showToast('Network error', 'Please try again', 'Order #' + orderId, '⚠️', { error: true });
+          btn.disabled = false; rej.disabled = false;
+          btn.textContent = '👨‍🍳 Send to Kitchen';
+        });
+    }
+
+    function rejectOrder(card) {
+      const orderId = card.dataset.orderId;
+      const reason = prompt('Reason for rejecting order #' + orderId + ' (optional):');
+      if (reason === null) return;
+
+      const btn = card.querySelector('.btn-send');
+      const rej = card.querySelector('.btn-reject');
+      btn.disabled = true; rej.disabled = true;
+      rej.textContent = 'Rejecting...';
+
+      const params = new URLSearchParams();
+      params.set('reason', reason);
+
+      post(card.dataset.rejectUrl, params)
+        .then(res => {
+          if (res.data && res.data.ok) {
+            showToast('Order Rejected', '❌ Order #' + orderId, res.data.refund ? 'Online payment needs a refund' : 'Customer informed', '❌');
+            return refreshLive();
+          }
+          showToast('Could not reject', (res.data && res.data.error) || 'Something went wrong', 'Order #' + orderId, '⚠️', { error: true });
+          btn.disabled = false; rej.disabled = false;
+          rej.textContent = '❌ Reject';
+          if (res.status === 409) refreshLive();
+        })
+        .catch(() => {
+          showToast('Network error', 'Please try again', 'Order #' + orderId, '⚠️', { error: true });
+          btn.disabled = false; rej.disabled = false;
+          rej.textContent = '❌ Reject';
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+      const sendBtn = e.target.closest('.btn-send');
+      const rejBtn = e.target.closest('.btn-reject');
+      if (!sendBtn && !rejBtn) return;
+      const card = e.target.closest('.order-card');
+      if (!card) return;
+      if (sendBtn) sendToKitchen(card, false);
+      else rejectOrder(card);
+    });
+  })();
+
+  // ---- Free Table (customer left) ----
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.btn-free-table');
+    if (!btn) return;
+    if (!confirm('Free Table ' + btn.dataset.table + '? Has the customer finished eating?')) return;
+
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Freeing...';
+
+    fetch(btn.dataset.url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': CSRF_TOKEN }
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(res => {
+        if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Could not free table');
+        showToast('Table Free', '🪑 TABLE ' + res.data.table, 'Order #' + btn.dataset.order + ' · ready for new guests', '✅');
+        return refreshLive();
+      })
+      .catch(err => {
+        showToast('Could not free', err.message, 'Order #' + btn.dataset.order, '⚠️', { error: true });
+        btn.disabled = false;
+        btn.textContent = label;
+      });
+  });
+
+  // ---- Take Order: server picks table + items, order goes to Kitchen ----
+  (function () {
+    const overlay = document.getElementById('toOverlay');
+    document.body.appendChild(overlay);
+    document.body.appendChild(document.getElementById('toastStack'));
+    const placeBtn = document.getElementById('toPlace');
+    const errBox = document.getElementById('toError');
+    let selectedTable = null;   // table id, or 'takeaway'
+    let selectedLabel = '';
+    const qty = {};             // { foodItemId: quantity }
+
+    function openModal() { overlay.classList.add('open'); }
+    function closeModal() { overlay.classList.remove('open'); }
+
+    function resetModal() {
+      selectedTable = null;
+      selectedLabel = '';
+      Object.keys(qty).forEach(k => delete qty[k]);
+      document.querySelectorAll('#toTables .to-chip').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('#toMenu .to-item').forEach(row => {
+        row.querySelector('.num').textContent = '0';
+      });
+      document.getElementById('toSearch').value = '';
+      filterMenu('');
+      errBox.style.display = 'none';
+      recalc();
+    }
+
+    function recalc() {
+      let total = 0, count = 0;
+      document.querySelectorAll('#toMenu .to-item').forEach(row => {
+        const q = qty[row.dataset.id] || 0;
+        total += q * parseFloat(row.dataset.price || 0);
+        count += q;
+      });
+      document.getElementById('toTotal').textContent = total.toFixed(2);
+      document.getElementById('toCount').textContent = count + ' item' + (count === 1 ? '' : 's') + ' · Cash payment';
+      placeBtn.disabled = !(selectedTable && count > 0);
+    }
+
+    function filterMenu(text) {
+      const t = text.trim().toLowerCase();
+      document.querySelectorAll('#toMenu .to-item').forEach(row => {
+        row.style.display = row.dataset.name.includes(t) ? '' : 'none';
+      });
+    }
+
+    document.getElementById('toOpen').addEventListener('click', openModal);
+    document.getElementById('toClose').addEventListener('click', closeModal);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+    document.getElementById('toSearch').addEventListener('input', e => filterMenu(e.target.value));
+
+    document.getElementById('toTables').addEventListener('click', e => {
+      const chip = e.target.closest('.to-chip');
+      if (!chip || chip.disabled) return;   // occupied tables cannot be picked
+      document.querySelectorAll('#toTables .to-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      selectedTable = chip.dataset.table;
+      selectedLabel = chip.dataset.label;
+      recalc();
+    });
+
+    document.getElementById('toMenu').addEventListener('click', e => {
+      const row = e.target.closest('.to-item');
+      if (!row) return;
+      const id = row.dataset.id;
+      if (e.target.classList.contains('plus')) qty[id] = (qty[id] || 0) + 1;
+      else if (e.target.classList.contains('minus')) qty[id] = Math.max(0, (qty[id] || 0) - 1);
+      else return;
+      row.querySelector('.num').textContent = qty[id];
+      recalc();
+    });
+
+    placeBtn.addEventListener('click', () => {
+      const items = Object.keys(qty).filter(id => qty[id] > 0)
+        .map(id => ({ food_item_id: Number(id), quantity: qty[id] }));
+      if (!selectedTable || !items.length) return;
+
+      placeBtn.disabled = true;
+      placeBtn.textContent = 'Placing...';
+      errBox.style.display = 'none';
+
+      fetch("{% url 'dashboard:server_take_order' %}", {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ table_id: selectedTable === 'takeaway' ? null : Number(selectedTable), items: items })
+      })
+        .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+        .then(res => {
+          if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Could not place order');
+          showToast('Sent to Kitchen', selectedLabel, 'Order #' + res.data.order_id, '👨‍🍳');
+          closeModal();
+          resetModal();
+          refreshLive();   // the table just used now shows as Occupied
+        })
+        .catch(err => {
+          errBox.textContent = '⚠️ ' + err.message;
+          errBox.style.display = 'block';
+        })
+        .finally(() => {
+          placeBtn.textContent = 'Place Order → Kitchen';
+          recalc();
+        });
+    });
   })();
 </script>
 {% endblock %}

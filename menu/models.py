@@ -1,3 +1,4 @@
+# menu/models.py
 from django.db import models
 
 
@@ -7,26 +8,36 @@ class Category(models.Model):
 
     class Meta:
         verbose_name_plural = "Categories"
-        ordering = ['name']
+        ordering = ["name"]
 
     def __str__(self):
         return self.name
 
 
+class FoodItemQuerySet(models.QuerySet):
+    def orderable(self):
+        """Dishes customers are allowed to see and order."""
+        return self.filter(is_available=True)
+
+
 class FoodItem(models.Model):
     category = models.ForeignKey(
-        Category, on_delete=models.CASCADE, related_name='items'
+        Category, on_delete=models.CASCADE, related_name="items"
     )
     name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=8, decimal_places=2)
-    image = models.ImageField(upload_to='food_images/', blank=True, null=True)
+    image = models.ImageField(upload_to="food_images/", blank=True, null=True)
     is_available = models.BooleanField(default=True)
+    # True when the system blocked the dish because of low or out of stock
+    auto_disabled = models.BooleanField(default=False)
     is_veg = models.BooleanField(default=True)  # True = Veg, False = Non-Veg
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = FoodItemQuerySet.as_manager()
+
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
 
     def __str__(self):
         return self.name
@@ -34,13 +45,13 @@ class FoodItem(models.Model):
 
 class FoodItemImage(models.Model):
     food_item = models.ForeignKey(
-        FoodItem, on_delete=models.CASCADE, related_name='gallery_images'
+        FoodItem, on_delete=models.CASCADE, related_name="gallery_images"
     )
-    image = models.ImageField(upload_to='food_images/gallery/')
+    image = models.ImageField(upload_to="food_images/gallery/")
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ['order']
+        ordering = ["order"]
 
     def __str__(self):
         return f"{self.food_item.name} - image {self.order}"

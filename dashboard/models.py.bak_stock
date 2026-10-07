@@ -1,0 +1,73 @@
+from django.db import models
+from django.contrib.auth.models import User
+
+
+class Notification(models.Model):
+    """Messages shown on the admin dashboard (e.g. when a waiter serves an order)."""
+
+    KIND_CHOICES = [
+        ('served', 'Order served'),
+        ('stock', 'Kitchen stock update'),
+    ]
+
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default='served')
+    message = models.CharField(max_length=255)
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications'
+    )
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+'
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-id']
+
+    def __str__(self):
+        return self.message
+
+
+class GroceryItem(models.Model):
+    UNIT_CHOICES = [
+        ('kg', 'kg'),
+        ('g', 'g'),
+        ('l', 'L'),
+        ('ml', 'ml'),
+        ('pcs', 'pcs'),
+        ('packet', 'Packet'),
+    ]
+
+    name = models.CharField(max_length=100)
+    quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    unit = models.CharField(max_length=10, choices=UNIT_CHOICES, default='kg')
+    low_stock_limit = models.DecimalField(max_digits=10, decimal_places=2, default=5)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    @property
+    def is_low(self):
+        return self.quantity <= self.low_stock_limit
+
+    def __str__(self):
+        return f'{self.name} ({self.quantity} {self.unit})'
+
+
+class RecipeIngredient(models.Model):
+    """How much of a grocery item ONE serving of a food item uses."""
+
+    food_item = models.ForeignKey(
+        'menu.FoodItem', on_delete=models.CASCADE, related_name='recipe')
+    grocery = models.ForeignKey(
+        'GroceryItem', on_delete=models.CASCADE, related_name='used_in')
+    qty_per_serving = models.DecimalField(
+        max_digits=8, decimal_places=3,
+        help_text="In the grocery item's own unit (e.g. 0.250 for 250 g if unit is kg)")
+
+    class Meta:
+        unique_together = ('food_item', 'grocery')
+
+    def __str__(self):
+        return f'{self.food_item} -> {self.qty_per_serving} {self.grocery.unit} {self.grocery.name}'

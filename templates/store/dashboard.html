@@ -1,0 +1,50 @@
+{% extends 'store/store_base.html' %}
+{% block title %}Store Dashboard{% endblock %}
+{% block content %}
+<h1>Store Dashboard</h1>
+
+<div class="stats">
+  <div class="stat"><div class="n">{{ total_items }}</div><div class="l">Total items</div></div>
+  <div class="stat warn"><div class="n">{{ low_count }}</div><div class="l">Low stock</div></div>
+  <div class="stat bad"><div class="n">{{ out_count }}</div><div class="l">Out of stock</div></div>
+  <div class="stat"><div class="n">₹{{ stock_value|floatformat:2 }}</div><div class="l">Stock value</div></div>
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h3 style="margin-top:0">⚠️ Low stock</h3>
+    {% for i in low_items %}
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f1f4;">
+        <span>{{ i.name }}</span>
+        <span><span class="badge low">{{ i.current_stock|floatformat:"-3" }} {{ i.unit }}</span>
+        <a class="btn small" href="{% url 'store:stock_update' i.pk %}">Update</a></span>
+      </div>
+    {% empty %}<p class="muted">Nothing is running low. 👍</p>{% endfor %}
+  </div>
+  <div class="card">
+    <h3 style="margin-top:0">🚫 Out of stock</h3>
+    {% for i in out_items %}
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f1f4;">
+        <span>{{ i.name }}</span>
+        <a class="btn small" href="{% url 'store:stock_update' i.pk %}">Add stock</a>
+      </div>
+    {% empty %}<p class="muted">Everything is in stock. 🎉</p>{% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Recent stock activity</h3>
+  <div class="table-wrap"><table>
+    <tr><th>When</th><th>Item</th><th>Change</th><th>Stock after</th><th>By</th></tr>
+    {% for m in recent %}
+    <tr>
+      <td>{{ m.created_at|date:"d M, h:i A" }}</td>
+      <td>{{ m.item.name }}</td>
+      <td class="{% if m.change >= 0 %}in{% else %}outq{% endif %}">{% if m.change > 0 %}+{% endif %}{{ m.change|floatformat:"-3" }} {{ m.item.unit }}</td>
+      <td>{{ m.stock_after|floatformat:"-3" }}</td>
+      <td>{{ m.created_by.username|default:"—" }}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5" class="muted">No activity yet.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

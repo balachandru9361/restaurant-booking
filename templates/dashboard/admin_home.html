@@ -1,164 +1,75 @@
 {% extends "dashboard/base_admin.html" %}
 {% block admin_content %}
 <style>
-  .dash-header {
-    margin-bottom: 25px;
-  }
-  .dash-header h2 {
-    font-size: 26px;
-    color: #1a1a2e;
-    margin-bottom: 4px;
-  }
-  .dash-header p {
-    color: #888;
-    font-size: 14px;
-  }
+.dash-header { margin-bottom: 25px; }
+.dash-header h2 { font-size: 26px; color: #1a1a2e; margin-bottom: 4px; }
+.dash-header p { color: #888; font-size: 14px; }
 
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 20px;
-    margin-bottom: 35px;
-  }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 35px; }
+.stat-card { background: #fff; border-radius: 14px; padding: 22px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); display: flex; align-items: center; gap: 16px; transition: transform 0.2s ease, box-shadow 0.2s ease; border-left: 5px solid transparent; min-width: 0; }
+.stat-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.12); }
+.stat-icon { width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+.stat-info { min-width: 0; }
+.stat-info .value { font-size: 26px; font-weight: 700; color: #1a1a2e; line-height: 1.1; white-space: nowrap; }
+.stat-info .label { font-size: 13px; color: #888; margin-top: 2px; }
 
-  .stat-card {
-    background: #fff;
-    border-radius: 14px;
-    padding: 22px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.06);
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    border-left: 5px solid transparent;
-  }
-  .stat-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
-  }
+.card-menu { border-left-color: #F63A3A; }
+.card-menu .stat-icon { background: #ffe5e5; }
+.card-tables { border-left-color: #3498db; }
+.card-tables .stat-icon { background: #e3f2fd; }
+.card-bookings { border-left-color: #9b59b6; }
+.card-bookings .stat-icon { background: #f3e5f9; }
+.card-users { border-left-color: #2ecc71; }
+.card-users .stat-icon { background: #e3f9ec; }
+.card-orders { border-left-color: #f39c12; }
+.card-orders .stat-icon { background: #fef3e0; }
+.card-sales { background: linear-gradient(135deg, #1a1a2e, #16213e); color: #fff; border-left: none; }
+.card-sales .stat-icon { background: rgba(255,255,255,0.12); }
+.card-sales .stat-info .value { color: #fff; }
+.card-sales .stat-info .label { color: #c0c0d8; }
+@media (min-width: 1100px) { .card-sales { grid-column: span 2; } }
 
-  .stat-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    flex-shrink: 0;
-  }
+.panels-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.panel { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); }
+.panel h3 { font-size: 16px; color: #1a1a2e; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+.panel table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.panel table th { text-align: left; color: #999; font-weight: 600; padding: 8px 6px; font-size: 12px; text-transform: uppercase; }
+.panel table td { padding: 10px 6px; border-top: 1px solid #f2f2f2; color: #333; }
 
-  .stat-info .value {
-    font-size: 26px;
-    font-weight: 700;
-    color: #1a1a2e;
-    line-height: 1.1;
-  }
-  .stat-info .label {
-    font-size: 13px;
-    color: #888;
-    margin-top: 2px;
-  }
+.badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; text-transform: capitalize; }
+.badge-confirmed { background: #e3f9ec; color: #2ecc71; }
+.badge-pending { background: #fef3e0; color: #f39c12; }
+.badge-cancelled { background: #ffe5e5; color: #e74c3c; }
+.badge-preparing { background: #e3f0ff; color: #3498db; }
+.badge-ready { background: #f3e5f9; color: #9b59b6; }
+.badge-delivered { background: #e3f9ec; color: #1e8e4e; }
+.badge-watch { background: #eef2ff; color: #4f46e5; text-transform: none; }
 
-  .card-menu { border-left-color: #F63A3A; }
-  .card-menu .stat-icon { background: #ffe5e5; }
+.notif-panel { margin-bottom: 20px; }
+.notif-panel h3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.notif-mark { background: #f4f6f9; border: none; color: #555; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.notif-mark:hover { background: #1a1a2e; color: #fff; }
 
-  .card-tables { border-left-color: #3498db; }
-  .card-tables .stat-icon { background: #e3f2fd; }
+.notif-sections { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.notif-sec { border-radius: 12px; padding: 14px; border-top: 4px solid var(--c); background: var(--bg); min-width: 0; }
+.notif-sec h4 { margin: 0 0 4px; font-size: 14px; color: var(--c); display: flex; align-items: center; gap: 8px; }
+.notif-sec .sec-sub { margin: 0 0 12px; font-size: 12px; color: #888; }
+.sec-served { --c: #2563eb; --bg: #f1f6ff; }
+.sec-out { --c: #dc2626; --bg: #fff2f2; }
+.sec-stock { --c: #0f766e; --bg: #effaf7; }
 
-  .card-bookings { border-left-color: #9b59b6; }
-  .card-bookings .stat-icon { background: #f3e5f9; }
+.notif-list { list-style: none; padding: 0; margin: 0; max-height: 420px; overflow-y: auto; }
+.notif-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; background: #fff; font-size: 13.5px; color: #333; border: 1px solid rgba(0,0,0,0.05); }
+.notif-item.unread { background: #fff7e6; border-left: 4px solid #f39c12; font-weight: 600; }
+.notif-item .n-icon { font-size: 18px; line-height: 1.3; }
+.notif-item .n-body { flex: 1; min-width: 0; }
+.notif-item .n-msg { display: block; word-break: break-word; }
+.notif-item .n-time { display: block; margin-top: 3px; font-size: 11.5px; color: #999; font-weight: 400; }
+.notif-list li.empty-row:not(:only-child) { display: none; }
+.empty-row { color: #aaa; text-align: center; padding: 20px 0; font-size: 13px; }
 
-  .card-users { border-left-color: #2ecc71; }
-  .card-users .stat-icon { background: #e3f9ec; }
-
-  .card-orders { border-left-color: #f39c12; }
-  .card-orders .stat-icon { background: #fef3e0; }
-
-  .card-sales {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    color: #fff;
-    border-left: none;
-  }
-  .card-sales .stat-icon { background: rgba(255,255,255,0.12); }
-  .card-sales .stat-info .value { color: #fff; }
-  .card-sales .stat-info .label { color: #c0c0d8; }
-
-  .panels-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-  }
-
-  .panel {
-    background: #fff;
-    border-radius: 14px;
-    padding: 20px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.06);
-  }
-  .panel h3 {
-    font-size: 16px;
-    color: #1a1a2e;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
-  }
-
-  .panel table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13.5px;
-  }
-  .panel table th {
-    text-align: left;
-    color: #999;
-    font-weight: 600;
-    padding: 8px 6px;
-    font-size: 12px;
-    text-transform: uppercase;
-  }
-  .panel table td {
-    padding: 10px 6px;
-    border-top: 1px solid #f2f2f2;
-    color: #333;
-  }
-
-  .badge {
-    padding: 3px 10px;
-    border-radius: 20px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: capitalize;
-  }
-  .badge-confirmed { background: #e3f9ec; color: #2ecc71; }
-  .badge-pending { background: #fef3e0; color: #f39c12; }
-  .badge-cancelled { background: #ffe5e5; color: #e74c3c; }
-  .badge-preparing { background: #e3f0ff; color: #3498db; }
-  .badge-ready { background: #f3e5f9; color: #9b59b6; }
-  .badge-delivered { background: #e3f9ec; color: #1e8e4e; }
-
-  /* service updates (waiter -> admin messages) */
-  .notif-panel { margin-bottom: 20px; }
-  .notif-panel h3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  .notif-mark {
-    background: #f4f6f9; border: none; color: #555; font-size: 12px; font-weight: 700;
-    padding: 6px 12px; border-radius: 8px; cursor: pointer;
-  }
-  .notif-mark:hover { background: #1a1a2e; color: #fff; }
-  .notif-list { list-style: none; padding: 0; margin: 0; }
-  .notif-item {
-    display: flex; align-items: center; gap: 12px; padding: 11px 12px;
-    border-radius: 10px; margin-bottom: 8px; background: #fafafb; font-size: 14px; color: #333;
-  }
-  .notif-item.unread { background: #fff7e6; border-left: 4px solid #f39c12; font-weight: 600; }
-  .notif-item .n-icon { font-size: 20px; }
-  .notif-item .n-time { margin-left: auto; font-size: 12px; color: #999; white-space: nowrap; font-weight: 400; }
-
-  .empty-row { color: #aaa; text-align: center; padding: 20px 0; }
-
-  @media (max-width: 900px) {
-    .panels-grid { grid-template-columns: 1fr; }
-  }
+@media (max-width: 1200px) { .notif-sections { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .panels-grid { grid-template-columns: 1fr; } }
 </style>
 
 <div class="dash-header">
@@ -170,7 +81,7 @@
 
 <div class="panel notif-panel" id="serviceUpdates">
   <h3>
-    <span>🔔 Service Updates {% if unread_notifications %}<span class="badge badge-pending">{{ unread_notifications }} new</span>{% endif %}</span>
+    <span>🔔 Service Updates <span class="badge badge-watch">👁️ Watch only</span> {% if unread_notifications %}<span class="badge badge-pending">{{ unread_notifications }} new</span>{% endif %}</span>
     {% if unread_notifications %}
     <form method="post" action="{% url 'dashboard:notifications_mark_read' %}">
       {% csrf_token %}
@@ -178,67 +89,84 @@
     </form>
     {% endif %}
   </h3>
-  <ul class="notif-list">
-    {% for n in notifications %}
-      <li class="notif-item {% if not n.is_read %}unread{% endif %}">
-        <span class="n-icon">🛎️</span>
-        <span>{{ n.message }}</span>
-        <span class="n-time">{{ n.created_at|timesince }} ago</span>
-      </li>
-    {% empty %}
-      <li class="empty-row">No service updates yet. When a waiter serves an order, it shows up here.</li>
-    {% endfor %}
-  </ul>
+
+  <div class="notif-sections">
+
+    <div class="notif-sec sec-served">
+      <h4>🛎️ Server: Orders Served</h4>
+      <p class="sec-sub">Orders served by waiters</p>
+      <ul class="notif-list">
+        {% for n in notifications %}
+          {% if n.kind == 'served' %}
+          <li class="notif-item {% if not n.is_read %}unread{% endif %}">
+            <span class="n-icon">🛎️</span>
+            <div class="n-body">
+              <span class="n-msg">{{ n.message }}</span>
+              <span class="n-time">{{ n.created_at|timesince }} ago</span>
+            </div>
+          </li>
+          {% endif %}
+        {% endfor %}
+        <li class="empty-row">No served orders yet.</li>
+      </ul>
+    </div>
+
+    <div class="notif-sec sec-out">
+      <h4>🚫 Kitchen → Store: Out of Stock</h4>
+      <p class="sec-sub">Items reported by kitchen (handled by Store)</p>
+      <ul class="notif-list">
+        {% for n in notifications %}
+          {% if "out of stock" in n.message|lower or "out-of-stock" in n.message|lower %}
+          <li class="notif-item {% if not n.is_read %}unread{% endif %}">
+            <span class="n-icon">🚫</span>
+            <div class="n-body">
+              <span class="n-msg">{{ n.message }}</span>
+              <span class="n-time">{{ n.created_at|timesince }} ago</span>
+            </div>
+          </li>
+          {% endif %}
+        {% endfor %}
+        <li class="empty-row">No out-of-stock reports. 👍</li>
+      </ul>
+    </div>
+
+    <div class="notif-sec sec-stock">
+      <h4>📦 Store ⇄ Kitchen: Stock Updates</h4>
+      <p class="sec-sub">Restocks done by Store for Kitchen</p>
+      <ul class="notif-list">
+        {% for n in notifications %}
+          {% if "stock" in n.message|lower and "out of stock" not in n.message|lower and "out-of-stock" not in n.message|lower %}
+          <li class="notif-item {% if not n.is_read %}unread{% endif %}">
+            <span class="n-icon">📦</span>
+            <div class="n-body">
+              <span class="n-msg">{{ n.message }}</span>
+              <span class="n-time">{{ n.created_at|timesince }} ago</span>
+            </div>
+          </li>
+          {% elif "updated" in n.message|lower %}
+          <li class="notif-item {% if not n.is_read %}unread{% endif %}">
+            <span class="n-icon">📋</span>
+            <div class="n-body">
+              <span class="n-msg">{{ n.message }}</span>
+              <span class="n-time">{{ n.created_at|timesince }} ago</span>
+            </div>
+          </li>
+          {% endif %}
+        {% endfor %}
+        <li class="empty-row">No stock updates yet.</li>
+      </ul>
+    </div>
+
+  </div>
 </div>
 
 <div class="stats-grid">
-  <div class="stat-card card-menu">
-    <div class="stat-icon">🍽️</div>
-    <div class="stat-info">
-      <div class="value">{{ total_menu_items }}</div>
-      <div class="label">Menu Items</div>
-    </div>
-  </div>
-
-  <div class="stat-card card-tables">
-    <div class="stat-icon">🪑</div>
-    <div class="stat-info">
-      <div class="value">{{ total_tables }}</div>
-      <div class="label">Tables</div>
-    </div>
-  </div>
-
-  <div class="stat-card card-bookings">
-    <div class="stat-icon">📅</div>
-    <div class="stat-info">
-      <div class="value">{{ total_bookings }}</div>
-      <div class="label">Table Bookings</div>
-    </div>
-  </div>
-
-  <div class="stat-card card-users">
-    <div class="stat-icon">👥</div>
-    <div class="stat-info">
-      <div class="value">{{ total_users }}</div>
-      <div class="label">Registered Users</div>
-    </div>
-  </div>
-
-  <div class="stat-card card-orders">
-    <div class="stat-icon">🧾</div>
-    <div class="stat-info">
-      <div class="value">{{ total_orders }}</div>
-      <div class="label">Total Orders</div>
-    </div>
-  </div>
-
-  <div class="stat-card card-sales">
-    <div class="stat-icon">💰</div>
-    <div class="stat-info">
-      <div class="value">₹{{ total_sales }}</div>
-      <div class="label">Total Sales</div>
-    </div>
-  </div>
+  <div class="stat-card card-menu"><div class="stat-icon">🍽️</div><div class="stat-info"><div class="value">{{ total_menu_items }}</div><div class="label">Menu Items</div></div></div>
+  <div class="stat-card card-tables"><div class="stat-icon">🪑</div><div class="stat-info"><div class="value">{{ total_tables }}</div><div class="label">Tables</div></div></div>
+  <div class="stat-card card-bookings"><div class="stat-icon">📅</div><div class="stat-info"><div class="value">{{ total_bookings }}</div><div class="label">Table Bookings</div></div></div>
+  <div class="stat-card card-users"><div class="stat-icon">👥</div><div class="stat-info"><div class="value">{{ total_users }}</div><div class="label">Registered Users</div></div></div>
+  <div class="stat-card card-orders"><div class="stat-icon">🧾</div><div class="stat-info"><div class="value">{{ total_orders }}</div><div class="label">Total Orders</div></div></div>
+  <div class="stat-card card-sales"><div class="stat-icon">💰</div><div class="stat-info"><div class="value">₹{{ total_sales|inr }}</div><div class="label">Total Sales</div></div></div>
 </div>
 
 <div class="panels-grid">
@@ -249,7 +177,7 @@
       {% for order in recent_orders %}
       <tr>
         <td>{{ order.user.username }}</td>
-        <td>₹{{ order.total_amount }}</td>
+        <td>₹{{ order.total_amount|inr }}</td>
         <td><span class="badge badge-{{ order.status }}">{{ order.status }}</span></td>
       </tr>
       {% empty %}

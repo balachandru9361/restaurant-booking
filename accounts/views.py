@@ -43,8 +43,11 @@ def login_view(request):
                 # Staff (non-superuser) -> role decides where they land
                 if user.is_staff:
                     profile = getattr(user, 'profile', None)
-                    if profile and profile.role == 'server':
+                    role = profile.role if profile else None
+                    if role == 'server':
                         return redirect('dashboard:server_dashboard')
+                    if role == 'store':
+                        return redirect('dashboard:manage_grocery')   # NEW
                     return redirect('dashboard:kitchen_dashboard')
 
                 # Normal users -> next param irundha adhukku, illana home

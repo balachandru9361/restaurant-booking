@@ -38,6 +38,36 @@
   }
   .print-all-btn:hover { background: #F63A3A; color: #fff; transform: translateY(-2px); }
 
+  /* NEW: website address box (the address inside every QR code) */
+  .base-box {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-left: 5px solid #d4af37;
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 24px;
+    font-family: 'Inter', sans-serif;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  }
+  .base-box label { display: block; font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .base-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .base-row input {
+    flex: 1; min-width: 220px; padding: 11px 14px; border: 1.5px solid #d1d5db; border-radius: 10px;
+    font-size: 14px; font-family: inherit; color: #0d1b2a;
+  }
+  .base-row input:focus { outline: none; border-color: #0f766e; }
+  .base-row button {
+    border: 0; cursor: pointer; padding: 11px 20px; border-radius: 10px; font-weight: 700; font-size: 13.5px;
+    background: #0f766e; color: #fff; font-family: inherit;
+  }
+  .base-row button:hover { background: #0b5a54; }
+  .base-note { font-size: 12.5px; color: #6b7280; margin-top: 8px; line-height: 1.5; }
+  .base-warn {
+    display: none; margin-top: 10px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; font-weight: 600; line-height: 1.5;
+  }
+  .base-warn.show { display: block; }
+
   .qr-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -146,7 +176,7 @@
   .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
 
   @media print {
-    .qr-header, .print-all-btn, .qr-card-actions, .admin-sidebar, .qr-scan-hint { display: none !important; }
+    .qr-header, .print-all-btn, .qr-card-actions, .admin-sidebar, .qr-scan-hint, .base-box { display: none !important; }
     .qr-grid {
       display: block !important;
     }
@@ -169,6 +199,24 @@
   <button class="print-all-btn" onclick="window.print()">🖨️ Print All</button>
 </div>
 
+<!-- NEW: the address that goes inside every QR code -->
+<div class="base-box">
+  <label for="baseUrl">Website address inside the QR codes</label>
+  <div class="base-row">
+    <input type="text" id="baseUrl" value="{{ request.scheme }}://{{ request.get_host }}" placeholder="http://192.168.1.5:8000" autocomplete="off" spellcheck="false">
+    <button type="button" id="baseApply">Update QR codes</button>
+  </div>
+  <p class="base-note">
+    Customers scan with their <b>phone</b>, so this must be an address the phone can open.
+    For testing at home: your laptop's Wi-Fi IP, like <b>http://192.168.1.5:8000</b>.
+    For the real restaurant: your website domain, like <b>https://chandru-restaurant.com</b>.
+  </p>
+  <div class="base-warn" id="baseWarn">
+    ⚠️ <b>127.0.0.1</b> and <b>localhost</b> only work on this laptop. A phone scanning this QR will fail.
+    Type your laptop's IP address above and tap "Update QR codes".
+  </div>
+</div>
+
 {% if tables %}
   <div class="qr-grid">
     {% for table in tables %}
@@ -177,6 +225,8 @@
 
         <div class="qr-image-wrap">
           <img
+            class="qr-img"
+            data-path="{% url 'orders:select_table' table.id %}"
             src="https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data={{ request.scheme }}://{{ request.get_host }}{% url 'orders:select_table' table.id %}"
             alt="QR code for Table {{ table.number }}"
           >
@@ -210,5 +260,44 @@
     window.print();
     allCards.forEach(c => { c.style.display = ''; });
   }
+
+  // ---- NEW: editable base address for the QR codes ----
+  (function () {
+    const KEY = 'qrBaseUrl';
+    const input = document.getElementById('baseUrl');
+    const warn = document.getElementById('baseWarn');
+
+    function clean(v) {
+      v = (v || '').trim().replace(/\/+$/, '');
+      if (v && !/^https?:\/\//i.test(v)) v = 'http://' + v;   // "192.168.1.5:8000" -> "http://192.168.1.5:8000"
+      return v;
+    }
+
+    function render() {
+      const base = clean(input.value);
+      warn.classList.toggle('show', /\/\/(127\.0\.0\.1|localhost)([:\/]|$)/i.test(base));
+      document.querySelectorAll('.qr-img').forEach(img => {
+        const link = base + img.dataset.path;
+        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=' + encodeURIComponent(link);
+      });
+    }
+
+    // use the address saved earlier in this browser, if any
+    try {
+      const saved = localStorage.getItem(KEY);
+      if (saved) input.value = saved;
+    } catch (e) {}
+
+    document.getElementById('baseApply').addEventListener('click', function () {
+      input.value = clean(input.value);
+      try { localStorage.setItem(KEY, input.value); } catch (e) {}
+      render();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') document.getElementById('baseApply').click();
+    });
+
+    render();
+  })();
 </script>
 {% endblock %}

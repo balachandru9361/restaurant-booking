@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'orders',
     'reviews',
     'dashboard',
+    'store',
 ]
 
 MIDDLEWARE = [
@@ -69,6 +70,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
+            'builtins': ['orders.templatetags.inr_filters'],
         },
     },
 ]

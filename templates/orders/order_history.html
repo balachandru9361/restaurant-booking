@@ -105,6 +105,10 @@
         box-shadow: 0 10px 26px rgba(0,0,0,0.1);
     }
 
+    .order-card.is-rejected {
+        border: 1.5px solid #fecaca;
+    }
+
     .order-card-top {
         display: flex;
         justify-content: space-between;
@@ -209,6 +213,45 @@
         font-size: 0.82rem;
     }
 
+    .item-main {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .item-thumb {
+        width: 52px;
+        height: 52px;
+        border-radius: 12px;
+        object-fit: cover;
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+
+    .item-thumb-empty {
+        background: #fff3e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        box-shadow: none;
+    }
+
+    .item-name {
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .item-price {
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .order-items-list li {
+        align-items: center;
+    }
+
     .order-total-row {
         display: flex;
         justify-content: space-between;
@@ -227,6 +270,225 @@
         font-size: 1.2rem;
         font-weight: 800;
         color: #e63946;
+    }
+
+    /* ---------- Rejected order box ---------- */
+    .rejected-box {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 14px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+    }
+
+    .rejected-title {
+        font-weight: 800;
+        color: #b91c1c;
+        font-size: 0.98rem;
+        margin-bottom: 6px;
+    }
+
+    .rejected-reason {
+        color: #7f1d1d;
+        font-size: 0.92rem;
+        margin: 0 0 6px;
+    }
+
+    .rejected-refund {
+        color: #166534;
+        background: #dcfce7;
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 10px;
+        font-size: 0.84rem;
+        font-weight: 600;
+        margin: 4px 0 0;
+    }
+
+    .suggest-title {
+        margin: 14px 0 10px;
+        font-weight: 700;
+        color: #1f2937;
+        font-size: 0.92rem;
+    }
+
+    .suggest-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+    }
+
+    .suggest-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #fff;
+        border: 1px solid #f3d6d6;
+        border-radius: 12px;
+        padding: 8px 10px;
+        text-decoration: none;
+        color: #1f2937;
+        transition: border-color 0.2s, transform 0.15s;
+    }
+
+    button.suggest-card {
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+        font: inherit;
+    }
+
+    .suggest-form {
+        margin: 0;
+    }
+
+    .suggest-card:hover {
+        border-color: #ff6b6b;
+        transform: translateY(-2px);
+        text-decoration: none;
+        color: #1f2937;
+    }
+
+    .suggest-thumb {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        object-fit: cover;
+        flex-shrink: 0;
+        background: #fff3e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+    }
+
+    .suggest-name {
+        font-weight: 700;
+        font-size: 0.86rem;
+        line-height: 1.2;
+    }
+
+    .suggest-price {
+        color: #e63946;
+        font-weight: 700;
+        font-size: 0.82rem;
+    }
+
+    .btn-order-again {
+        display: inline-block;
+        margin-top: 12px;
+        padding: 9px 20px;
+        border-radius: 24px;
+        background: #1f2937;
+        color: #fff;
+        font-weight: 700;
+        font-size: 0.85rem;
+        text-decoration: none;
+        transition: background-color 0.2s;
+    }
+
+    .btn-order-again:hover {
+        background: #ff6b6b;
+        color: #fff;
+        text-decoration: none;
+    }
+
+    /* ---------- Order progress tracker ---------- */
+    .tracker {
+        display: flex;
+        margin: 0 0 18px;
+    }
+
+    .t-step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #aaa;
+    }
+
+    .t-step::before {
+        content: '';
+        position: absolute;
+        top: 10px;
+        left: -50%;
+        width: 100%;
+        height: 3px;
+        background: #e5e7eb;
+    }
+
+    .t-step:first-child::before {
+        display: none;
+    }
+
+    .t-dot {
+        position: relative;
+        z-index: 1;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #e5e7eb;
+        color: #fff;
+        margin: 0 auto 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+    }
+
+    .t-step.done {
+        color: #16a34a;
+    }
+
+    .t-step.done .t-dot {
+        background: #16a34a;
+    }
+
+    .t-step.done::before,
+    .t-step.current::before {
+        background: #16a34a;
+    }
+
+    .t-step.current {
+        color: #d97706;
+    }
+
+    .t-step.current .t-dot {
+        background: #f59e0b;
+        animation: t-pulse 1.6s infinite;
+    }
+
+    @keyframes t-pulse {
+        0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+        70%  { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+    }
+
+    /* ---------- Live toast ---------- */
+    .live-toast {
+        position: fixed;
+        top: 90px;
+        right: 20px;
+        z-index: 9999;
+        max-width: 340px;
+        padding: 14px 18px;
+        border-radius: 14px;
+        background: #1f2937;
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.9rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        animation: toast-in 0.3s ease;
+    }
+
+    .live-toast.reject {
+        background: #b91c1c;
+    }
+
+    @keyframes toast-in {
+        from { opacity: 0; transform: translateY(-10px); }
+        to   { opacity: 1; transform: translateY(0); }
     }
 
     .empty-orders {
@@ -300,16 +562,16 @@
         <button class="order-filter-tab" data-status="pending" onclick="filterOrders(this, 'pending')">Pending</button>
         <button class="order-filter-tab" data-status="confirmed" onclick="filterOrders(this, 'confirmed')">Confirmed</button>
         <button class="order-filter-tab" data-status="delivered" onclick="filterOrders(this, 'delivered')">Delivered</button>
-        <button class="order-filter-tab" data-status="cancelled" onclick="filterOrders(this, 'cancelled')">Cancelled</button>
+        <button class="order-filter-tab" data-status="cancelled" onclick="filterOrders(this, 'cancelled')">Rejected</button>
     </div>
 
     <div class="orders-list" id="ordersList">
         {% for order in orders %}
-            <div class="order-card" data-status="{{ order.status }}">
+            <div class="order-card{% if order.status == 'cancelled' %} is-rejected{% endif %}" data-status="{{ order.status }}" data-id="{{ order.id }}">
                 <div class="order-card-top">
                     <h3>Order #{{ order.id }}</h3>
                     <div class="badge-group">
-                        <span class="order-status-badge {{ order.status }}">{{ order.status }}</span>
+                        <span class="order-status-badge {{ order.status }}">{% if order.status == 'cancelled' %}rejected{% else %}{{ order.status }}{% endif %}</span>
                         {% if order.payment_method == 'cash' %}
                             {% if order.payment_status == 'paid' %}
                                 <span class="payment-badge paid">Cash Paid</span>
@@ -327,18 +589,84 @@
                 </div>
                 <p class="order-date">Placed on {{ order.created_at|date:"d M Y, h:i A" }}</p>
 
+                {% if order.status != 'cancelled' %}
+                    <div class="tracker">
+                        <div class="t-step {% if order.status == 'pending' %}current{% else %}done{% endif %}">
+                            <div class="t-dot">{% if order.status != 'pending' %}&#10003;{% endif %}</div>Placed
+                        </div>
+                        <div class="t-step {% if order.status == 'confirmed' %}current{% elif order.status == 'preparing' or order.status == 'ready' or order.status == 'delivered' %}done{% endif %}">
+                            <div class="t-dot">{% if order.status == 'preparing' or order.status == 'ready' or order.status == 'delivered' %}&#10003;{% endif %}</div>Confirmed
+                        </div>
+                        <div class="t-step {% if order.status == 'preparing' %}current{% elif order.status == 'ready' or order.status == 'delivered' %}done{% endif %}">
+                            <div class="t-dot">{% if order.status == 'ready' or order.status == 'delivered' %}&#10003;{% endif %}</div>Preparing
+                        </div>
+                        <div class="t-step {% if order.status == 'ready' %}current{% elif order.status == 'delivered' %}done{% endif %}">
+                            <div class="t-dot">{% if order.status == 'delivered' %}&#10003;{% endif %}</div>Ready
+                        </div>
+                        <div class="t-step {% if order.status == 'delivered' %}done{% endif %}">
+                            <div class="t-dot">{% if order.status == 'delivered' %}&#10003;{% endif %}</div>Served
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if order.status == 'cancelled' %}
+                    <div class="rejected-box">
+                        <div class="rejected-title">❌ Sorry, we could not accept this order</div>
+                        {% if order.reject_reason %}
+                            <p class="rejected-reason"><strong>Reason:</strong> {{ order.reject_reason }}</p>
+                        {% endif %}
+                        {% if order.payment_method == 'online' and order.payment_status == 'paid' %}
+                            {% if order.refunded %}
+                                <p class="rejected-refund">✅ Your payment has been refunded.</p>
+                            {% else %}
+                                <p class="rejected-refund">💸 Your payment will be refunded.</p>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if order.suggestions %}
+                            <div class="suggest-title">💡 How about trying these instead?</div>
+                            <div class="suggest-grid">
+                                {% for dish in order.suggestions %}
+                                    <form method="post" action="{% url 'orders:add_to_cart' dish.id %}" class="suggest-form">
+                                        {% csrf_token %}
+                                        <button type="submit" class="suggest-card">
+                                            {% if dish.image %}
+                                                <img class="suggest-thumb" src="{{ dish.image.url }}" alt="{{ dish.name }}">
+                                            {% else %}
+                                                <span class="suggest-thumb">🍽️</span>
+                                            {% endif %}
+                                            <span>
+                                                <span class="suggest-name">{{ dish.name }}</span><br>
+                                                <span class="suggest-price">₹{{ dish.price|inr }} &middot; Add</span>
+                                            </span>
+                                        </button>
+                                    </form>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <a class="btn-order-again" href="{% url 'menu_list' %}">Order again</a>
+                    </div>
+                {% endif %}
+
                 <ul class="order-items-list">
                     {% for item in order.items.all %}
                         <li>
-                            <span>{{ item.food_item.name }} <span class="item-qty">x {{ item.quantity }}</span></span>
-                            <span>₹{{ item.subtotal }}</span>
+                            <span class="item-main">
+                                {% if item.food_item.image %}
+                                    <img class="item-thumb" src="{{ item.food_item.image.url }}" alt="{{ item.food_item.name }}">
+                                {% else %}
+                                    <span class="item-thumb item-thumb-empty">🍽️</span>
+                                {% endif %}
+                                <span class="item-name">{{ item.food_item.name }} <span class="item-qty">x {{ item.quantity }}</span></span>
+                            </span>
+                            <span class="item-price">₹{{ item.subtotal|inr }}</span>
                         </li>
                     {% endfor %}
                 </ul>
 
                 <div class="order-total-row">
                     <span class="total-label">Total</span>
-                    <span class="total-value">₹{{ order.total_amount }}</span>
+                    <span class="total-value">₹{{ order.total_amount|inr }}</span>
                 </div>
             </div>
         {% endfor %}
@@ -353,6 +681,59 @@
 {% endif %}
 
 <script>
+    (function () {
+        const POLL_URL = "{% url 'orders:order_status_poll' %}";
+        const LABELS = {
+            pending: 'is waiting for approval',
+            confirmed: 'was confirmed',
+            preparing: 'is being prepared',
+            ready: 'is ready',
+            delivered: 'was served. Enjoy your meal!',
+            cancelled: 'could not be accepted'
+        };
+
+        const known = {};
+        document.querySelectorAll('.order-card[data-id]').forEach(card => {
+            known[card.dataset.id] = card.dataset.status;
+        });
+        if (!Object.keys(known).length) return;
+
+        function showToast(text, isReject) {
+            const el = document.createElement('div');
+            el.className = 'live-toast' + (isReject ? ' reject' : '');
+            el.textContent = text;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 6000);
+        }
+
+        async function poll() {
+            if (document.hidden) return;
+            try {
+                const res = await fetch(POLL_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!res.ok) return;
+                const data = await res.json();
+                let changed = false;
+                let rejected = false;
+                data.orders.forEach(o => {
+                    const old = known[String(o.id)];
+                    if (old && old !== o.status) {
+                        changed = true;
+                        const isReject = o.status === 'cancelled';
+                        rejected = rejected || isReject;
+                        let msg = 'Order #' + o.id + ' ' + (LABELS[o.status] || 'was updated');
+                        if (isReject && o.reason) msg += '. Reason: ' + o.reason;
+                        showToast(msg, isReject);
+                    }
+                });
+                if (changed) setTimeout(() => window.location.reload(), rejected ? 4000 : 2500);
+            } catch (e) {
+                /* ignore network errors, try again on the next tick */
+            }
+        }
+
+        setInterval(poll, 8000);
+    })();
+
     function filterOrders(btn, status) {
         document.querySelectorAll('.order-filter-tab').forEach(tab => tab.classList.remove('active'));
         btn.classList.add('active');

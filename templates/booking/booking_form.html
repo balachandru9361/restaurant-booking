@@ -170,7 +170,7 @@
 
 .field-row-double { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 
-.zone-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 2px; }
+.zone-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 2px; }
 
 .zone-card {
     border: 1.5px solid #e7e9ee;
@@ -193,145 +193,6 @@
 .guest-stepper input { border: none !important; background: transparent !important; text-align: center; flex: 1; box-shadow: none !important; }
 
 .char-count { text-align: right; font-size: 0.68rem; color: #b3b8c2; margin-top: 4px; }
-
-.availability-msg {
-    margin-top: 10px;
-    padding: 9px 13px;
-    border-radius: 10px;
-    font-size: 0.82rem;
-    font-weight: 700;
-    display: none;
-}
-.availability-msg.show { display: block; }
-.availability-msg.ok { background: #eafaf0; color: #1f9d55; }
-.availability-msg.bad { background: #ffe6e4; color: #c0392b; }
-.availability-msg.checking { background: #f0f1f5; color: #6b7280; }
-
-/* ---- Table selection grid ---- */
-.table-select-placeholder {
-    font-size: 0.85rem;
-    color: #9aa0ab;
-    font-style: italic;
-    padding: 10px 14px;
-    background: #fafbfc;
-    border: 1px dashed #e7e9ee;
-    border-radius: 12px;
-    text-align: center;
-}
-
-.table-legend-row {
-    display: flex;
-    gap: 16px;
-    margin: 2px 0 12px;
-    animation: fadeInGrid 0.25s ease;
-}
-
-.table-legend-row span {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: #9aa0ab;
-}
-
-.table-legend-row .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.table-legend-row .dot.free { background: #1f9d55; box-shadow: 0 0 5px rgba(31,157,85,0.6); }
-.table-legend-row .dot.busy { background: #e0392b; box-shadow: 0 0 5px rgba(224,57,43,0.6); }
-.table-legend-row .dot.small { background: #cfd3da; }
-
-.table-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-    gap: 10px;
-    animation: fadeInGrid 0.3s ease;
-}
-
-@keyframes fadeInGrid {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.table-cell { position: relative; }
-
-.table-cell input[type="radio"] {
-    position: absolute;
-    opacity: 0;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    cursor: pointer;
-    z-index: 1;
-}
-
-.table-cell input[type="radio"]:disabled { cursor: not-allowed; }
-
-.table-chip-lite {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    padding: 11px 4px 10px;
-    border-radius: 12px;
-    border: 1.5px solid #e7e9ee;
-    background: #fbfbfd;
-    color: #6b7280;
-    font-size: 0.72rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.table-chip-lite .t-icon { font-size: 1.05rem; transition: transform 0.15s ease; }
-.table-chip-lite .t-cap { font-weight: 500; font-size: 0.62rem; color: #b3b8c2; transition: color 0.15s ease; }
-
-.table-status-dot {
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-}
-
-.table-cell.free .table-chip-lite { border-color: rgba(31,157,85,0.35); background: rgba(31,157,85,0.07); }
-.table-cell.free .table-status-dot { background: #1f9d55; box-shadow: 0 0 5px rgba(31,157,85,0.6); }
-.table-cell.free .table-chip-lite:hover {
-    border-color: #f5a623;
-    background: #fff8ec;
-    transform: translateY(-3px);
-    box-shadow: 0 6px 14px -6px rgba(245,166,35,0.5);
-}
-.table-cell.free .table-chip-lite:hover .t-icon { transform: scale(1.12) rotate(-4deg); }
-
-.table-cell.busy .table-chip-lite { border-color: rgba(224,57,43,0.3); background: rgba(224,57,43,0.06); color: #c0392b; opacity: 0.65; cursor: not-allowed; }
-.table-cell.busy .table-status-dot { background: #e0392b; box-shadow: 0 0 5px rgba(224,57,43,0.6); }
-.table-cell.busy .t-label { text-decoration: line-through; }
-
-.table-cell.toosmall .table-chip-lite { opacity: 0.45; cursor: not-allowed; }
-
-.table-cell input:checked + .table-chip-lite {
-    background: linear-gradient(155deg, #f5a623, #f28c1a);
-    border-color: #f5a623;
-    color: #fff;
-    transform: translateY(-3px) scale(1.04);
-    box-shadow: 0 8px 18px -6px rgba(245,166,35,0.55);
-}
-.table-cell input:checked + .table-chip-lite .t-cap { color: rgba(255,255,255,0.9); }
-.table-cell input:checked + .table-chip-lite .table-status-dot { background: #fff; box-shadow: none; }
-.table-cell input:checked + .table-chip-lite .t-icon { transform: scale(1.1); }
-
-.table-cell input:focus-visible + .table-chip-lite { outline: 2px solid #f5a623; outline-offset: 2px; }
-
-.table-select-note {
-    font-size: 0.72rem;
-    color: #9aa0ab;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px dashed #eef0f3;
-}
 
 .preview-card {
     margin: 22px 26px 0;
@@ -488,7 +349,6 @@
     .progress-steps { grid-template-columns: repeat(2, 1fr); }
     .card-section-title, .booking-form-body, .submit-area { padding-left: 18px; padding-right: 18px; }
     .preview-card { margin-left: 18px; margin-right: 18px; }
-    .table-grid { grid-template-columns: repeat(4, 1fr); }
 }
 </style>
 
@@ -510,7 +370,7 @@
             <div class="progress-card">
                 <div class="progress-label">📝 Your Reservation Progress</div>
                 <div class="progress-steps">
-                    <div class="step active"><div class="num" id="stepGuestsNum">1</div><div class="lab">Guest</div></div>
+                    <div class="step active"><div class="num" id="stepGuestsNum">✓</div><div class="lab">Guest</div></div>
                     <div class="step" id="stepPartyBox"><div class="num" id="stepParty">1</div><div class="lab">People</div></div>
                     <div class="step" id="stepDateBox"><div class="num" id="stepDate">—</div><div class="lab">Date</div></div>
                     <div class="step" id="stepTimeBox"><div class="num" id="stepTimeNum">—</div><div class="lab">Time</div></div>
@@ -527,13 +387,8 @@
                     <form method="post" id="bookingForm">
                         {% csrf_token %}
 
-                        <div class="field-row-badge">
-                            <div class="badge blue">👤</div>
-                            <div class="field-content">
-                                <label>Name</label>
-                                <input type="text" name="name" id="fName" placeholder="Your full name" required>
-                            </div>
-                        </div>
+                        {# Name comes from the logged-in user, so no name field is shown #}
+                        <input type="hidden" name="name" id="fName" value="{% firstof request.user.get_full_name request.user.username %}">
 
                         <div class="field-row-badge">
                             <div class="badge orange">📞</div>
@@ -565,7 +420,7 @@
                                         <label>Guests</label>
                                         <div class="guest-stepper">
                                             <button type="button" id="decreaseGuests">&minus;</button>
-                                            <input type="number" name="guests" id="guestsInput" min="1" max="6" value="1" required>
+                                            <input type="number" name="guests" id="guestsInput" min="1" max="25" value="1" required>
                                             <button type="button" id="increaseGuests">&plus;</button>
                                         </div>
                                     </div>
@@ -593,7 +448,6 @@
                                 <div class="zone-grid">
                                     <div class="zone-card active" data-zone="indoor"><span class="zicon">🏠</span><span class="zlab">Indoor</span></div>
                                     <div class="zone-card" data-zone="outdoor"><span class="zicon">🌿</span><span class="zlab">Outdoor</span></div>
-                                    <div class="zone-card" data-zone="window"><span class="zicon">🪟</span><span class="zlab">Window</span></div>
                                 </div>
                             </div>
                         </div>
@@ -611,26 +465,6 @@
                                         <input type="time" name="booking_time" id="fTime" required>
                                     </div>
                                 </div>
-                                <div class="availability-msg" id="availabilityMsg"></div>
-                            </div>
-                        </div>
-
-                        <div class="field-row-badge">
-                            <div class="badge amber">🍽️</div>
-                            <div class="field-content">
-                                <label>Choose your table <span style="text-transform:none;font-weight:500;color:#cfd3da;">(optional)</span></label>
-                                <input type="hidden" name="table" id="fTable" value="">
-
-                                <p class="table-select-placeholder" id="tablePlaceholder">📅 Select date &amp; time to see available tables</p>
-
-                                <div id="tableLegend" class="table-legend-row" style="display:none;">
-                                    <span><span class="dot free"></span> Free</span>
-                                    <span><span class="dot busy"></span> Booked (opens after 2 hrs)</span>
-                                </div>
-
-                                <div id="tableGrid" class="table-grid"></div>
-
-                                <p class="table-select-note" id="tableSelectNote" style="display:none;">Leave unselected and we'll auto-assign the best-fit free table for you.</p>
                             </div>
                         </div>
 
@@ -652,7 +486,6 @@
                     <div class="preview-row" id="rowDateTime"><span>Date &amp; time</span><span id="sumDateTime">—</span></div>
                     <div class="preview-row" id="rowGuests"><span>Guests</span><span id="sumGuests">1 people</span></div>
                     <div class="preview-row" id="rowZone"><span>Seating</span><span id="sumZone">Indoor</span></div>
-                    <div class="preview-row" id="rowTable"><span>Table</span><span id="sumTable">Auto-assign</span></div>
                     <div class="preview-row" id="rowOccasion"><span>Occasion</span><span id="sumOccasion">—</span></div>
                 </div>
 
@@ -697,17 +530,14 @@
 <script>
     const guestsInput = document.getElementById('guestsInput');
     document.getElementById('increaseGuests').addEventListener('click', () => {
-        guestsInput.value = parseInt(guestsInput.value || 1) + 1;
+        const current = parseInt(guestsInput.value || 1);
+        if (current < 25) guestsInput.value = current + 1;
         updateSummary('rowGuests');
-        checkAvailability();
-        loadTableGrid();
     });
     document.getElementById('decreaseGuests').addEventListener('click', () => {
         const current = parseInt(guestsInput.value || 1);
         if (current > 1) guestsInput.value = current - 1;
         updateSummary('rowGuests');
-        checkAvailability();
-        loadTableGrid();
     });
 
     document.getElementById('fDate').min = new Date().toISOString().split('T')[0];
@@ -732,7 +562,6 @@
     const phoneInput = document.getElementById('fPhone');
     const phoneTick = document.getElementById('phoneTick');
     const phoneError = document.getElementById('phoneError');
-    const submitBtnRef = document.getElementById('submitBtn');
 
     function isValidIndianPhone(digits) {
         return /^[6-9][0-9]{9}$/.test(digits);
@@ -777,7 +606,7 @@
         const dt = d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
         return `${dt}${t ? ' at ' + formatTime12(t) : ''}`;
     }
-    const zoneLabels = { indoor: 'Indoor', outdoor: 'Outdoor', window: 'Window' };
+    const zoneLabels = { indoor: 'Indoor', outdoor: 'Outdoor' };
 
     function pulse(id) {
         const el = document.getElementById(id);
@@ -828,7 +657,6 @@
         if (changedRow) pulse(changedRow);
     }
 
-    document.getElementById('fName').addEventListener('input', () => updateSummary('rowName'));
     document.getElementById('fOccasion').addEventListener('change', () => updateSummary('rowOccasion'));
 
     // Some browsers (esp. Linux date/time pickers) don't reliably fire
@@ -836,17 +664,15 @@
     // listen to both 'input' and 'change' to catch every update live.
     function onDateOrTimeChange() {
         updateSummary('rowDateTime');
-        checkAvailability();
         loadBookingsForDate(document.getElementById('fDate').value);
-        loadTableGrid();
     }
     document.getElementById('fDate').addEventListener('input', onDateOrTimeChange);
     document.getElementById('fDate').addEventListener('change', onDateOrTimeChange);
     document.getElementById('fTime').addEventListener('input', onDateOrTimeChange);
     document.getElementById('fTime').addEventListener('change', onDateOrTimeChange);
 
-    guestsInput.addEventListener('input', () => { checkAvailability(); loadTableGrid(); });
-    guestsInput.addEventListener('change', () => { checkAvailability(); loadTableGrid(); });
+    guestsInput.addEventListener('input', () => { updateSummary('rowGuests'); });
+    guestsInput.addEventListener('change', () => { updateSummary('rowGuests'); });
 
     document.getElementById('bookingForm').addEventListener('submit', function (e) {
         const submitBtn = document.getElementById('submitBtn');
@@ -867,152 +693,6 @@
         submitBtn.classList.add('loading');
         document.getElementById('submitLabel').textContent = 'Confirming…';
     });
-
-    let availabilityTimer = null;
-
-    function checkAvailability() {
-        const date = document.getElementById('fDate').value;
-        const time = timeInput.value;
-        const guests = parseInt(guestsInput.value || 1);
-        const msgBox = document.getElementById('availabilityMsg');
-        const submitBtn = document.getElementById('submitBtn');
-
-        if (guests > 6) {
-            msgBox.className = 'availability-msg show bad';
-            msgBox.textContent = '⚠️ Max 6 guests allowed per table. Please choose 6 or fewer, or split into multiple bookings.';
-            submitBtn.disabled = true;
-            return;
-        }
-
-        if (!date || !time) {
-            msgBox.className = 'availability-msg';
-            msgBox.textContent = '';
-            submitBtn.disabled = false;
-            return;
-        }
-
-        msgBox.className = 'availability-msg show checking';
-        msgBox.textContent = 'Checking availability…';
-
-        clearTimeout(availabilityTimer);
-        availabilityTimer = setTimeout(() => {
-            fetch(`/booking/check-availability/?date=${date}&time=${time}&guests=${guests}`)
-                .then(res => res.json())
-                .then(data => {
-                    msgBox.className = 'availability-msg show ' + (data.available ? 'ok' : 'bad');
-                    msgBox.textContent = data.message;
-                    submitBtn.disabled = !data.available;
-                })
-                .catch(() => {
-                    msgBox.className = 'availability-msg show bad';
-                    msgBox.textContent = '⚠️ Could not check availability. Try again.';
-                    submitBtn.disabled = false;
-                });
-        }, 300);
-    }
-
-    // ---- Table selection grid (cart-page style) ----
-    const fTable = document.getElementById('fTable');
-    const tableGrid = document.getElementById('tableGrid');
-    const tablePlaceholder = document.getElementById('tablePlaceholder');
-    const tableLegend = document.getElementById('tableLegend');
-    const tableSelectNote = document.getElementById('tableSelectNote');
-    let tableGridTimer = null;
-
-    function selectTable(id, number) {
-        fTable.value = id;
-        document.querySelectorAll('.table-cell input[type="radio"]').forEach(r => {
-            r.checked = (r.value === String(id));
-        });
-        document.getElementById('sumTable').textContent = `Table #${number}`;
-        pulse('rowTable');
-    }
-
-    function clearTableSelection() {
-        fTable.value = '';
-        document.getElementById('sumTable').textContent = 'Auto-assign';
-    }
-
-    function loadTableGrid() {
-        const date = document.getElementById('fDate').value;
-        const time = timeInput.value;
-        const guests = parseInt(guestsInput.value || 1);
-
-        if (!date || !time) {
-            tablePlaceholder.style.display = 'block';
-            tablePlaceholder.textContent = '📅 Select date & time to see available tables';
-            tableLegend.style.display = 'none';
-            tableSelectNote.style.display = 'none';
-            tableGrid.innerHTML = '';
-            clearTableSelection();
-            return;
-        }
-
-        clearTimeout(tableGridTimer);
-        tableGridTimer = setTimeout(() => {
-            tablePlaceholder.style.display = 'block';
-            tablePlaceholder.textContent = 'Loading tables…';
-            tableGrid.innerHTML = '';
-
-            fetch(`/booking/table-status/?date=${date}&time=${time}&guests=${guests}`)
-                .then(res => res.json())
-                .then(data => {
-                    const tables = data.tables || [];
-
-                    if (tables.length === 0) {
-                        tablePlaceholder.style.display = 'block';
-                        tablePlaceholder.textContent = 'No tables set up yet.';
-                        tableLegend.style.display = 'none';
-                        tableSelectNote.style.display = 'none';
-                        return;
-                    }
-
-                    tablePlaceholder.style.display = 'none';
-                    tableLegend.style.display = 'flex';
-                    tableSelectNote.style.display = 'block';
-
-                    // If the previously selected table is no longer valid, clear it
-                    const currentSelection = fTable.value;
-                    const stillValid = tables.some(t => String(t.id) === currentSelection && !t.busy && t.fits);
-                    if (currentSelection && !stillValid) clearTableSelection();
-
-                    tableGrid.innerHTML = tables.map(t => {
-                        const disabled = t.busy || !t.fits;
-                        const stateClass = t.busy ? 'busy' : (!t.fits ? 'toosmall' : 'free');
-                        const checked = String(t.id) === fTable.value ? 'checked' : '';
-                        const title = t.busy
-                            ? 'Booked — opens again after 2 hrs'
-                            : (!t.fits ? `Seats only ${t.capacity} — too small for ${guests} guests` : `Seats ${t.capacity}`);
-                        return `
-                            <div class="table-cell ${stateClass}">
-                                <input type="radio" name="table_radio" value="${t.id}" id="tbl-${t.id}" ${disabled ? 'disabled' : ''} ${checked}>
-                                <label class="table-chip-lite" for="tbl-${t.id}" title="${title}">
-                                    <span class="table-status-dot"></span>
-                                    <span class="t-icon">🪑</span>
-                                    <span class="t-label">#${t.number}</span>
-                                    <span class="t-cap">${t.capacity} seats</span>
-                                </label>
-                            </div>
-                        `;
-                    }).join('');
-
-                    tableGrid.querySelectorAll('.table-cell input[type="radio"]').forEach(radio => {
-                        radio.addEventListener('change', function () {
-                            if (this.checked) {
-                                const num = tables.find(t => String(t.id) === this.value).number;
-                                selectTable(this.value, num);
-                            }
-                        });
-                    });
-                })
-                .catch(() => {
-                    tablePlaceholder.style.display = 'block';
-                    tablePlaceholder.textContent = '⚠️ Could not load table status. Try again.';
-                    tableLegend.style.display = 'none';
-                    tableSelectNote.style.display = 'none';
-                });
-        }, 300);
-    }
 
     function loadBookingsForDate(date) {
         const listBox = document.getElementById('sidebarBookingsList');
@@ -1066,6 +746,7 @@
     window.addEventListener('DOMContentLoaded', () => {
         const todayStr = new Date().toISOString().split('T')[0];
         loadBookingsForDate(todayStr);
+        updateSummary();
     });
 </script>
 

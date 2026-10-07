@@ -1,0 +1,95 @@
+{% extends base_tpl %}
+{% block admin_content %}
+<style>
+  .kv-hero { background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#3a1c4a 100%); color:#fff; border-radius:18px; padding:22px 26px; margin-bottom:18px; box-shadow:0 10px 28px rgba(26,26,46,.25); }
+  .kv-hero h1 { margin:0; font-size:26px; font-weight:800; }
+  .kv-hero p { margin:4px 0 0; color:#b8b8d4; font-size:13.5px; }
+  .kv-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:18px; }
+  .kv-stat { background:#fff; border-radius:14px; padding:14px 18px; box-shadow:0 2px 10px rgba(0,0,0,.05); cursor:pointer; border:2px solid transparent; }
+  .kv-stat.active { border-color:#1a1a2e; }
+  .kv-stat .n { font-size:1.7rem; font-weight:800; }
+  .kv-stat .l { font-size:.8rem; color:#6b7280; font-weight:600; }
+  .kv-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px; }
+  .kv-bar input { flex:1; min-width:220px; padding:10px 14px; border:1px solid #e5e7eb; border-radius:10px; font-size:.95rem; }
+  .kv-count { color:#6b7280; font-size:.85rem; }
+  .kv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
+  .kv-card { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 2px 10px rgba(0,0,0,.05); border-top:4px solid #22c55e; }
+  .kv-card.low { border-top-color:#f59e0b; }
+  .kv-card.out { border-top-color:#dc2626; }
+  .kv-name { font-weight:700; font-size:1rem; }
+  .kv-qty { font-size:1.6rem; font-weight:800; margin:8px 0 2px; }
+  .kv-qty small { font-size:.9rem; font-weight:600; color:#6b7280; }
+  .kv-meta { font-size:.78rem; color:#9ca3af; }
+  .kv-tag { float:right; font-size:.7rem; font-weight:700; padding:3px 9px; border-radius:999px; background:#dcfce7; color:#16a34a; }
+  .kv-card.low .kv-tag { background:#fef3c7; color:#d97706; }
+  .kv-card.out .kv-tag { background:#fee2e2; color:#dc2626; }
+  .kv-empty { display:none; text-align:center; color:#9ca3af; padding:30px; }
+</style>
+
+<div class="kv-hero">
+  <h1>📦 Kitchen Stock</h1>
+  <p>View only. Stock is updated by the store.</p>
+</div>
+
+<div class="kv-stats">
+  <div class="kv-stat active" data-f="all"><div class="n" id="kvAll">0</div><div class="l">Total items</div></div>
+  <div class="kv-stat" data-f="ok"><div class="n" id="kvOk">0</div><div class="l">In stock</div></div>
+  <div class="kv-stat" data-f="low"><div class="n" id="kvLow">0</div><div class="l">Low stock</div></div>
+  <div class="kv-stat" data-f="out"><div class="n" id="kvOut">0</div><div class="l">Out of stock</div></div>
+</div>
+
+<div class="kv-bar">
+  <input type="text" id="kvSearch" placeholder="Search item...">
+  <span class="kv-count" id="kvCount"></span>
+</div>
+
+<div class="kv-grid" id="kvGrid">
+  {% for item in grocery_items %}
+  <div class="kv-card {% if item.quantity <= 0 %}out{% elif item.is_low %}low{% else %}ok{% endif %}"
+       data-name="{{ item.name|lower }}"
+       data-state="{% if item.quantity <= 0 %}out{% elif item.is_low %}low{% else %}ok{% endif %}">
+    <span class="kv-tag">{% if item.quantity <= 0 %}Out{% elif item.is_low %}Low{% else %}In stock{% endif %}</span>
+    <div class="kv-name">{{ item.name }}</div>
+    <div class="kv-qty">{{ item.quantity|floatformat:"-2" }} <small>{{ item.unit }}</small></div>
+    <div class="kv-meta">Low limit: {{ item.low_stock_limit|floatformat:"-2" }} {{ item.unit }}</div>
+    <div class="kv-meta">Updated {{ item.updated_at|timesince }} ago</div>
+  </div>
+  {% endfor %}
+</div>
+<div class="kv-empty" id="kvEmpty">No items found.</div>
+
+<script>
+(function () {
+  var cards = Array.prototype.slice.call(document.querySelectorAll('#kvGrid .kv-card'));
+  var stats = Array.prototype.slice.call(document.querySelectorAll('.kv-stat'));
+  var search = document.getElementById('kvSearch');
+  var filter = 'all';
+  function count(state) { return cards.filter(function (c) { return c.dataset.state === state; }).length; }
+  document.getElementById('kvAll').textContent = cards.length;
+  document.getElementById('kvOk').textContent = count('ok');
+  document.getElementById('kvLow').textContent = count('low');
+  document.getElementById('kvOut').textContent = count('out');
+  function apply() {
+    var q = search.value.trim().toLowerCase();
+    var shown = 0;
+    cards.forEach(function (c) {
+      var ok = (filter === 'all' || c.dataset.state === filter) && (!q || c.dataset.name.indexOf(q) !== -1);
+      c.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    document.getElementById('kvCount').textContent = shown + ' / ' + cards.length + ' items';
+    document.getElementById('kvEmpty').style.display = shown ? 'none' : 'block';
+  }
+  stats.forEach(function (s) {
+    s.addEventListener('click', function () {
+      stats.forEach(function (x) { x.classList.remove('active'); });
+      s.classList.add('active');
+      filter = s.dataset.f;
+      apply();
+    });
+  });
+  search.addEventListener('input', apply);
+  apply();
+})();
+</script>
+{% endblock %}

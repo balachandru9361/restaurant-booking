@@ -5,11 +5,12 @@ from django.contrib.auth.models import User
 class Profile(models.Model):
     """Extra info for staff logins created by the admin.
     Superusers = Admin, regular users (no profile) = Customer.
-    Staff (is_staff=True, not superuser) get a role here: kitchen or server."""
+    Staff (is_staff=True, not superuser) get a role here: kitchen, server or store."""
 
     ROLE_CHOICES = [
         ('kitchen', 'Kitchen Staff'),
         ('server', 'Server / Waiter'),
+        ('store', 'Store Manager'),   # NEW
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')

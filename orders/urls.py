@@ -8,6 +8,7 @@ urlpatterns = [
     path('add/<int:item_id>/', views.add_to_cart, name='add_to_cart'),
     path('add-order/<int:item_id>/', views.add_to_order, name='add_to_order'),
     path('bulk-add/', views.bulk_add_to_cart, name='bulk_add_to_cart'),
+    path('update/<int:item_id>/', views.update_cart_qty, name='update_cart_qty'),
     path('remove/<int:item_id>/', views.remove_from_cart, name='remove_from_cart'),
     path('coupon/apply/', views.apply_coupon, name='apply_coupon'),
     path('coupon/remove/', views.remove_coupon, name='remove_coupon'),
@@ -15,5 +16,8 @@ urlpatterns = [
     path('payment/initiate/<int:order_id>/', views.initiate_payment, name='initiate_payment'),
     path('payment/success/<int:order_id>/', views.payment_success, name='payment_success'),
     path('history/', views.order_history, name='order_history'),
+    path('status-poll/', views.order_status_poll, name='order_status_poll'),
     path('table/<int:table_id>/', views.select_table, name='select_table'),
+    path('table/clear/', views.clear_table, name='clear_table'),   # NEW
+    path('cart/data/', views.cart_data, name='cart_data'),
 ]

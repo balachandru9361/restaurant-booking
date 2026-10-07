@@ -1,0 +1,508 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .su-hero {
+    display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:14px;
+    background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#3a1c4a 100%);
+    color:#fff; border-radius:18px; padding:22px 26px; margin-bottom:18px;
+    box-shadow:0 10px 28px rgba(26,26,46,.25);
+  }
+  .su-hero h1 { margin:0; font-size:26px; font-weight:800; letter-spacing:.3px; }
+  .su-hero p { margin:4px 0 0; color:#b8b8d4; font-size:13.5px; }
+  .su-btn { border:0; border-radius:10px; padding:10px 16px; font-weight:600; font-size:13.5px; cursor:pointer; transition:.2s; }
+  .su-btn.ghost { background:rgba(255,255,255,.12); color:#fff; border:1px solid rgba(255,255,255,.25); }
+  .su-btn.ghost:hover { background:rgba(255,255,255,.22); }
+
+  .su-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:12px; }
+  .su-stat {
+    background:#fff; border:2px solid transparent; border-radius:14px; padding:14px 16px; text-align:left;
+    cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,.06); transition:.2s; display:flex; align-items:center; gap:12px; font-family:inherit;
+  }
+  .su-stat:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.1); }
+  .su-stat.active { border-color:#1a1a2e; }
+  .su-stat .ico { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:21px; }
+  .su-stat .n { display:block; font-size:26px; font-weight:800; color:#111827; line-height:1; }
+  .su-stat .l { font-size:12.5px; color:#6b7280; }
+  .su-stat.s-all .ico { background:#e0e7ff; }
+  .su-stat.s-ok .ico { background:#dcfce7; }
+  .su-stat.s-low .ico { background:#fef3c7; }
+  .su-stat.s-out .ico { background:#fee2e2; }
+
+  .su-health { display:flex; height:10px; border-radius:8px; overflow:hidden; background:#e5e7eb; margin-bottom:18px; }
+  .su-health span { display:block; height:100%; transition:width .5s ease; }
+  .h-ok { background:#2bb673; } .h-low { background:#f59e0b; } .h-out { background:#ef4444; }
+
+  .su-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px; }
+  .su-toolbar input[type=text], .su-toolbar select {
+    padding:10px 14px; border:1px solid #d1d5db; border-radius:10px; font-size:14px; background:#fff; font-family:inherit;
+  }
+  .su-toolbar input[type=text] { flex:1; min-width:200px; max-width:340px; }
+  .su-view { display:flex; border:1px solid #d1d5db; border-radius:10px; overflow:hidden; background:#fff; margin-left:auto; }
+  .su-view button { border:0; background:transparent; padding:9px 14px; cursor:pointer; font-size:14px; color:#374151; }
+  .su-view button.on { background:#1a1a2e; color:#fff; }
+  .su-count { font-size:13px; color:#6b7280; }
+
+  .su-layout { display:grid; grid-template-columns:1fr 300px; gap:20px; align-items:start; }
+  @media (max-width:1250px) { .su-layout { grid-template-columns:1fr; } }
+
+  .su-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; }
+  .su-card {
+    background:#fff; border-radius:16px; padding:18px; box-shadow:0 4px 14px rgba(0,0,0,.07);
+    border-top:5px solid #2bb673; transition:box-shadow .3s, transform .2s; position:relative;
+  }
+  .su-card:hover { box-shadow:0 10px 26px rgba(0,0,0,.12); }
+  .su-card.st-low { border-top-color:#f59e0b; }
+  .su-card.st-out { border-top-color:#ef4444; background:linear-gradient(180deg,#fff5f5,#fff 40%); }
+  .su-card.flash { animation:suFlash 1.1s ease; }
+  @keyframes suFlash { 0% { box-shadow:0 0 0 0 rgba(43,182,115,.7); } 70% { box-shadow:0 0 0 14px rgba(43,182,115,0); } 100% { box-shadow:0 4px 14px rgba(0,0,0,.07); } }
+
+  .su-top { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+  .su-who { display:flex; align-items:center; gap:12px; min-width:0; }
+  .su-ico {
+    flex:0 0 auto; width:46px; height:46px; border-radius:13px; background:#f3f4f6;
+    display:flex; align-items:center; justify-content:center; font-size:26px; line-height:1;
+  }
+  .su-ico.letter { background:#e0e7ff; color:#3730a3; font-size:19px; font-weight:800; text-transform:uppercase; }
+  .su-name { font-size:17px; font-weight:700; color:#1a1a2e; text-transform:capitalize; }
+  .su-id { font-size:11px; color:#9ca3af; font-weight:500; margin-left:4px; }
+  .su-tag { font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; white-space:nowrap; background:#dcfce7; color:#166534; }
+  .st-low .su-tag { background:#fef3c7; color:#92400e; }
+  .st-out .su-tag { background:#fee2e2; color:#b91c1c; }
+  .su-qty { margin:10px 0 2px; font-size:14px; color:#4b5563; }
+  .su-qty b { font-size:26px; color:#111827; }
+  .su-upd { font-size:11.5px; color:#9ca3af; }
+
+  .su-bar { position:relative; height:9px; background:#e5e7eb; border-radius:6px; margin-top:10px; }
+  .su-bar .fill { position:absolute; left:0; top:0; height:100%; border-radius:6px; background:#2bb673; transition:width .5s ease; }
+  .st-low .su-bar .fill { background:#f59e0b; }
+  .st-out .su-bar .fill { background:#ef4444; }
+  .su-bar .mark { position:absolute; top:-4px; width:2px; height:17px; background:#1a1a2e; opacity:.55; border-radius:2px; transition:left .4s; }
+  .su-limit { font-size:12px; color:#9ca3af; margin-top:6px; }
+
+  .su-mode { display:flex; margin:14px 0 10px; border:1px solid #d1d5db; border-radius:10px; overflow:hidden; }
+  .su-mode button { flex:1; padding:8px 6px; border:0; background:#f9fafb; font-size:13px; cursor:pointer; color:#374151; font-family:inherit; }
+  .su-mode button.on { background:#1a1a2e; color:#fff; font-weight:600; }
+
+  .su-quick { display:flex; gap:6px; margin-bottom:10px; }
+  .su-quick button { flex:1; padding:7px 0; border:1px solid #d1d5db; background:#fff; border-radius:8px; font-size:13px; cursor:pointer; font-family:inherit; transition:.15s; }
+  .su-quick button:hover { background:#1a1a2e; color:#fff; border-color:#1a1a2e; }
+  .su-card[data-mode=add] .q-set { display:none; }
+  .su-card[data-mode=set] .q-add { display:none; }
+
+  .su-row { display:flex; gap:8px; }
+  .su-row input { flex:1; min-width:0; padding:10px 12px; border:1px solid #d1d5db; border-radius:10px; font-size:15px; font-family:inherit; }
+  .su-row input:focus { outline:2px solid #1a1a2e33; border-color:#1a1a2e; }
+  .su-row .js-save { padding:10px 18px; border:0; border-radius:10px; background:#F63A3A; color:#fff; font-weight:700; cursor:pointer; transition:.2s; }
+  .su-row .js-save:hover { background:#d92d2d; }
+  .su-row .js-save:disabled { opacity:.6; cursor:wait; }
+  .su-preview { font-size:12.5px; color:#374151; margin-top:7px; min-height:17px; font-weight:600; }
+  .su-preview.up { color:#166534; } .su-preview.down { color:#b45309; }
+  .su-hint { font-size:12.5px; margin-top:2px; min-height:17px; display:flex; align-items:center; gap:10px; }
+  .su-undo { display:none; border:0; background:#eef2ff; color:#3730a3; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; }
+  .su-undo.show { display:inline-block; }
+  .su-empty { display:none; text-align:center; color:#6b7280; padding:50px 0; font-size:15px; }
+
+  /* list view */
+  .su-grid.list { grid-template-columns:1fr; gap:12px; }
+  .su-grid.list .su-card { display:grid; grid-template-columns:1.1fr 1.2fr 2.2fr; gap:22px; align-items:center; border-top:0; border-left:6px solid #2bb673; padding:14px 18px; }
+  .su-grid.list .su-card.st-low { border-left-color:#f59e0b; }
+  .su-grid.list .su-card.st-out { border-left-color:#ef4444; }
+  .su-grid.list .su-mode { margin-top:0; }
+  @media (max-width:1000px) { .su-grid.list .su-card { display:block; } }
+
+  /* activity panel */
+  .su-side { background:#fff; border-radius:16px; padding:16px; box-shadow:0 4px 14px rgba(0,0,0,.07); position:sticky; top:16px; }
+  .su-side h3 { margin:0 0 10px; font-size:15px; color:#1a1a2e; display:flex; justify-content:space-between; align-items:center; }
+  .su-side h3 button { border:0; background:none; color:#9ca3af; font-size:12px; cursor:pointer; }
+  .su-act { list-style:none; margin:0; padding:0; max-height:520px; overflow:auto; }
+  .su-act li { padding:9px 0; border-bottom:1px dashed #e5e7eb; font-size:13px; color:#374151; }
+  .su-act li:last-child { border-bottom:0; }
+  .su-act li b { color:#111827; text-transform:capitalize; }
+  .su-act li small { display:block; color:#9ca3af; font-size:11.5px; }
+  .su-act .none { color:#9ca3af; text-align:center; padding:20px 0; border:0; }
+</style>
+
+<div class="su-hero">
+  <div>
+    <h1>📦 Stock Update</h1>
+    <p>Pudhu stock vandha <b>Add stock</b>, count correct panna <b>Set exact</b>. Update aanadhum admin-ku message pogum.</p>
+  </div>
+  <button type="button" class="su-btn ghost" id="suCopy">📋 Copy low-stock list</button>
+</div>
+
+<div class="su-stats">
+  <button type="button" class="su-stat s-all active" data-f="all"><span class="ico">🧺</span><span><span class="n" id="nAll">0</span><span class="l">Total items</span></span></button>
+  <button type="button" class="su-stat s-ok" data-f="ok"><span class="ico">✅</span><span><span class="n" id="nOk">0</span><span class="l">In stock</span></span></button>
+  <button type="button" class="su-stat s-low" data-f="low"><span class="ico">⚠️</span><span><span class="n" id="nLow">0</span><span class="l">Low stock</span></span></button>
+  <button type="button" class="su-stat s-out" data-f="out"><span class="ico">🚫</span><span><span class="n" id="nOut">0</span><span class="l">Out of stock</span></span></button>
+</div>
+<div class="su-health"><span class="h-ok" id="hOk"></span><span class="h-low" id="hLow"></span><span class="h-out" id="hOut"></span></div>
+
+<div class="su-toolbar">
+  <input type="text" id="suSearch" placeholder="🔍 Search item...  ( / )">
+  <select id="suSort">
+    <option value="attention">⚡ Needs attention first</option>
+    <option value="name">🔤 Name (A-Z)</option>
+    <option value="qtyAsc">⬇️ Lowest stock</option>
+    <option value="qtyDesc">⬆️ Highest stock</option>
+  </select>
+  <span class="su-count" id="suCount"></span>
+  <div class="su-view">
+    <button type="button" class="on" data-v="grid">▦ Grid</button>
+    <button type="button" data-v="list">☰ List</button>
+  </div>
+</div>
+
+<div class="su-layout">
+  <div>
+    <div class="su-grid" id="suGrid">
+      {% for item in grocery_items %}
+      <div class="su-card" data-mode="add"
+           data-name="{{ item.name|lower }}"
+           data-qty="{{ item.quantity }}"
+           data-limit="{{ item.low_stock_limit }}"
+           data-unit="{{ item.unit }}"
+           data-url="{% url 'dashboard:kitchen_update_grocery' item.pk %}">
+        <div class="c-info">
+          <div class="su-top">
+            <div class="su-who">
+              <span class="su-ico js-ico"></span>
+              <div class="su-name">{{ item.name }}<span class="su-id">#{{ item.pk }}</span></div>
+            </div>
+            <span class="su-tag">In stock</span>
+          </div>
+          <div class="su-qty">Now: <b class="js-qty">{{ item.quantity }}</b> {{ item.unit }}</div>
+          <div class="su-upd">{% if item.updated_at %}Updated {{ item.updated_at|timesince }} ago{% endif %}</div>
+        </div>
+
+        <div class="c-bar">
+          <div class="su-bar"><span class="fill js-bar"></span><span class="mark js-mark"></span></div>
+          <div class="su-limit">Low limit: {{ item.low_stock_limit }} {{ item.unit }}</div>
+        </div>
+
+        <div class="c-actions">
+          <div class="su-mode">
+            <button type="button" class="js-mode on" data-mode="add">➕ Add stock</button>
+            <button type="button" class="js-mode" data-mode="set">✏️ Set exact</button>
+          </div>
+          <div class="su-quick q-add">
+            <button type="button" data-act="add" data-v="1">+1</button>
+            <button type="button" data-act="add" data-v="5">+5</button>
+            <button type="button" data-act="add" data-v="10">+10</button>
+            <button type="button" data-act="add" data-v="25">+25</button>
+          </div>
+          <div class="su-quick q-set">
+            <button type="button" data-act="minus" data-v="1">−1</button>
+            <button type="button" data-act="minus" data-v="5">−5</button>
+            <button type="button" data-act="zero">0</button>
+            <button type="button" data-act="limit">= Limit</button>
+          </div>
+          <div class="su-row">
+            <input type="number" class="js-input" min="0" step="any" placeholder="Pudhusa vandha quantity">
+            <button type="button" class="js-save">Update</button>
+          </div>
+          <div class="su-preview js-preview"></div>
+          <div class="su-hint"><span class="js-hint"></span><button type="button" class="su-undo js-undo">↩ Undo</button></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="su-empty" id="suEmpty">😕 Edhuvum kedaikala.</div>
+  </div>
+
+  <aside class="su-side">
+    <h3>🕒 Recent activity <button type="button" id="suClearLog">Clear</button></h3>
+    <ul class="su-act" id="suLog"></ul>
+  </aside>
+</div>
+
+<script>
+(function () {
+  var CSRF = "{{ csrf_token }}";
+  var LOG_KEY = 'kitchenStockActivity';
+  var grid = document.getElementById('suGrid');
+  var cards = Array.prototype.slice.call(grid.querySelectorAll('.su-card'));
+  var view = { filter: 'all', sort: 'attention', q: '' };
+
+  function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+  function fmt(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+  function statusOf(q, limit) { return q <= 0 ? 'out' : (q <= limit ? 'low' : 'ok'); }
+  function nameOf(card) { return card.querySelector('.su-name').firstChild.textContent.trim(); }
+
+  /* ---------- food icons (picked from item name) ---------- */
+  var ICONS = [
+    ['eggplant|brinjal', '🍆'], ['egg', '🥚'],
+    ['chicken|hen|broiler', '🍗'], ['mutton|lamb|goat|beef|meat', '🥩'],
+    ['fish|prawn|shrimp|crab|seafood|squid', '🐟'],
+    ['onion', '🧅'], ['tomato', '🍅'], ['potato', '🥔'], ['carrot', '🥕'],
+    ['garlic', '🧄'], ['ginger', '🫚'], ['capsicum|bell pepper', '🫑'],
+    ['chilli|chili|pepper|masala|spice|powder', '🌶️'],
+    ['cucumber', '🥒'], ['corn', '🌽'], ['mushroom', '🍄'],
+    ['bay leaf|curry leaf|coriander|mint|leaf|leaves|herb|basil|cilantro', '🌿'],
+    ['lemon|lime', '🍋'], ['blueberr', '🫐'], ['strawberr', '🍓'], ['mango', '🥭'],
+    ['banana', '🍌'], ['apple', '🍎'], ['orange', '🍊'], ['grape', '🍇'],
+    ['pineapple', '🍍'], ['watermelon', '🍉'], ['coconut', '🥥'],
+    ['milk', '🥛'], ['butter|ghee', '🧈'], ['cheese|paneer', '🧀'], ['curd|yogurt|yoghurt', '🥣'],
+    ['ice', '🧊'],
+    ['rice|biryani', '🍚'], ['noodle|pasta|maggi', '🍜'],
+    ['wheat|flour|atta|maida|rava|sooji', '🌾'], ['bread|bun', '🍞'],
+    ['oil', '🫒'], ['salt', '🧂'], ['sugar|jaggery', '🍬'], ['honey', '🍯'],
+    ['tea|coffee', '☕'], ['water', '💧'], ['soda|cola|juice|syrup|drink', '🥤'],
+    ['nut|cashew|almond|peanut|pista', '🥜'], ['dal|lentil|gram|beans|peas', '🫘']
+  ].map(function (p) { return [new RegExp('\\b(' + p[0] + ')', 'i'), p[1]]; });
+
+  function iconFor(name) {
+    for (var i = 0; i < ICONS.length; i++) { if (ICONS[i][0].test(name)) return ICONS[i][1]; }
+    return null;
+  }
+  function setIcon(card) {
+    var el = card.querySelector('.js-ico');
+    var nm = nameOf(card);
+    var emoji = iconFor(nm);
+    if (emoji) { el.textContent = emoji; el.classList.remove('letter'); }
+    else { el.textContent = nm.charAt(0) || '?'; el.classList.add('letter'); }
+  }
+
+  /* ---------- paint one card ---------- */
+  function paint(card) {
+    var q = num(card.dataset.qty), limit = num(card.dataset.limit);
+    var st = statusOf(q, limit);
+    card.dataset.st = st;
+    card.classList.remove('st-ok', 'st-low', 'st-out');
+    card.classList.add('st-' + st);
+    card.querySelector('.su-tag').textContent = st === 'out' ? 'OUT' : (st === 'low' ? 'LOW' : 'In stock');
+    var max = Math.max(limit * 3, q, 1);
+    card.querySelector('.js-bar').style.width = Math.min(100, (q / max) * 100) + '%';
+    card.querySelector('.js-mark').style.left = Math.min(98, (limit / max) * 100) + '%';
+  }
+
+  function countUp(el, from, to) {
+    var start = null, dur = 600;
+    function step(ts) {
+      if (start === null) start = ts;
+      var p = Math.min(1, (ts - start) / dur);
+      el.textContent = fmt(from + (to - from) * p);
+      if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  /* ---------- stats + health bar ---------- */
+  function stats() {
+    var c = { ok: 0, low: 0, out: 0 };
+    cards.forEach(function (card) { c[card.dataset.st]++; });
+    var total = cards.length || 1;
+    document.getElementById('nAll').textContent = cards.length;
+    document.getElementById('nOk').textContent = c.ok;
+    document.getElementById('nLow').textContent = c.low;
+    document.getElementById('nOut').textContent = c.out;
+    document.getElementById('hOk').style.width = (c.ok / total * 100) + '%';
+    document.getElementById('hLow').style.width = (c.low / total * 100) + '%';
+    document.getElementById('hOut').style.width = (c.out / total * 100) + '%';
+  }
+
+  /* ---------- filter + sort ---------- */
+  var order = { out: 0, low: 1, ok: 2 };
+  function applyView(resort) {
+    var q = view.q.toLowerCase();
+    if (resort) {
+      var list = cards.slice();
+      list.sort(function (a, b) {
+        var qa = num(a.dataset.qty), qb = num(b.dataset.qty);
+        if (view.sort === 'name') return a.dataset.name.localeCompare(b.dataset.name);
+        if (view.sort === 'qtyAsc') return qa - qb;
+        if (view.sort === 'qtyDesc') return qb - qa;
+        var d = order[a.dataset.st] - order[b.dataset.st];
+        return d !== 0 ? d : a.dataset.name.localeCompare(b.dataset.name);
+      });
+      list.forEach(function (c) { grid.appendChild(c); });
+    }
+    var shown = 0;
+    cards.forEach(function (c) {
+      var ok = c.dataset.name.indexOf(q) !== -1 && (view.filter === 'all' || c.dataset.st === view.filter);
+      c.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    document.getElementById('suEmpty').style.display = shown ? 'none' : 'block';
+    document.getElementById('suCount').textContent = shown + ' / ' + cards.length + ' items';
+  }
+
+  document.querySelectorAll('.su-stat').forEach(function (b) {
+    b.addEventListener('click', function () {
+      view.filter = b.dataset.f;
+      document.querySelectorAll('.su-stat').forEach(function (x) { x.classList.toggle('active', x === b); });
+      applyView(false);
+    });
+  });
+  document.getElementById('suSearch').addEventListener('input', function (e) { view.q = e.target.value.trim(); applyView(false); });
+  document.getElementById('suSort').addEventListener('change', function (e) { view.sort = e.target.value; applyView(true); });
+  document.querySelectorAll('.su-view button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.su-view button').forEach(function (x) { x.classList.toggle('on', x === b); });
+      grid.classList.toggle('list', b.dataset.v === 'list');
+    });
+  });
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (e.key === '/' && tag !== 'input' && tag !== 'textarea') {
+      e.preventDefault();
+      document.getElementById('suSearch').focus();
+    }
+  });
+
+  /* ---------- activity log ---------- */
+  function loadLog() { try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch (e) { return []; } }
+  function saveLog(arr) { try { localStorage.setItem(LOG_KEY, JSON.stringify(arr.slice(0, 12))); } catch (e) {} }
+  function renderLog() {
+    var ul = document.getElementById('suLog');
+    ul.innerHTML = '';
+    var arr = loadLog();
+    if (!arr.length) {
+      var li = document.createElement('li'); li.className = 'none'; li.textContent = 'Innum updates illa.'; ul.appendChild(li); return;
+    }
+    arr.forEach(function (a) {
+      var li = document.createElement('li');
+      var b = document.createElement('b'); b.textContent = a.name;
+      var t = document.createElement('span'); t.textContent = ' ' + a.text;
+      var s = document.createElement('small'); s.textContent = a.time;
+      li.appendChild(b); li.appendChild(t); li.appendChild(s);
+      ul.appendChild(li);
+    });
+  }
+  function logAct(name, text) {
+    var arr = loadLog();
+    var now = new Date();
+    arr.unshift({ name: name, text: text, time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+    saveLog(arr); renderLog();
+  }
+  document.getElementById('suClearLog').addEventListener('click', function () { saveLog([]); renderLog(); });
+
+  /* ---------- copy low-stock list ---------- */
+  document.getElementById('suCopy').addEventListener('click', function () {
+    var lines = cards.filter(function (c) { return c.dataset.st !== 'ok'; }).map(function (c) {
+      return '- ' + nameOf(c) + ': ' + fmt(num(c.dataset.qty)) + ' ' + c.dataset.unit +
+             ' (limit ' + fmt(num(c.dataset.limit)) + ')' + (c.dataset.st === 'out' ? ' OUT' : '');
+    });
+    var text = lines.length ? 'Low / out of stock list:\n' + lines.join('\n') : 'Ella items-um stock-la irukku.';
+    function done() { if (window.showToast) window.showToast('📋 Copied', lines.length + ' items copy aachu', 'good'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done);
+    } else {
+      var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); ta.remove(); done();
+    }
+  });
+
+  /* ---------- network ---------- */
+  function send(card, mode, val) {
+    var body = new FormData();
+    body.append('quantity', val);
+    body.append('mode', mode);
+    return fetch(card.dataset.url, {
+      method: 'POST', headers: { 'X-CSRFToken': CSRF }, credentials: 'same-origin', body: body
+    }).then(function (r) { return r.json(); });
+  }
+
+  /* ---------- per-card wiring ---------- */
+  cards.forEach(function (card) {
+    var mode = 'add';
+    var input = card.querySelector('.js-input');
+    var saveBtn = card.querySelector('.js-save');
+    var hintEl = card.querySelector('.js-hint');
+    var prev = card.querySelector('.js-preview');
+    var undoBtn = card.querySelector('.js-undo');
+    var undoVal = null;
+    var unit = card.dataset.unit;
+
+    setIcon(card);
+    paint(card);
+    card.querySelector('.js-qty').textContent = fmt(num(card.dataset.qty));
+
+    function hint(text, bad) { hintEl.textContent = text; hintEl.style.color = bad ? '#b91c1c' : '#166534'; }
+
+    function preview() {
+      var cur = num(card.dataset.qty);
+      var raw = input.value.trim();
+      prev.className = 'su-preview js-preview';
+      if (raw === '' || isNaN(raw)) { prev.textContent = ''; return; }
+      var v = num(raw);
+      var res = mode === 'add' ? cur + v : v;
+      prev.textContent = mode === 'add'
+        ? fmt(cur) + ' + ' + fmt(v) + ' = ' + fmt(res) + ' ' + unit
+        : fmt(cur) + ' → ' + fmt(res) + ' ' + unit;
+      if (res > cur) prev.classList.add('up'); else if (res < cur) prev.classList.add('down');
+    }
+    input.addEventListener('input', preview);
+    input.addEventListener('keydown', function (e) { if (e.key === 'Enter') saveBtn.click(); });
+
+    card.querySelectorAll('.js-mode').forEach(function (b) {
+      b.addEventListener('click', function () {
+        mode = b.dataset.mode;
+        card.dataset.mode = mode;
+        card.querySelectorAll('.js-mode').forEach(function (x) { x.classList.toggle('on', x === b); });
+        input.placeholder = mode === 'add' ? 'Pudhusa vandha quantity' : 'Exact remaining count';
+        input.value = ''; hint(''); preview();
+      });
+    });
+
+    card.querySelectorAll('.su-quick button').forEach(function (q) {
+      q.addEventListener('click', function () {
+        var act = q.dataset.act, v = num(q.dataset.v), cur = num(card.dataset.qty);
+        if (act === 'add') input.value = fmt(num(input.value) + v).replace(/\.00$/, '');
+        else if (act === 'minus') input.value = fmt(Math.max(0, cur - v)).replace(/\.00$/, '');
+        else if (act === 'zero') input.value = '0';
+        else if (act === 'limit') input.value = fmt(num(card.dataset.limit)).replace(/\.00$/, '');
+        preview();
+        input.focus();
+      });
+    });
+
+    function applyResult(data, label, oldQ) {
+      var newQ = num(data.quantity);
+      card.dataset.qty = data.quantity;
+      countUp(card.querySelector('.js-qty'), oldQ, newQ);
+      paint(card);
+      card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
+      card.querySelector('.su-upd').textContent = 'Updated just now';
+      stats(); applyView(false);
+      if (window.showToast) window.showToast('✅ Stock updated', nameOf(card) + ': ' + fmt(newQ) + ' ' + unit, 'good');
+      logAct(nameOf(card), label + ' (' + fmt(oldQ) + ' → ' + fmt(newQ) + ' ' + unit + ')');
+    }
+
+    saveBtn.addEventListener('click', function () {
+      var val = input.value.trim();
+      if (val === '' || isNaN(val) || parseFloat(val) < 0) { hint('Valid quantity enter pannunga.', true); return; }
+      var oldQ = num(card.dataset.qty);
+      var usedMode = mode;
+      saveBtn.disabled = true;
+      send(card, usedMode, val).then(function (data) {
+        if (!data.ok) { hint(data.error || 'Update aagala.', true); return; }
+        undoVal = oldQ;
+        undoBtn.classList.add('show');
+        applyResult(data, usedMode === 'add' ? '+' + val + ' added' : 'set to ' + val, oldQ);
+        input.value = ''; preview();
+        hint(usedMode === 'add' ? '✔ +' + data.added + ' added' : '✔ Count updated');
+      }).catch(function () { hint('Network error. Thirumba try pannunga.', true); })
+        .then(function () { saveBtn.disabled = false; });
+    });
+
+    undoBtn.addEventListener('click', function () {
+      if (undoVal === null) return;
+      var oldQ = num(card.dataset.qty);
+      undoBtn.disabled = true;
+      send(card, 'set', undoVal).then(function (data) {
+        if (!data.ok) { hint(data.error || 'Undo aagala.', true); return; }
+        applyResult(data, '↩ undo', oldQ);
+        undoVal = null; undoBtn.classList.remove('show');
+        hint('↩ Pazhaya quantity-ku thirumbiduchu');
+      }).catch(function () { hint('Network error.', true); })
+        .then(function () { undoBtn.disabled = false; });
+    });
+  });
+
+  stats();
+  applyView(true);
+  renderLog();
+})();
+</script>
+{% endblock %}

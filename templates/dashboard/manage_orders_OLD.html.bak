@@ -1,0 +1,490 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .od-hero { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:14px;
+    background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#3a1c4a 100%); color:#fff; border-radius:18px;
+    padding:20px 26px; margin-bottom:18px; box-shadow:0 10px 28px rgba(26,26,46,.25); }
+  .od-hero h1 { margin:0; font-size:26px; font-weight:800; }
+  .od-hero p { margin:4px 0 0; color:#b8b8d4; font-size:13.5px; }
+  .od-live { display:flex; align-items:center; gap:14px; flex-wrap:wrap; font-size:13px; color:#d6d6ee; }
+  .od-live .dot { width:9px; height:9px; border-radius:50%; background:#22c55e; display:inline-block; margin-right:6px; animation:odPulse 1.6s infinite; }
+  @keyframes odPulse { 0%{box-shadow:0 0 0 0 rgba(34,197,94,.7);} 70%{box-shadow:0 0 0 9px rgba(34,197,94,0);} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0);} }
+  .od-live label { display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .od-btn { border:1px solid rgba(255,255,255,.25); background:rgba(255,255,255,.12); color:#fff; padding:8px 14px; border-radius:10px; font-weight:600; font-size:13px; cursor:pointer; font-family:inherit; }
+  .od-btn:hover { background:rgba(255,255,255,.22); }
+
+  .od-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:16px; }
+  .od-stat { background:#fff; border-radius:14px; padding:14px 16px; box-shadow:0 4px 14px rgba(0,0,0,.06); display:flex; align-items:center; gap:12px; border:2px solid transparent; cursor:pointer; text-align:left; font-family:inherit; transition:.2s; }
+  .od-stat:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.1); }
+  .od-stat .ico { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:21px; }
+  .od-stat b { display:block; font-size:26px; color:#111827; line-height:1; }
+  .od-stat span.l { font-size:12px; color:#6b7280; letter-spacing:.4px; text-transform:uppercase; }
+  .od-stat.a .ico { background:#e0e7ff; } .od-stat.b .ico { background:#fef3c7; } .od-stat.c .ico { background:#dbeafe; }
+  .od-stat.d .ico { background:#dcfce7; } .od-stat.e .ico { background:#fee2e2; }
+  .od-stat.b.pulse { border-color:#f59e0b; animation:odGlow 1.8s infinite; }
+  @keyframes odGlow { 0%,100%{box-shadow:0 4px 14px rgba(245,158,11,.15);} 50%{box-shadow:0 4px 22px rgba(245,158,11,.5);} }
+
+  .od-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
+  .od-bar input[type=text], .od-bar select { padding:11px 14px; border:1px solid #e5e7eb; border-radius:10px; font-size:14px; background:#fff; font-family:inherit; }
+  .od-bar input[type=text] { flex:1; min-width:230px; }
+  .od-today { display:flex; align-items:center; gap:6px; font-size:13.5px; color:#374151; cursor:pointer; background:#fff; padding:10px 14px; border:1px solid #e5e7eb; border-radius:10px; }
+  .od-chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  .od-chip { border:0; background:#fff; padding:8px 14px; border-radius:20px; font-size:13px; font-weight:600; color:#4b5563; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.05); font-family:inherit; }
+  .od-chip em { font-style:normal; background:#f3f4f6; border-radius:10px; padding:1px 8px; margin-left:5px; font-size:11.5px; }
+  .od-chip.on { background:#1a1a2e; color:#fff; } .od-chip.on em { background:rgba(255,255,255,.2); }
+
+  .od-wrap { background:#fff; border-radius:16px; box-shadow:0 4px 18px rgba(0,0,0,.07); overflow:hidden; }
+  .od-scroll { overflow-x:auto; }
+  .od-table { width:100%; border-collapse:collapse; min-width:1100px; }
+  .od-table th { background:#1a1a2e; color:#fff; text-align:left; padding:14px 14px; font-size:11.5px; letter-spacing:.8px; text-transform:uppercase; white-space:nowrap; }
+  .od-table td { padding:13px 14px; border-bottom:1px solid #f1f5f9; vertical-align:middle; font-size:14px; }
+  .od-row:hover td { background:#fafbff; }
+  .od-row.needs td { background:#fffbeb; }
+  .od-row.needs td:first-child { box-shadow:inset 4px 0 0 #f59e0b; }
+  .od-row.cancelled td { opacity:.55; }
+
+  .oid { font-weight:800; color:#111827; }
+  .cust { display:flex; align-items:center; gap:9px; }
+  .cust .av { width:32px; height:32px; border-radius:50%; background:#e0e7ff; color:#3730a3; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; text-transform:uppercase; flex-shrink:0; }
+  .it { display:inline-block; background:#f3f4f6; border-radius:8px; padding:3px 9px; font-size:12.5px; margin:2px 4px 2px 0; color:#374151; }
+  .it b { color:#F63A3A; }
+  .amt { font-weight:800; color:#111827; white-space:nowrap; }
+  .when { color:#6b7280; font-size:12.5px; white-space:nowrap; }
+
+  .tbadge { display:inline-block; padding:4px 11px; border-radius:20px; font-size:12.5px; font-weight:700; background:#ede9fe; color:#5b21b6; margin-bottom:6px; }
+  .tbadge.take { background:#f3f4f6; color:#6b7280; }
+  .js-tbl, .js-status { display:block; padding:7px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; background:#fff; font-family:inherit; max-width:170px; }
+  .js-tbl:focus, .js-status:focus { outline:2px solid #1a1a2e33; }
+  .js-tbl.err { border-color:#ef4444; }
+
+  .pay { display:inline-block; padding:4px 11px; border-radius:20px; font-size:12.5px; font-weight:700; white-space:nowrap; }
+  .pay.ok { background:#dbeafe; color:#1d4ed8; } .pay.cash { background:#fef3c7; color:#92400e; } .pay.warn { background:#fee2e2; color:#b91c1c; }
+  .mini { display:block; margin-top:6px; border:1px solid #2bb673; color:#15803d; background:#fff; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .mini:hover { background:#2bb673; color:#fff; }
+
+  .appr-l { font-size:11px; font-weight:800; color:#b45309; letter-spacing:.6px; margin-bottom:6px; }
+  .appr-b { display:flex; gap:6px; flex-wrap:wrap; }
+  .ab { border:0; border-radius:8px; padding:7px 12px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap; }
+  .ab.chk { background:#e0f2fe; color:#0369a1; } .ab.ok { background:#22c55e; color:#fff; } .ab.no { background:#fee2e2; color:#b91c1c; }
+  .ab:disabled { opacity:.5; cursor:wait; }
+
+  .flow { display:flex; gap:4px; margin-top:8px; }
+  .flow i { width:26px; height:5px; border-radius:4px; background:#e5e7eb; display:block; transition:.3s; }
+  .flow i.done { background:#2bb673; }
+  .od-row.cancelled .flow { display:none; }
+
+  .od-more { text-align:center; padding:16px; display:none; }
+  .od-more button { background:#1a1a2e; color:#fff; border:0; padding:10px 22px; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; }
+  .od-empty { display:none; text-align:center; padding:50px; color:#6b7280; font-size:15px; }
+
+  /* stock modal */
+  .md { position:fixed; inset:0; background:rgba(15,23,42,.55); z-index:10050; display:none; align-items:center; justify-content:center; padding:20px; }
+  .md.show { display:flex; }
+  .md-box { background:#fff; border-radius:18px; width:100%; max-width:640px; max-height:86vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .md-head { display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid #f1f5f9; position:sticky; top:0; background:#fff; }
+  .md-head h3 { margin:0; font-size:18px; color:#1a1a2e; }
+  .md-x { border:0; background:#f3f4f6; width:32px; height:32px; border-radius:50%; cursor:pointer; font-size:15px; }
+  .md-body { padding:18px 22px; }
+  .md-body h4 { margin:16px 0 8px; font-size:13px; letter-spacing:.6px; text-transform:uppercase; color:#6b7280; }
+  .md-body h4:first-child { margin-top:0; }
+  .rq { display:grid; grid-template-columns:1.4fr 1fr 1fr 1fr; gap:8px; padding:8px 0; border-bottom:1px dashed #e5e7eb; font-size:13.5px; align-items:center; }
+  .rq.short { color:#b91c1c; font-weight:700; }
+  .rq .good { color:#15803d; font-weight:700; }
+  .md-note { background:#fffbeb; border:1px solid #fde68a; color:#92400e; padding:10px 12px; border-radius:10px; font-size:13px; margin-bottom:8px; }
+  .md-foot { padding:14px 22px; border-top:1px solid #f1f5f9; display:flex; justify-content:flex-end; gap:10px; }
+</style>
+
+<div class="od-hero">
+  <div>
+    <h1>🧾 Orders</h1>
+    <p>Approve new orders, table assign pannunga, status track pannunga. Ella live-a update aagum.</p>
+  </div>
+  <div class="od-live">
+    <span><i class="dot"></i>Live · <span id="odUpdated">just now</span></span>
+    <label><input type="checkbox" id="odAuto" checked> Auto refresh</label>
+    <button type="button" class="od-btn" id="odRefresh">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="od-stats">
+  <button type="button" class="od-stat a" data-f="all"><span class="ico">📦</span><span><b id="sTotal">0</b><span class="l">Total orders</span></span></button>
+  <button type="button" class="od-stat b" data-f="approval" id="sApprCard"><span class="ico">⏳</span><span><b id="sAppr">0</b><span class="l">Awaiting approval</span></span></button>
+  <button type="button" class="od-stat c" data-f="preparing"><span class="ico">👨‍🍳</span><span><b id="sKitchen">0</b><span class="l">In kitchen</span></span></button>
+  <button type="button" class="od-stat d" data-f="delivered"><span class="ico">✅</span><span><b id="sDone">0</b><span class="l">Delivered</span></span></button>
+  <button type="button" class="od-stat e" data-f="cancelled"><span class="ico">❌</span><span><b id="sCancel">0</b><span class="l">Cancelled</span></span></button>
+</div>
+
+<div class="od-bar">
+  <input type="text" id="odSearch" placeholder="🔍 Search order ID, customer, item, table...">
+  <select id="odPay">
+    <option value="all">💰 All payments</option>
+    <option value="online">💳 Online</option>
+    <option value="cash">💵 Cash</option>
+    <option value="unpaid">⚠️ Unpaid</option>
+  </select>
+  <select id="odSort">
+    <option value="new">🕒 Newest first</option>
+    <option value="old">🕘 Oldest first</option>
+    <option value="high">⬆️ Amount: high → low</option>
+    <option value="low">⬇️ Amount: low → high</option>
+  </select>
+  <label class="od-today"><input type="checkbox" id="odToday"> Today only</label>
+</div>
+
+<div class="od-chips" id="odChips">
+  <button type="button" class="od-chip on" data-f="all">All <em data-c="all">0</em></button>
+  <button type="button" class="od-chip" data-f="approval">⏳ Approval <em data-c="approval">0</em></button>
+  <button type="button" class="od-chip" data-f="pending">Pending <em data-c="pending">0</em></button>
+  <button type="button" class="od-chip" data-f="confirmed">Confirmed <em data-c="confirmed">0</em></button>
+  <button type="button" class="od-chip" data-f="preparing">Preparing <em data-c="preparing">0</em></button>
+  <button type="button" class="od-chip" data-f="ready">Ready <em data-c="ready">0</em></button>
+  <button type="button" class="od-chip" data-f="delivered">Delivered <em data-c="delivered">0</em></button>
+  <button type="button" class="od-chip" data-f="cancelled">Cancelled <em data-c="cancelled">0</em></button>
+</div>
+
+<div class="od-wrap">
+  <div class="od-scroll">
+    <table class="od-table">
+      <thead>
+        <tr><th>Order</th><th>Customer</th><th>Table</th><th>Items</th><th>Amount</th><th>Payment</th><th>Status</th><th>Placed on</th></tr>
+      </thead>
+      <tbody id="ordBody">
+        {% for order in orders %}
+        <tr class="od-row"
+            data-id="{{ order.id }}"
+            data-status="{{ order.status }}"
+            data-appr="{% if order.status == 'pending' and order.payment_status != 'pending' %}1{% else %}0{% endif %}"
+            data-method="{{ order.payment_method }}"
+            data-unpaid="{% if order.payment_method == 'online' %}{% if order.payment_status == 'pending' %}1{% else %}0{% endif %}{% elif order.payment_status == 'paid' %}0{% else %}1{% endif %}"
+            data-amount="{{ order.total_amount|stringformat:'f' }}"
+            data-ts="{{ order.created_at|date:'c' }}"
+            data-table="{{ order.table_id|default_if_none:'' }}"
+            data-active="{% if order.status != 'delivered' and order.status != 'cancelled' and not order.table_released %}1{% else %}0{% endif %}"
+            data-stock-url="{% url 'dashboard:order_stock_check' order.pk %}"
+            data-approve-url="{% url 'dashboard:approve_order' order.pk %}"
+            data-reject-url="{% url 'dashboard:reject_order' order.pk %}"
+            data-cash-url="{% url 'dashboard:mark_cash_received' order.pk %}"
+            data-assign-url="{% url 'dashboard:assign_table' order.pk %}"
+            data-status-url="{% url 'dashboard:api_order_status' order.pk %}">
+          <td><span class="oid js-s">#{{ order.id }}</span></td>
+          <td>
+            <div class="cust"><span class="av">{{ order.user.username|slice:":1" }}</span><span class="js-s">{{ order.user.username }}</span></div>
+          </td>
+          <td>
+            <span class="tbadge js-tb js-s {% if not order.table %}take{% endif %}">{% if order.table %}🪑 #{{ order.table.number }}{% else %}🥡 Takeaway{% endif %}</span>
+            {% if order.status != 'delivered' and order.status != 'cancelled' %}
+            <select class="js-tbl" title="Assign table">
+              <option value="">🥡 Takeaway (no table)</option>
+              {% for t in tables_info %}
+              <option value="{{ t.id }}" data-num="{{ t.number }}" data-busy="{% if t.busy %}1{% else %}0{% endif %}" data-label="Table #{{ t.number }}" {% if order.table_id == t.id %}selected{% endif %}>Table #{{ t.number }}</option>
+              {% endfor %}
+            </select>
+            {% endif %}
+          </td>
+          <td class="js-s">{% for oi in order.items.all %}<span class="it"><b>{{ oi.quantity }}×</b> {{ oi.food_item.name }}</span>{% endfor %}</td>
+          <td class="amt">₹{{ order.total_amount }}</td>
+          <td>
+            {% if order.payment_method == 'online' %}
+              {% if order.payment_status == 'pending' %}<span class="pay warn">💳 Online · unpaid</span>{% else %}<span class="pay ok">💳 Paid Online</span>{% endif %}
+            {% else %}
+              {% if order.payment_status == 'paid' %}<span class="pay ok">💵 Cash received</span>{% else %}<span class="pay cash">💵 Cash pending</span><button type="button" class="mini" data-act="cash">Mark Received</button>{% endif %}
+            {% endif %}
+          </td>
+          <td>
+            {% if order.status == 'pending' and order.payment_status != 'pending' %}
+              <div class="appr-l">WAITING FOR APPROVAL</div>
+              <div class="appr-b">
+                <button type="button" class="ab chk" data-act="check">📦 Check Stock</button>
+                <button type="button" class="ab ok" data-act="approve">✅ Approve</button>
+                <button type="button" class="ab no" data-act="reject">❌ Reject</button>
+              </div>
+            {% else %}
+              <select class="js-status">
+                <option value="pending" {% if order.status == 'pending' %}selected{% endif %}>⏳ Pending</option>
+                <option value="confirmed" {% if order.status == 'confirmed' %}selected{% endif %}>✅ Confirmed</option>
+                <option value="preparing" {% if order.status == 'preparing' %}selected{% endif %}>👨‍🍳 Preparing</option>
+                <option value="ready" {% if order.status == 'ready' %}selected{% endif %}>🛎️ Ready</option>
+                <option value="delivered" {% if order.status == 'delivered' %}selected{% endif %}>📦 Delivered</option>
+                <option value="cancelled" {% if order.status == 'cancelled' %}selected{% endif %}>❌ Cancelled</option>
+              </select>
+            {% endif %}
+            <div class="flow" title="Progress"><i></i><i></i><i></i><i></i></div>
+          </td>
+          <td class="when">{{ order.created_at|date:"d M Y" }}<br>{{ order.created_at|date:"g:i A" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="od-empty" id="odEmpty">😕 Edhuvum kedaikala.</div>
+  <div class="od-more" id="odMore"><button type="button" id="odMoreBtn">Load more</button></div>
+</div>
+
+<div class="md" id="stModal">
+  <div class="md-box">
+    <div class="md-head"><h3 id="stTitle">Stock check</h3><button type="button" class="md-x" id="stClose">✕</button></div>
+    <div class="md-body" id="stBody"></div>
+    <div class="md-foot" id="stFoot"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var CSRF = "{{ csrf_token }}";
+  var body = document.getElementById('ordBody');
+  var state = { filter: 'all', q: '', pay: 'all', sort: 'new', today: false, limit: 30 };
+  var LEVEL = { pending: 0, confirmed: 1, preparing: 2, ready: 3, delivered: 4, cancelled: -1 };
+  var lastMax = 0;
+  var modalRow = null;
+
+  function rows() { return Array.prototype.slice.call(body.querySelectorAll('.od-row')); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function toast(t, s, k) { if (window.showToast) window.showToast(t, s ? esc(s) : '', k); }
+  function f2(n) { return (Math.round(Number(n) * 100) / 100).toFixed(2); }
+
+  /* ---------- paint ---------- */
+  function paintRow(r) {
+    var lv = LEVEL[r.dataset.status]; if (lv === undefined) lv = 0;
+    r.classList.toggle('cancelled', lv < 0);
+    r.classList.toggle('needs', r.dataset.appr === '1');
+    r.querySelectorAll('.flow i').forEach(function (d, i) { d.className = lv > i ? 'done' : ''; });
+  }
+
+  /* ---------- table locking (one table -> one active order) ---------- */
+  function owners() {
+    var o = {};
+    rows().forEach(function (r) { if (r.dataset.table && r.dataset.active === '1') o[r.dataset.table] = r.dataset.id; });
+    return o;
+  }
+  function syncOptions() {
+    var o = owners();
+    rows().forEach(function (r) {
+      var sel = r.querySelector('.js-tbl'); if (!sel) return;
+      Array.prototype.forEach.call(sel.options, function (opt) {
+        if (!opt.value) return;
+        var own = o[opt.value];
+        var mine = r.dataset.table === opt.value;
+        var taken = own && own !== r.dataset.id;
+        var busy = opt.dataset.busy === '1';
+        opt.disabled = !mine && (taken || busy);
+        opt.textContent = opt.dataset.label + (!mine && taken ? '  🔒 Order #' + own : (!mine && busy ? '  📅 Booked' : ''));
+      });
+    });
+  }
+
+  /* ---------- stats / chips ---------- */
+  function stats() {
+    var c = { all: 0, approval: 0, pending: 0, confirmed: 0, preparing: 0, ready: 0, delivered: 0, cancelled: 0 };
+    rows().forEach(function (r) {
+      c.all++;
+      if (r.dataset.appr === '1') c.approval++;
+      else if (r.dataset.status === 'pending') c.pending++;
+      if (c[r.dataset.status] !== undefined && r.dataset.status !== 'pending') c[r.dataset.status]++;
+    });
+    document.getElementById('sTotal').textContent = c.all;
+    document.getElementById('sAppr').textContent = c.approval;
+    document.getElementById('sKitchen').textContent = c.confirmed + c.preparing + c.ready;
+    document.getElementById('sDone').textContent = c.delivered;
+    document.getElementById('sCancel').textContent = c.cancelled;
+    document.getElementById('sApprCard').classList.toggle('pulse', c.approval > 0);
+    document.querySelectorAll('#odChips em').forEach(function (e) { e.textContent = c[e.dataset.c]; });
+  }
+
+  /* ---------- filter / sort / paging ---------- */
+  function textOf(r) {
+    return Array.prototype.map.call(r.querySelectorAll('.js-s'), function (e) { return e.textContent; }).join(' ').toLowerCase().replace(/\s+/g, ' ');
+  }
+  function match(r) {
+    var f = state.filter, st = r.dataset.status;
+    if (f === 'approval' && r.dataset.appr !== '1') return false;
+    if (f === 'pending' && !(st === 'pending' && r.dataset.appr !== '1')) return false;
+    if (['confirmed', 'preparing', 'ready', 'delivered', 'cancelled'].indexOf(f) > -1 && st !== f) return false;
+    if (state.pay === 'online' && r.dataset.method !== 'online') return false;
+    if (state.pay === 'cash' && r.dataset.method !== 'cash') return false;
+    if (state.pay === 'unpaid' && r.dataset.unpaid !== '1') return false;
+    if (state.today && new Date(r.dataset.ts).toDateString() !== new Date().toDateString()) return false;
+    if (state.q && textOf(r).indexOf(state.q) === -1) return false;
+    return true;
+  }
+  function sortRows() {
+    var list = rows();
+    list.sort(function (a, b) {
+      if (state.sort === 'old') return a.dataset.id - b.dataset.id;
+      if (state.sort === 'high') return parseFloat(b.dataset.amount) - parseFloat(a.dataset.amount);
+      if (state.sort === 'low') return parseFloat(a.dataset.amount) - parseFloat(b.dataset.amount);
+      return b.dataset.id - a.dataset.id;
+    });
+    list.forEach(function (r) { body.appendChild(r); });
+  }
+  function apply() {
+    var shown = 0, total = 0;
+    rows().forEach(function (r) {
+      if (match(r)) { total++; if (shown < state.limit) { r.style.display = ''; shown++; } else r.style.display = 'none'; }
+      else r.style.display = 'none';
+    });
+    document.getElementById('odEmpty').style.display = total ? 'none' : 'block';
+    var more = document.getElementById('odMore');
+    more.style.display = total > shown ? 'block' : 'none';
+    document.getElementById('odMoreBtn').textContent = 'Load more (' + (total - shown) + ' remaining)';
+  }
+  function resetLimit() { state.limit = 30; }
+
+  function setChip(f) {
+    state.filter = f; resetLimit();
+    document.querySelectorAll('#odChips .od-chip').forEach(function (c) { c.classList.toggle('on', c.dataset.f === f); });
+    apply();
+  }
+  document.querySelectorAll('#odChips .od-chip').forEach(function (c) { c.addEventListener('click', function () { setChip(c.dataset.f); }); });
+  document.querySelectorAll('.od-stat').forEach(function (c) { c.addEventListener('click', function () { setChip(c.dataset.f); }); });
+  document.getElementById('odSearch').addEventListener('input', function (e) { state.q = e.target.value.trim().toLowerCase(); resetLimit(); apply(); });
+  document.getElementById('odPay').addEventListener('change', function (e) { state.pay = e.target.value; resetLimit(); apply(); });
+  document.getElementById('odSort').addEventListener('change', function (e) { state.sort = e.target.value; sortRows(); apply(); });
+  document.getElementById('odToday').addEventListener('change', function (e) { state.today = e.target.checked; resetLimit(); apply(); });
+  document.getElementById('odMoreBtn').addEventListener('click', function () { state.limit += 30; apply(); });
+
+  /* ---------- init + refresh ---------- */
+  function maxId() { var m = 0; rows().forEach(function (r) { m = Math.max(m, parseInt(r.dataset.id, 10)); }); return m; }
+  function init() { rows().forEach(paintRow); syncOptions(); sortRows(); stats(); apply(); }
+  function stamp() { document.getElementById('odUpdated').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+
+  function refresh(silent) {
+    return fetch(location.href, { credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (html) {
+        var nb = new DOMParser().parseFromString(html, 'text/html').getElementById('ordBody');
+        if (!nb) return;
+        var prev = lastMax;
+        body.innerHTML = nb.innerHTML;
+        init(); stamp();
+        var now = maxId();
+        if (silent && prev && now > prev) {
+          toast('🆕 New order #' + now, 'Approval-ku wait pannuthu', 'good');
+          if (window.beep) window.beep();
+        }
+        lastMax = now;
+      })
+      .catch(function () {});
+  }
+  document.getElementById('odRefresh').addEventListener('click', function () { refresh(false); });
+  setInterval(function () {
+    if (!document.getElementById('odAuto').checked || document.hidden) return;
+    if (modalRow || (document.activeElement && document.activeElement.tagName === 'SELECT')) return;
+    refresh(true);
+  }, 15000);
+
+  /* ---------- network helper ---------- */
+  function post(url, data, json) {
+    var opt = { method: 'POST', headers: { 'X-CSRFToken': CSRF }, credentials: 'same-origin' };
+    if (json) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(json); }
+    else { var fd = new FormData(); Object.keys(data || {}).forEach(function (k) { fd.append(k, data[k]); }); opt.body = fd; }
+    return fetch(url, opt).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); });
+  }
+
+  /* ---------- approve / reject / cash ---------- */
+  function approve(row, force) {
+    post(row.dataset.approveUrl, force ? { force: '1' } : {}).then(function (x) {
+      if (x.d.ok) { toast('✅ Order #' + row.dataset.id + ' approved', 'Kitchen-ku pogudhu', 'good'); closeModal(); refresh(false); }
+      else if (x.d.short) {
+        if (confirm(x.d.error + '\n\nStock kammi. Aanaalum approve pannanuma?')) approve(row, true);
+      } else toast('⚠️ Approve aagala', x.d.error || '', 'alert');
+    }).catch(function () { toast('⚠️ Network error', '', 'alert'); });
+  }
+  function reject(row) {
+    if (!confirm('Order #' + row.dataset.id + ' reject pannanuma?')) return;
+    post(row.dataset.rejectUrl, {}).then(function (x) {
+      if (x.d.ok) { toast('❌ Order #' + row.dataset.id + ' rejected', '', 'alert'); closeModal(); refresh(false); }
+      else toast('⚠️ Reject aagala', x.d.error || '', 'alert');
+    }).catch(function () { toast('⚠️ Network error', '', 'alert'); });
+  }
+  function cash(row) {
+    post(row.dataset.cashUrl, {}).then(function (x) {
+      if (x.d.success) { toast('💵 Cash received', 'Order #' + row.dataset.id, 'good'); refresh(false); }
+      else toast('⚠️ Update aagala', '', 'alert');
+    }).catch(function () { toast('⚠️ Network error', '', 'alert'); });
+  }
+
+  /* ---------- stock modal ---------- */
+  var modal = document.getElementById('stModal');
+  function closeModal() { modal.classList.remove('show'); modalRow = null; }
+  document.getElementById('stClose').addEventListener('click', closeModal);
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+  function openStock(row) {
+    modalRow = row;
+    document.getElementById('stTitle').textContent = '📦 Stock check · Order #' + row.dataset.id;
+    document.getElementById('stBody').innerHTML = '<p style="color:#6b7280">Loading...</p>';
+    document.getElementById('stFoot').innerHTML = '';
+    modal.classList.add('show');
+    fetch(row.dataset.stockUrl, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+      var h = '<h4>Ingredients needed</h4>';
+      if (d.requirements.length) {
+        h += '<div class="rq" style="font-weight:700;color:#6b7280"><span>Item</span><span>Need</span><span>Have</span><span>Status</span></div>';
+        d.requirements.forEach(function (q) {
+          h += '<div class="rq ' + (q.short ? 'short' : '') + '"><span>' + esc(q.name) + '</span><span>' + f2(q.need) + ' ' + esc(q.unit) + '</span><span>' + f2(q.have) + ' ' + esc(q.unit) + '</span><span class="' + (q.short ? '' : 'good') + '">' +
+               (q.short ? '⚠️ Short ' + f2(q.need - q.have) : '✅ OK') + '</span></div>';
+        });
+      } else h += '<p style="color:#6b7280">Recipe set pannala, stock check panna mudiyaadhu.</p>';
+      if (d.no_recipe.length) h += '<div class="md-note" style="margin-top:10px">⚠️ Recipe illaadha items: ' + d.no_recipe.map(esc).join(', ') + '</div>';
+      h += '<h4>Order items · today demand</h4>';
+      d.items.forEach(function (i) {
+        h += '<div class="rq" style="grid-template-columns:1.6fr 1fr 1.6fr"><span><b>' + i.qty + '×</b> ' + esc(i.name) + '</span><span>' + (i.available ? '' : '⛔ Not available') + '</span><span style="color:#6b7280">Today: ' + i.today_qty + ' in ' + i.today_orders + ' orders</span></div>';
+      });
+      document.getElementById('stBody').innerHTML = h;
+      var foot = '<button type="button" class="ab no" id="stCancel">Close</button>';
+      if (row.dataset.appr === '1') foot += '<button type="button" class="ab ok" id="stApprove">✅ Approve</button>';
+      document.getElementById('stFoot').innerHTML = foot;
+      document.getElementById('stCancel').onclick = closeModal;
+      var ap = document.getElementById('stApprove'); if (ap) ap.onclick = function () { approve(row, false); };
+    }).catch(function () { document.getElementById('stBody').innerHTML = '<p style="color:#b91c1c">Load aagala. Thirumba try pannunga.</p>'; });
+  }
+
+  /* ---------- delegated events ---------- */
+  body.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-act]'); if (!b) return;
+    var row = b.closest('.od-row'); var act = b.dataset.act;
+    if (act === 'check') openStock(row);
+    else if (act === 'approve') approve(row, false);
+    else if (act === 'reject') reject(row);
+    else if (act === 'cash') cash(row);
+  });
+
+  body.addEventListener('change', function (e) {
+    var row = e.target.closest('.od-row'); if (!row) return;
+
+    if (e.target.classList.contains('js-tbl')) {
+      var sel = e.target, val = sel.value, before = row.dataset.table;
+      post(row.dataset.assignUrl, { table: val }).then(function (x) {
+        if (x.d.success) {
+          row.dataset.table = val;
+          var tb = row.querySelector('.js-tb');
+          tb.textContent = val ? '🪑 #' + x.d.table : '🥡 Takeaway';
+          tb.classList.toggle('take', !val);
+          syncOptions();
+          toast(val ? '🪑 Table #' + x.d.table + ' assigned' : '🥡 Takeaway', 'Order #' + row.dataset.id + (val ? ' · vera customer-ku ippo kaattaadhu' : ''), 'good');
+        } else {
+          sel.value = before; sel.classList.add('err'); setTimeout(function () { sel.classList.remove('err'); }, 1500);
+          toast('⛔ Table assign aagala', x.d.error || '', 'alert');
+          syncOptions();
+        }
+      }).catch(function () { sel.value = before; toast('⚠️ Network error', '', 'alert'); });
+    }
+
+    if (e.target.classList.contains('js-status')) {
+      var s = e.target, nv = s.value, old = row.dataset.status;
+      post(row.dataset.statusUrl, null, { status: nv }).then(function (x) {
+        if (x.d.ok) {
+          row.dataset.status = nv;
+          row.dataset.active = (nv === 'delivered' || nv === 'cancelled') ? '0' : '1';
+          paintRow(row); syncOptions(); stats(); apply();
+          toast('🔄 Status updated', 'Order #' + row.dataset.id + ' → ' + nv, 'good');
+        } else { s.value = old; toast('⚠️ Status maaralaa', x.d.error || '', 'alert'); }
+      }).catch(function () { s.value = old; toast('⚠️ Network error', '', 'alert'); });
+    }
+  });
+
+  lastMax = maxId();
+  init(); stamp();
+})();
+</script>
+{% endblock %}

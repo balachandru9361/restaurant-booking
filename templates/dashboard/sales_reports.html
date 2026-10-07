@@ -6,7 +6,7 @@
   .page-header p { font-size: 13px; color: #999; margin-top: 3px; }
 
   .btn-export {
-    background: #fff; border: 1.5px solid #e6e6ee; color: #555;
+    background: #fff; border: 1.5px solid #e6e6ee; color: #555; text-decoration: none;
     padding: 10px 18px; border-radius: 10px; font-size: 13.5px; font-weight: 700;
     cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease;
   }
@@ -44,7 +44,7 @@
   .filter-chip {
     padding: 9px 16px; border-radius: 20px; font-size: 13px; font-weight: 700;
     background: #f5f5f8; color: #666; cursor: pointer; border: 1.5px solid transparent;
-    transition: all 0.15s ease; white-space: nowrap;
+    transition: all 0.15s ease; white-space: nowrap; text-decoration: none; display: inline-block;
   }
   .filter-chip.active { background: #1a1a2e; color: #fff; }
   .filter-chip:hover:not(.active) { border-color: #ddd; }
@@ -77,8 +77,6 @@
   table.reports-table tbody tr:hover { background: #fafafb; }
   table.reports-table td { padding: 13px 16px; border-top: 1px solid #f2f2f5; font-size: 14.5px; vertical-align: middle; color: #333; }
   .amount { font-weight: 800; color: #1a1a2e; }
-  .trend-up { color: #2ecc71; font-weight: 700; font-size: 12.5px; }
-  .trend-down { color: #e74c3c; font-weight: 700; font-size: 12.5px; }
 
   .pay-tag {
     display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;
@@ -89,6 +87,7 @@
 
   .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
   .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
+  .table-note { font-size: 12px; color: #9ca3af; margin: 10px 4px 0; }
 
   @media (max-width: 700px) {
     .reports-table-wrap { overflow-x: auto; }
@@ -101,23 +100,29 @@
     <h2>📊 Sales Reports</h2>
     <p>Revenue overview and order performance</p>
   </div>
-  <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+  <a class="btn-export" href="?range={{ range }}&export=csv">⬇ Export CSV ({{ range_label }})</a>
+</div>
+
+<div class="toolbar">
+  {% for key, label in ranges %}
+    <a class="filter-chip{% if range == key %} active{% endif %}" href="?range={{ key }}">{{ label }}</a>
+  {% endfor %}
 </div>
 
 <div class="big-stat-row">
   <div class="big-stat">
     <div class="lbl">💰 Total Revenue</div>
-    <div class="val">₹{{ total_revenue|default:"0" }}</div>
-    <div class="sub">All-time sales</div>
+    <div class="val">₹{{ total_revenue|inr }}</div>
+    <div class="sub">{{ range_label }} sales</div>
   </div>
   <div class="big-stat alt">
     <div class="lbl">🧾 Total Orders</div>
-    <div class="val" id="orderCountVal">{{ total_orders|default:"0" }}</div>
-    <div class="sub">Orders placed so far</div>
+    <div class="val">{{ total_orders }}</div>
+    <div class="sub">{{ range_label }} orders</div>
   </div>
   <div class="big-stat green">
     <div class="lbl">📈 Avg Order Value</div>
-    <div class="val" id="avgOrderVal">₹{{ avg_order_value|default:"0" }}</div>
+    <div class="val">₹{{ avg_order_value|inr }}</div>
     <div class="sub">Per order average</div>
   </div>
 </div>
@@ -125,29 +130,23 @@
 <div class="pay-stat-row">
   <div class="pay-stat">
     <div class="lbl">💳 Online Revenue</div>
-    <div class="val">₹{{ online_revenue|default:"0" }}</div>
-    <div class="sub">{{ online_count|default:"0" }} orders paid online</div>
+    <div class="val">₹{{ online_revenue|inr }}</div>
+    <div class="sub">{{ online_count }} orders paid online</div>
   </div>
   <div class="pay-stat cash">
     <div class="lbl">💵 Cash Collected</div>
-    <div class="val">₹{{ cash_revenue|default:"0" }}</div>
-    <div class="sub">{{ cash_count|default:"0" }} cash orders total</div>
+    <div class="val">₹{{ cash_revenue|inr }}</div>
+    <div class="sub">{{ cash_count }} cash orders collected</div>
   </div>
   <div class="pay-stat pending">
     <div class="lbl">⏳ Cash Pending to Collect</div>
-    <div class="val">₹{{ cash_pending_amount|default:"0" }}</div>
-    <div class="sub">{{ cash_pending_count|default:"0" }} orders not yet collected</div>
+    <div class="val">₹{{ cash_pending_amount|inr }}</div>
+    <div class="sub">{{ cash_pending_count }} orders not yet collected</div>
   </div>
 </div>
 
-<div class="toolbar">
-  <div class="filter-chip active" data-range="all" onclick="setRange('all')">All Time</div>
-  <div class="filter-chip" data-range="week" onclick="setRange('week')">This Week</div>
-  <div class="filter-chip" data-range="month" onclick="setRange('month')">This Month</div>
-</div>
-
 <div class="chart-card">
-  <h3>Revenue by Order (recent)</h3>
+  <h3>Revenue by Order (latest 10 — {{ range_label }})</h3>
   <div class="bar-chart" id="barChart"></div>
 </div>
 
@@ -165,50 +164,45 @@
     </thead>
     <tbody id="reportsTableBody">
       {% for order in recent_orders %}
-      <tr data-amount="{{ order.total_amount }}" data-date="{{ order.created_at|date:'Y-m-d' }}">
+      <tr data-amount="{{ order.total_amount|floatformat:'2' }}">
         <td>#{{ order.id }}</td>
         <td>{{ order.user.get_full_name|default:order.user.username }}</td>
-        <td class="amount">₹{{ order.total_amount }}</td>
+        <td class="amount">₹{{ order.total_amount|inr }}</td>
         <td>
           {% if order.payment_method == 'cash' %}
-            {% if order.payment_status == 'paid' %}
-              <span class="pay-tag cash">Cash</span>
-            {% else %}
+            {% if order.payment_status == 'cash_pending' %}
               <span class="pay-tag cash-pending">Cash Pending</span>
+            {% else %}
+              <span class="pay-tag cash">Cash</span>
             {% endif %}
           {% else %}
             <span class="pay-tag online">Online</span>
           {% endif %}
         </td>
         <td>{{ order.status|title }}</td>
-        <td>{{ order.created_at|date:"d M Y" }}</td>
+        <td>{{ order.created_at|date:"d M Y, h:i A" }}</td>
       </tr>
       {% empty %}
       <tr><td colspan="6">
         <div class="empty-state">
           <div class="big-emoji">📊</div>
-          <p>No order data yet to generate reports.</p>
+          <p>No orders for {{ range_label }} yet.</p>
         </div>
       </td></tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+{% if total_orders > 50 %}
+  <p class="table-note">Showing the latest 50 orders. Use Export CSV to get all {{ total_orders }} orders.</p>
+{% endif %}
 
 <script>
-  const rows = Array.from(document.querySelectorAll('#reportsTableBody tr[data-amount]'));
-  let currentRange = 'all';
-
-  function computeAvg(visibleRows) {
-    if (visibleRows.length === 0) { document.getElementById('avgOrderVal').textContent = '₹0'; return; }
-    const sum = visibleRows.reduce((acc, r) => acc + parseFloat(r.dataset.amount || 0), 0);
-    document.getElementById('avgOrderVal').textContent = '₹' + Math.round(sum / visibleRows.length);
-  }
-
-  function buildChart(visibleRows) {
+  // Chart: latest 10 orders from the table (all totals come from the server)
+  (function () {
+    const rows = Array.from(document.querySelectorAll('#reportsTableBody tr[data-amount]'));
     const chart = document.getElementById('barChart');
-    chart.innerHTML = '';
-    const recent = visibleRows.slice(0, 10).reverse();
+    const recent = rows.slice(0, 10).reverse();
     if (recent.length === 0) {
       chart.innerHTML = '<p style="color:#bbb; font-size:13px; margin:auto;">No data to chart yet.</p>';
       return;
@@ -225,46 +219,6 @@
       `;
       chart.appendChild(col);
     });
-  }
-
-  function applyRange() {
-    const now = new Date();
-    let cutoff = null;
-    if (currentRange === 'week') { cutoff = new Date(now); cutoff.setDate(now.getDate() - 7); }
-    if (currentRange === 'month') { cutoff = new Date(now); cutoff.setMonth(now.getMonth() - 1); }
-
-    const visible = [];
-    rows.forEach(row => {
-      const d = new Date(row.dataset.date);
-      const show = !cutoff || d >= cutoff;
-      row.style.display = show ? '' : 'none';
-      if (show) visible.push(row);
-    });
-    document.getElementById('orderCountVal').textContent = visible.length;
-    computeAvg(visible);
-    buildChart(visible);
-  }
-
-  function setRange(r) {
-    currentRange = r;
-    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.range === r));
-    applyRange();
-  }
-
-  applyRange();
-
-  function exportCSV() {
-    let csv = 'Order ID,Customer,Amount,Payment,Status,Date\n';
-    rows.forEach(r => {
-      if (r.style.display === 'none') return;
-      const cells = r.querySelectorAll('td');
-      csv += `"${cells[0].innerText}","${cells[1].innerText}","${cells[2].innerText}","${cells[3].innerText}","${cells[4].innerText}","${cells[5].innerText}"\n`;
-    });
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'sales_report.csv';
-    link.click();
-  }
+  })();
 </script>
 {% endblock %}

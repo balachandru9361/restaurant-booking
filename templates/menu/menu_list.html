@@ -443,65 +443,6 @@
         margin-bottom: 12px;
     }
 
-    .item-card-qty {
-        display: flex;
-        align-items: center;
-        border: 1.5px solid #e5e7eb;
-        border-radius: 30px;
-        overflow: hidden;
-        margin-bottom: 12px;
-        width: fit-content;
-    }
-
-    .item-card-qty button {
-        width: 32px;
-        height: 32px;
-        border: none;
-        background: #f9fafb;
-        font-weight: 700;
-        cursor: pointer;
-        color: #1f2937;
-        -webkit-tap-highlight-color: transparent;
-        touch-action: manipulation;
-    }
-
-    .item-card-qty button:hover {
-        background: #ffe0d6;
-        color: #ff6b6b;
-    }
-
-    .item-card-qty button:active {
-        background: #ff6b6b;
-        color: #fff;
-    }
-
-    .item-card-qty input {
-        width: 36px;
-        text-align: center;
-        border: none;
-        font-weight: 700;
-        font-size: 0.9rem;
-        transition: transform 0.18s ease;
-    }
-
-    @keyframes qtyPop {
-        0% {
-            transform: scale(1);
-        }
-
-        40% {
-            transform: scale(1.35);
-        }
-
-        100% {
-            transform: scale(1);
-        }
-    }
-
-    .item-card-qty input.qty-pop {
-        animation: qtyPop 0.28s ease;
-    }
-
     .item-card-actions {
         display: flex;
         gap: 10px;
@@ -539,6 +480,11 @@
         transform: scale(0.97);
     }
 
+    .btn-cart:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
     .btn-view {
         background: #fff;
         border: 1.5px solid #1f2937 !important;
@@ -554,6 +500,57 @@
     .btn-view:active {
         background: #e5e7eb;
         transform: scale(0.97);
+    }
+
+    /* In-card quantity stepper (shown after item is added to cart) */
+    .card-qty {
+        display: none;
+        flex: 1;
+        align-items: center;
+        justify-content: space-between;
+        border: 1.5px solid #1f2937;
+        border-radius: 30px;
+        background: #1f2937;
+        color: #fff;
+        overflow: hidden;
+        animation: fadeUpIn 0.2s ease both;
+    }
+
+    .add-to-cart-form.in-cart .card-qty {
+        display: flex;
+    }
+
+    .add-to-cart-form.in-cart .btn-cart {
+        display: none;
+    }
+
+    .card-qty button {
+        width: 38px;
+        height: 38px;
+        border: none;
+        background: transparent;
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 800;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    .card-qty button:hover {
+        background: #ff6b6b;
+    }
+
+    .card-qty button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .card-qty .cq-num {
+        font-weight: 800;
+        font-size: 0.95rem;
+        min-width: 24px;
+        text-align: center;
     }
 
     .empty-msg {
@@ -628,13 +625,168 @@
         border: 1px solid #555;
     }
 
-    @media (hover: none) and (pointer: coarse) {
-        .item-card-qty button {
-            width: 42px;
-            height: 42px;
-            font-size: 1.2rem;
-        }
+    /* ===== RIGHT SIDE CART PANEL (Amazon style) ===== */
+    :root {
+        --cp-top: 72px;   /* navbar height: adjust if your navbar is taller/shorter */
+        --cp-width: 130px;
+    }
 
+    #menuMain {
+        transition: padding-right 0.25s ease;
+    }
+
+    body.has-cart-panel #menuMain {
+        padding-right: var(--cp-width);
+    }
+
+    .cart-panel {
+        display: none;
+        position: fixed;
+        right: 0;
+        top: var(--cp-top);
+        width: var(--cp-width);
+        height: calc(100vh - var(--cp-top));
+        background: #fff;
+        border-left: 1px solid #e5e7eb;
+        box-shadow: -4px 0 14px rgba(0, 0, 0, 0.06);
+        overflow-y: auto;
+        padding: 12px 8px 24px;
+        text-align: center;
+        z-index: 90;
+        box-sizing: border-box;
+    }
+
+    .cart-panel.active {
+        display: block;
+        animation: fadeUpIn 0.25s ease both;
+    }
+
+    .cart-panel .cp-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #1f2937;
+    }
+
+    .cart-panel .cp-subtotal {
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #e63946;
+        margin-bottom: 8px;
+        word-break: break-word;
+    }
+
+    .cart-panel .cp-go {
+        display: block;
+        padding: 7px 4px;
+        border: 1.5px solid #1f2937;
+        border-radius: 30px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #1f2937;
+        text-decoration: none;
+        margin-bottom: 14px;
+        transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .cart-panel .cp-go:hover {
+        background: #1f2937;
+        color: #fff;
+        text-decoration: none;
+    }
+
+    .cp-item {
+        padding-bottom: 14px;
+        margin-bottom: 14px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .cp-item img {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+        border-radius: 10px;
+        display: block;
+        margin: 0 auto 6px;
+    }
+
+    .cp-price {
+        font-size: 0.85rem;
+        font-weight: 800;
+        color: #1f2937;
+        margin-bottom: 6px;
+    }
+
+    .cp-qty {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        border: 2px solid #fbbf24;
+        border-radius: 30px;
+        padding: 2px 4px;
+        background: #fff;
+    }
+
+    .cp-qty button {
+        width: 24px;
+        height: 24px;
+        border: none;
+        background: transparent;
+        font-weight: 800;
+        font-size: 0.95rem;
+        line-height: 1;
+        cursor: pointer;
+        color: #1f2937;
+        border-radius: 50%;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    .cp-qty button:hover {
+        background: #ffe0d6;
+        color: #e63946;
+    }
+
+    .cp-qty button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .cp-qty span {
+        min-width: 18px;
+        font-size: 0.85rem;
+        font-weight: 800;
+    }
+
+    /* Small "Added to cart" toast */
+    .cart-toast {
+        position: fixed;
+        top: calc(var(--cp-top) + 12px);
+        right: 16px;
+        background: #1f2937;
+        color: #fff;
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        z-index: 9998;
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+        transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .cart-toast.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .cart-toast.error {
+        background: #b91c1c;
+    }
+
+    @media (hover: none) and (pointer: coarse) {
         .select-tick {
             width: 30px;
             height: 30px;
@@ -645,10 +797,28 @@
             padding: 13px 0;
             font-size: 0.9rem;
         }
+
+        .cp-qty button {
+            width: 28px;
+            height: 28px;
+        }
     }
 
     /* ===== MOBILE FIXES ===== */
     @media (max-width: 500px) {
+        :root {
+            --cp-width: 92px;
+        }
+
+        .cp-item img {
+            width: 62px;
+            height: 62px;
+        }
+
+        .cart-panel .cp-go {
+            font-size: 0.7rem;
+        }
+
         .menu-hero {
             padding: 24px 16px 16px;
         }
@@ -751,9 +921,9 @@
         .menu-hero,
         .search-section,
         .bulk-select-bar.active,
+        .cart-panel.active,
         .menu-category,
-        .item-card,
-        .item-card-qty input.qty-pop {
+        .item-card {
             animation: none !important;
             transition: none !important;
             opacity: 1 !important;
@@ -761,6 +931,8 @@
         }
     }
 </style>
+
+<div id="menuMain">
 
 <div class="menu-hero">
     <div class="icon">🍽️</div>
@@ -815,19 +987,18 @@
             <div class="item-card-body">
                 <h3>{{ item.name }}</h3>
                 <p class="description">{{ item.description|truncatewords:15 }}</p>
-                <p class="price">₹{{ item.price }}</p>
+                <p class="price">₹{{ item.price|inr }}</p>
 
-                <form method="post" action="{% url 'orders:add_to_cart' item.id %}">
+                <form method="post" action="{% url 'orders:add_to_cart' item.id %}" class="add-to-cart-form" data-item-id="{{ item.id }}">
                     {% csrf_token %}
-                    <div class="item-card-qty">
-                        <button type="button" onclick="stepQty(this, -1)">−</button>
-
-                        <input type="number" name="quantity" value="0" min="0" max="200" readonly>
-
-                        <button type="button" onclick="stepQty(this, 1)">+</button>
-                    </div>
+                    <input type="hidden" name="quantity" value="1">
                     <div class="item-card-actions">
                         <button type="submit" class="btn-cart">Add to Cart</button>
+                        <div class="card-qty" data-cart-id="" data-qty="0">
+                            <button type="button" data-step="minus" aria-label="Decrease">−</button>
+                            <span class="cq-num">0</span>
+                            <button type="button" data-step="plus" aria-label="Increase">+</button>
+                        </div>
                         <a href="{% url 'item_detail' item.id %}" class="btn-view">View</a>
                     </div>
                 </form>
@@ -845,6 +1016,18 @@
 
 <div class="no-results" id="noResults">😕 No dishes found matching your search.</div>
 
+</div><!-- /#menuMain -->
+
+<!-- Right side cart panel -->
+<aside id="cartPanel" class="cart-panel" aria-label="Your cart">
+    <div class="cp-label">Subtotal</div>
+    <div class="cp-subtotal" id="cpSubtotal">₹0.00</div>
+    <a href="{% url 'orders:view_cart' %}" class="cp-go">Go to Cart</a>
+    <div id="cpItems"></div>
+</aside>
+
+<div class="cart-toast" id="cartToast"></div>
+
 <div class="bulk-select-bar" id="bulkBar">
     <span class="count" id="selectedCount">0 items selected</span>
     <button class="btn-add-selected" id="addSelectedBtn" onclick="addSelectedToCart()">Add Selected to Cart</button>
@@ -860,21 +1043,6 @@
             document.body.appendChild(bar);
         }
     })();
-
-    function stepQty(btn, delta) {
-        const input = btn.parentElement.querySelector('input');
-
-        let val = parseInt(input.value, 10) || 0;
-
-        val = Math.min(200, Math.max(0, val + delta));
-
-        input.value = val;
-
-        // ===== Qty stepper bounce feedback =====
-        input.classList.remove('qty-pop');
-        void input.offsetWidth;
-        input.classList.add('qty-pop');
-    }
 
     function updateBulkBar() {
         const checked = document.querySelectorAll('.item-select-checkbox:checked');
@@ -919,16 +1087,214 @@
         return cookieValue;
     }
 
+    // =====================================================
+    // SIDE CART PANEL (Add to Cart without leaving the page)
+    // =====================================================
+
+    // The "0" is a placeholder item id, replaced with the real id in urlFor()
+    const CART_URLS = {
+        update: "{% url 'orders:update_cart_qty' 0 %}",
+        remove: "{% url 'orders:remove_from_cart' 0 %}",
+        data: "{% url 'orders:cart_data' %}"
+    };
+    const NO_IMAGE = "{% static 'images/no-image.png' %}";
+
+    function urlFor(template, id) {
+        return template.replace(/0(\/?)$/, id + '$1');
+    }
+
+    function csrfToken() {
+        return getCookie('csrftoken') || '{{ csrf_token }}';
+    }
+
+    function postForm(url, data) {
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken(),
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: new URLSearchParams(data || {})
+        }).then(function (res) {
+            return res.json();
+        });
+    }
+
+    function formatMoney(value) {
+        const n = Number(value);
+        if (isNaN(n)) return '₹' + value;
+        return '₹' + n.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text == null ? '' : String(text);
+        return div.innerHTML;
+    }
+
+    let toastTimer = null;
+    function showToast(message, isError) {
+        const toast = document.getElementById('cartToast');
+        toast.textContent = message;
+        toast.classList.toggle('error', !!isError);
+        toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () {
+            toast.classList.remove('show');
+        }, 2000);
+    }
+
+    // Swap "Add to Cart" button <-> quantity stepper on each menu card
+    function syncCards(data) {
+        const map = {};
+        if (data && data.success && data.items) {
+            data.items.forEach(function (i) {
+                const menuId = (i.item_id !== undefined && i.item_id !== null) ? i.item_id : i.id;
+                map[String(menuId)] = {cartId: i.id, quantity: i.quantity};
+            });
+        }
+
+        document.querySelectorAll('.add-to-cart-form').forEach(function (form) {
+            const entry = map[form.dataset.itemId];
+            const stepper = form.querySelector('.card-qty');
+            if (!stepper) return;
+
+            if (entry) {
+                stepper.dataset.cartId = entry.cartId;
+                stepper.dataset.qty = entry.quantity;
+                stepper.querySelector('.cq-num').textContent = entry.quantity;
+                stepper.querySelector('[data-step="minus"]').textContent = entry.quantity <= 1 ? '🗑' : '−';
+                form.classList.add('in-cart');
+            } else {
+                form.classList.remove('in-cart');
+            }
+        });
+    }
+
+    // + / − buttons on the menu cards
+    document.addEventListener('click', function (e) {
+        const btn = e.target.closest('.card-qty button');
+        if (!btn) return;
+
+        const stepper = btn.closest('.card-qty');
+        const id = stepper.dataset.cartId;
+        const qty = parseInt(stepper.dataset.qty, 10) || 1;
+
+        let request;
+        if (btn.dataset.step === 'plus') {
+            request = postForm(urlFor(CART_URLS.update, id), {action: 'inc'});
+        } else if (qty <= 1) {
+            request = postForm(urlFor(CART_URLS.remove, id));
+        } else {
+            request = postForm(urlFor(CART_URLS.update, id), {action: 'dec'});
+        }
+
+        btn.disabled = true;
+        request.then(function (data) {
+            btn.disabled = false;
+            renderCartPanel(data);
+        }).catch(function (err) {
+            console.error(err);
+            btn.disabled = false;
+            showToast('Could not update cart. Try again.', true);
+        });
+    });
+
+    function renderCartPanel(data) {
+        const panel = document.getElementById('cartPanel');
+        syncCards(data);
+
+        if (!data || !data.success || !data.items || data.items.length === 0) {
+            panel.classList.remove('active');
+            document.body.classList.remove('has-cart-panel');
+            document.getElementById('cpItems').innerHTML = '';
+            return;
+        }
+
+        document.getElementById('cpSubtotal').textContent = formatMoney(data.subtotal);
+
+        document.getElementById('cpItems').innerHTML = data.items.map(function (i) {
+            const img = i.image_url || NO_IMAGE;
+            const isOne = i.quantity <= 1;
+            return '' +
+                '<div class="cp-item" data-id="' + i.id + '">' +
+                '<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(i.name) + '" title="' + escapeHtml(i.name) + '">' +
+                '<div class="cp-price">' + formatMoney(i.price) + '</div>' +
+                '<div class="cp-qty">' +
+                '<button type="button" data-action="' + (isOne ? 'remove' : 'dec') + '" aria-label="' + (isOne ? 'Remove' : 'Decrease') + '">' +
+                (isOne ? '🗑' : '−') + '</button>' +
+                '<span>' + i.quantity + '</span>' +
+                '<button type="button" data-action="inc" aria-label="Increase">+</button>' +
+                '</div>' +
+                '</div>';
+        }).join('');
+
+        panel.classList.add('active');
+        document.body.classList.add('has-cart-panel');
+    }
+
+    // + / - / delete buttons inside the panel
+    document.getElementById('cpItems').addEventListener('click', function (e) {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+
+        const itemEl = btn.closest('.cp-item');
+        const id = itemEl.dataset.id;
+        const action = btn.dataset.action;
+
+        btn.disabled = true;
+
+        const request = action === 'remove'
+            ? postForm(urlFor(CART_URLS.remove, id))
+            : postForm(urlFor(CART_URLS.update, id), {action: action});
+
+        request.then(renderCartPanel).catch(function (err) {
+            console.error(err);
+            btn.disabled = false;
+            showToast('Could not update cart. Try again.', true);
+        });
+    });
+
+    function refreshCartPanel() {
+        fetch(CART_URLS.data, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            .then(function (res) { return res.json(); })
+            .then(renderCartPanel)
+            .catch(function (err) { console.error(err); });
+    }
+
+    // "Add to Cart" buttons: stay on this page, update the side panel (always adds 1)
+    document.querySelectorAll('.add-to-cart-form').forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const btn = form.querySelector('.btn-cart');
+            btn.disabled = true;
+
+            postForm(form.action, {quantity: 1})
+                .then(function (data) {
+                    btn.disabled = false;
+                    if (data.success) {
+                        renderCartPanel(data);
+                        showToast(data.message || 'Item added to cart!');
+                    } else {
+                        showToast(data.error || 'Could not add item.', true);
+                    }
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    btn.disabled = false;
+                    showToast('Failed to add item. Please try again.', true);
+                });
+        });
+    });
+
     function addSelectedToCart() {
         const checked = document.querySelectorAll('.item-select-checkbox:checked');
         if (checked.length === 0) return;
 
         const items = Array.from(checked).map(cb => {
-            const card = cb.closest('.item-card');
-            const qtyInput = card.querySelector('.item-card-qty input');
-            let qty = parseInt(qtyInput.value, 10) || 0;
-            if (qty < 1) qty = 1;
-            return {id: cb.dataset.id, quantity: qty};
+            return {id: cb.dataset.id, quantity: 1};
         });
 
         const btn = document.getElementById('addSelectedBtn');
@@ -939,17 +1305,20 @@
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
+                'X-CSRFToken': csrfToken()
             },
             body: JSON.stringify({items: items})
         })
             .then(response => response.json())
             .then(data => {
+                btn.disabled = false;
+                btn.textContent = 'Add Selected to Cart';
                 if (data.success) {
-                    window.location.href = "{% url 'orders:view_cart' %}";
+                    // Stay on the menu page: clear the selection and refresh the side panel
+                    clearSelection();
+                    refreshCartPanel();
+                    showToast(data.added_count + ' item' + (data.added_count !== 1 ? 's' : '') + ' added to cart!');
                 } else {
-                    btn.disabled = false;
-                    btn.textContent = 'Add Selected to Cart';
                     alert('Error: ' + (data.error || 'Something went wrong'));
                 }
             })
@@ -961,7 +1330,9 @@
             });
     }
 
-    // ===== Search + Category filter (combined) =====
+    // Fill the panel when the page loads (if the cart already has items)
+    refreshCartPanel();
+
     // ===== Search + Category filter =====
 
     const searchInput = document.getElementById('menuSearch');
@@ -1153,11 +1524,6 @@
             activeCategory =
                 this.getAttribute('data-target');
 
-
-            console.log(
-                'Selected category:',
-                activeCategory
-            );
             applyFilters();
 
         });

@@ -1,0 +1,35 @@
+{% extends 'store/store_base.html' %}
+{% block title %}Update Stock - {{ item.name }}{% endblock %}
+{% block content %}
+<h1>Update Stock: {{ item.name }}</h1>
+<div class="card" style="max-width:560px">
+  <p style="margin-top:0">Current stock: <strong style="font-size:1.3rem">{{ item.current_stock|floatformat:"-3" }} {{ item.unit }}</strong>
+    {% if item.is_out %}<span class="badge out">Out</span>{% elif item.is_low %}<span class="badge low">Low</span>{% endif %}</p>
+
+  <form method="post">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="field">
+      <label>What happened?</label>
+      <div class="radio-row">
+        {% for value, text in form.fields.movement_type.choices %}
+          <label><input type="radio" name="movement_type" value="{{ value }}" {% if form.movement_type.value == value or not form.movement_type.value and forloop.first %}checked{% endif %}> {{ text }}</label>
+        {% endfor %}
+      </div>
+      {{ form.movement_type.errors }}
+    </div>
+    <div class="field">
+      <label for="id_quantity">Quantity ({{ item.unit }})</label>
+      <input type="number" step="0.001" min="0" name="quantity" id="id_quantity" value="{{ form.quantity.value|default_if_none:'' }}" required>
+      <div class="help">For "Correction", enter the exact quantity you counted on the shelf.</div>
+      {{ form.quantity.errors }}
+    </div>
+    <div class="field">
+      <label for="id_note">Note (optional)</label>
+      <input type="text" name="note" id="id_note" maxlength="200" value="{{ form.note.value|default_if_none:'' }}" placeholder="e.g. Bought from Ravi Traders / Spoiled / Monthly count">
+    </div>
+    <button class="btn" type="submit">Save</button>
+    <a class="btn light" href="{% url 'store:item_list' %}">Cancel</a>
+  </form>
+</div>
+{% endblock %}
