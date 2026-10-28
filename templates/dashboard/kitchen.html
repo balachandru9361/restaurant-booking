@@ -282,6 +282,26 @@
     gap: 8px;
   }
 
+  /* --- Chef name (which chef took this order) --- */
+  .chef-line {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #eef2ff;
+    color: #3730a3;
+    border: 1px solid #c7d2fe;
+    border-radius: 20px;
+    padding: 3px 12px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .chef-line .chef-label {
+    font-weight: 600;
+    opacity: 0.75;
+  }
+  #kdsRoot:fullscreen .chef-line { font-size: 16px; padding: 4px 14px; }
+
   /* --- Table badge --- */
   .order-table-badge {
     display: inline-flex;
@@ -434,14 +454,68 @@
     80% { transform: rotate(5deg); }
   }
 
+  /* --- Ready-by estimate --- */
+  .eta-select {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0 8px;
+    margin-right: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #92650a;
+    background: #fff;
+    cursor: pointer;
+  }
+  .eta-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #fff4d6;
+    color: #92650a;
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin-bottom: 10px;
+    font-size: 12.5px;
+    font-weight: 700;
+  }
+  .eta-line.overdue { background: #fee2e2; color: #991b1b; }
+  #kdsRoot:fullscreen .eta-line { font-size: 16px; padding: 8px 12px; }
+  #kdsRoot:fullscreen .eta-select { font-size: 16px; }
+
+  /* --- Display Mode (fullscreen kitchen display) --- */
+  #kdsRoot:fullscreen {
+    background: #0b1424;
+    overflow-y: auto;
+    padding: 22px 28px;
+  }
+  #kdsRoot:fullscreen .kitchen-header h1 { color: #fff; font-size: 32px; }
+  #kdsRoot:fullscreen .kitchen-header p { color: #9fb0c8; }
+  #kdsRoot:fullscreen .kitchen-toolbar { display: none; }
+  #kdsRoot:fullscreen .stat-num { font-size: 30px; }
+  #kdsRoot:fullscreen .stat-label { font-size: 14px; }
+  #kdsRoot:fullscreen .kitchen-column { background: #14223a; min-height: calc(100vh - 260px); }
+  #kdsRoot:fullscreen .kitchen-column-header h3 { color: #fff; font-size: 20px; }
+  #kdsRoot:fullscreen .order-card { padding: 18px; }
+  #kdsRoot:fullscreen .order-id { font-size: 22px; }
+  #kdsRoot:fullscreen .order-user { font-size: 16px; }
+  #kdsRoot:fullscreen .order-items { font-size: 17px; }
+  #kdsRoot:fullscreen .order-items li { padding: 5px 0; }
+  #kdsRoot:fullscreen .order-total { font-size: 17px; }
+  #kdsRoot:fullscreen .order-time-badge { font-size: 14px; padding: 4px 10px; }
+  #kdsRoot:fullscreen .order-action-btn,
+  #kdsRoot:fullscreen .btn-waiting { font-size: 17px; padding: 14px; }
+  #kdsRoot:fullscreen .empty-col { color: #6b7f9c; }
+
   @media print {
     .kitchen-header, .kitchen-stats, .kitchen-toolbar, .order-actions, .admin-sidebar, #toastStack { display: none !important; }
   }
 </style>
 
-<div id="toastStack"></div>
-
 {% include "includes/thermal_print.html" %}
+
+<div id="kdsRoot">
+<div id="toastStack"></div>
 
 <div class="kitchen-header">
   <div>
@@ -450,6 +524,7 @@
   </div>
   <div style="display:flex; gap:10px; align-items:center;">
     <div class="sound-toggle" id="soundToggle" onclick="toggleSound()">🔔 <span id="soundToggleLabel">Sound On</span></div>
+    <div class="sound-toggle" id="kdsToggle" onclick="toggleKds()">📺 <span id="kdsToggleLabel">Display Mode</span></div>
     <div class="live-badge"><span class="live-dot"></span> Live</div>
     <div class="kitchen-clock"><span class="dot"></span> <span id="liveClock"></span></div>
   </div>
@@ -476,9 +551,9 @@
 
 <div class="kitchen-toolbar">
   <div class="kitchen-search">
-    <input type="text" id="orderSearch" placeholder="Search by Order # or customer name..." onkeyup="filterOrders()">
+    <input type="text" id="orderSearch" placeholder="Search by Order #, customer or chef name..." onkeyup="filterOrders()">
   </div>
-  <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Now</button>
+  <button class="refresh-btn" onclick="refreshBoard()">🔄 Refresh Now</button>
   <span class="refresh-timer" id="refreshTimer">Full refresh in <span id="countdown">5</span>s</span>
 </div>
 
@@ -490,7 +565,7 @@
       <span class="kitchen-count">{{ confirmed_orders|length }}</span>
     </div>
     {% for order in confirmed_orders %}
-      <div class="order-card" data-order-id="{{ order.id }}" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
+      <div class="order-card" data-order-id="{{ order.id }}" data-time="{{ order.created_at|date:'c' }}" data-asap="{% if order.arrival_time %}0{% else %}1{% endif %}" data-arrival="{% if order.arrival_time %}{{ order.arrival_time|date:'c' }}{% endif %}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
         <div class="order-card-top">
           <span class="order-id">Order #{{ order.id }}</span>
           <span class="order-time-badge"><span class="time-ago">just now</span><span class="urgent-flag">⏰ Urgent</span></span>
@@ -504,15 +579,25 @@
           {% endif %}
         </div>
         {% include 'dashboard/_order_meta.html' %}
+        {% if order.status == 'preparing' and order.ready_by %}
+          <div class="eta-line" data-ready-by="{{ order.ready_by|date:'c' }}">⏱️ <span class="eta-text"></span></div>
+        {% endif %}
         <ul class="order-items">
           {% for item in order.items.all %}
-            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span>{% if item.options_text %}<small style="display:block;font-size:.8em;font-weight:600;color:#d97706;margin-top:2px">{{ item.options_text }}</small>{% endif %}</li>
           {% endfor %}
         </ul>
         <div class="order-total">₹{{ order.total_amount|inr }}</div>
         <div class="order-actions">
           <form method="post" action="{% url 'dashboard:update_order_status' order.id 'preparing' %}">
             {% csrf_token %}
+            <select name="eta_minutes" class="eta-select" aria-label="Ready in (minutes)" title="Ready in how many minutes?">
+              <option value="10">10 min</option>
+              <option value="15">15 min</option>
+              <option value="20" selected>20 min</option>
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+            </select>
             <button type="submit" class="order-action-btn btn-to-preparing">Start Preparing →</button>
           </form>
           <a href="#" onclick="printKitchenTicket(this); return false;" class="order-action-btn btn-print" title="Print ticket">🖨️</a>
@@ -529,7 +614,7 @@
       <span class="kitchen-count">{{ preparing_orders|length }}</span>
     </div>
     {% for order in preparing_orders %}
-      <div class="order-card" data-order-id="{{ order.id }}" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
+      <div class="order-card" data-order-id="{{ order.id }}" data-time="{{ order.created_at|date:'c' }}" data-asap="{% if order.arrival_time %}0{% else %}1{% endif %}" data-arrival="{% if order.arrival_time %}{{ order.arrival_time|date:'c' }}{% endif %}" data-search="order #{{ order.id }} {{ order.user.username|lower }}{% if order.prepared_by %} {{ order.prepared_by.username|lower }}{% endif %}">
         <div class="order-card-top">
           <span class="order-id">Order #{{ order.id }}</span>
           <span class="order-time-badge"><span class="time-ago">just now</span><span class="urgent-flag">⏰ Urgent</span></span>
@@ -542,10 +627,16 @@
             {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
           {% endif %}
         </div>
+        {% if order.prepared_by %}
+          <div class="chef-line">👨‍🍳 <span class="chef-label">Cooking:</span> {{ order.prepared_by.get_full_name|default:order.prepared_by.username }}</div>
+        {% endif %}
         {% include 'dashboard/_order_meta.html' %}
+        {% if order.status == 'preparing' and order.ready_by %}
+          <div class="eta-line" data-ready-by="{{ order.ready_by|date:'c' }}">⏱️ <span class="eta-text"></span></div>
+        {% endif %}
         <ul class="order-items">
           {% for item in order.items.all %}
-            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span>{% if item.options_text %}<small style="display:block;font-size:.8em;font-weight:600;color:#d97706;margin-top:2px">{{ item.options_text }}</small>{% endif %}</li>
           {% endfor %}
         </ul>
         <div class="order-total">₹{{ order.total_amount|inr }}</div>
@@ -568,7 +659,7 @@
       <span class="kitchen-count">{{ ready_orders|length }}</span>
     </div>
     {% for order in ready_orders %}
-      <div class="order-card" data-order-id="{{ order.id }}" data-time="{{ order.created_at|date:'c' }}" data-search="order #{{ order.id }} {{ order.user.username|lower }}">
+      <div class="order-card" data-order-id="{{ order.id }}" data-time="{{ order.created_at|date:'c' }}" data-asap="{% if order.arrival_time %}0{% else %}1{% endif %}" data-arrival="{% if order.arrival_time %}{{ order.arrival_time|date:'c' }}{% endif %}" data-search="order #{{ order.id }} {{ order.user.username|lower }}{% if order.prepared_by %} {{ order.prepared_by.username|lower }}{% endif %}">
         <div class="order-card-top">
           <span class="order-id">Order #{{ order.id }}</span>
           <span class="order-time-badge"><span class="time-ago">just now</span></span>
@@ -581,10 +672,16 @@
             {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
           {% endif %}
         </div>
+        {% if order.prepared_by %}
+          <div class="chef-line">👨‍🍳 <span class="chef-label">Prepared by:</span> {{ order.prepared_by.get_full_name|default:order.prepared_by.username }}</div>
+        {% endif %}
         {% include 'dashboard/_order_meta.html' %}
+        {% if order.status == 'preparing' and order.ready_by %}
+          <div class="eta-line" data-ready-by="{{ order.ready_by|date:'c' }}">⏱️ <span class="eta-text"></span></div>
+        {% endif %}
         <ul class="order-items">
           {% for item in order.items.all %}
-            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+            <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span>{% if item.options_text %}<small style="display:block;font-size:.8em;font-weight:600;color:#d97706;margin-top:2px">{{ item.options_text }}</small>{% endif %}</li>
           {% endfor %}
         </ul>
         <div class="order-total">₹{{ order.total_amount|inr }}</div>
@@ -599,6 +696,7 @@
   </div>
 
 </div>
+</div>
 
 <script>
   // Live clock
@@ -609,7 +707,7 @@
   setInterval(updateClock, 1000);
   updateClock();
 
-  // Time-ago + urgency coloring (OK < 15min, WARN 15-30min, LATE/URGENT 30+min)
+  // Time-ago + urgency coloring (OK < 10min, WARN 10-15min, LATE/URGENT 15+min)
   function updateTimeAgo() {
     document.querySelectorAll('.order-card').forEach(card => {
       const created = new Date(card.getAttribute('data-time'));
@@ -617,9 +715,9 @@
       const badge = card.querySelector('.time-ago');
 
       card.classList.remove('urgency-ok', 'urgency-warn', 'urgency-late');
-      if (diffMin < 15) {
+      if (diffMin < 10) {
         card.classList.add('urgency-ok');
-      } else if (diffMin < 30) {
+      } else if (diffMin < 15) {
         card.classList.add('urgency-warn');
       } else {
         card.classList.add('urgency-late');
@@ -632,6 +730,49 @@
   }
   updateTimeAgo();
   setInterval(updateTimeAgo, 5000);
+  sortCards();
+
+  // "Ready in N min" countdown on Preparing cards
+  function updateEta() {
+    document.querySelectorAll('.eta-line').forEach(el => {
+      const due = new Date(el.dataset.readyBy);
+      const left = Math.round((due - new Date()) / 60000);
+      const clock = due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const text = el.querySelector('.eta-text');
+      el.classList.toggle('overdue', left < 0);
+      if (left > 0) {
+        text.textContent = 'Ready in ' + left + ' min (promised ' + clock + ')';
+      } else if (left === 0) {
+        text.textContent = 'Due now (promised ' + clock + ')';
+      } else {
+        text.textContent = 'Overdue by ' + (-left) + ' min (promised ' + clock + ')';
+      }
+    });
+  }
+  updateEta();
+  setInterval(updateEta, 10000);
+
+  // Priority order inside each column: ASAP orders first (oldest first),
+  // then orders with an arrival time (soonest first).
+  function sortCards() {
+    document.querySelectorAll('.kitchen-column').forEach(col => {
+      const cards = Array.from(col.querySelectorAll('.order-card'));
+      if (cards.length < 2) return;
+      const info = c => ({
+        asap: c.dataset.asap === '1',
+        arrival: c.dataset.arrival ? new Date(c.dataset.arrival).getTime() : 0,
+        created: new Date(c.dataset.time).getTime()
+      });
+      cards.sort((a, b) => {
+        const x = info(a);
+        const y = info(b);
+        if (x.asap !== y.asap) return x.asap ? -1 : 1;
+        if (!x.asap && x.arrival !== y.arrival) return x.arrival - y.arrival;
+        return x.created - y.created;
+      });
+      cards.forEach(c => col.appendChild(c));
+    });
+  }
 
   // Search filter
   function filterOrders() {
@@ -878,7 +1019,7 @@
 
   // Chrome/browser autoplay policy blocks audio (beep + speech) until the
   // page has had at least one real user gesture (click/tap/keypress).
-  // Because this dashboard auto-reloads every few seconds, each fresh reload
+  // Because this dashboard reloads when orders change, each fresh reload
   // starts "locked" again — so a new order arriving before the chef
   // clicks anything would play silently. This unlocks audio on the very
   // first interaction so all later beeps/voice announcements work.
@@ -907,22 +1048,196 @@
   renderSoundToggle();
   checkForNewOrders();
 
-  // Full board refresh every 5 seconds (columns, stats, everything).
-  // Paused while a thermal ticket is being printed so the reload can't cut it off.
-  let seconds = 5;
-  const countdownEl = document.getElementById('countdown');
-  setInterval(() => {
+  // ---- Live board refresh (WebSocket push, polling as a fallback) ----
+  // The board is refreshed in place (no page reload), so Display Mode stays
+  // fullscreen, audio stays unlocked and the search box keeps its text.
+  const POLL_FALLBACK = 5;    // seconds, used when the socket is down
+  const POLL_CONNECTED = 60;  // seconds, safety net while the socket is up
+  let wsConnected = false;
+  let seconds = POLL_FALLBACK;
+  let refreshing = false;
+  let refreshQueued = false;
+  let refreshDebounce = null;
+  let etaTouchedAt = 0;
+  ['focusin', 'change'].forEach(evt => {
+    document.addEventListener(evt, (e) => {
+      if (e.target.classList && e.target.classList.contains('eta-select')) {
+        etaTouchedAt = Date.now();
+      }
+    });
+  });
+  const refreshTimerEl = document.getElementById('refreshTimer');
+
+  function updateTimerLabel() {
+    if (wsConnected) {
+      refreshTimerEl.textContent = 'Live updates on';
+    } else {
+      refreshTimerEl.innerHTML = 'Auto refresh in <span id="countdown">' + seconds + '</span>s';
+    }
+  }
+
+  async function refreshBoard() {
+    // Never touch the page while a thermal ticket is being printed.
     if (window.thermalPrinting) {
-      seconds = 5;
-      countdownEl.textContent = seconds;
+      setTimeout(refreshBoard, 1000);
       return;
     }
+    // Leave the board alone for a few seconds after the chef touches a minutes selector.
+    if (Date.now() - etaTouchedAt < 8000) {
+      setTimeout(refreshBoard, 2000);
+      return;
+    }
+    if (refreshing) {
+      refreshQueued = true;
+      return;
+    }
+    refreshing = true;
+    try {
+      const res = await fetch(window.location.href, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const newBoard = doc.querySelector('.kitchen-board');
+      const newStats = doc.querySelector('.kitchen-stats');
+      if (!newBoard || !newStats) {
+        // Probably logged out: let the browser follow the redirect.
+        window.location.reload();
+        return;
+      }
+      document.querySelector('.kitchen-board').replaceWith(newBoard);
+      document.querySelector('.kitchen-stats').replaceWith(newStats);
+      updateTimeAgo();
+      updateEta();
+      sortCards();
+      filterOrders();
+      checkForNewOrders();
+    } catch (err) {
+      /* network hiccup: the next refresh will try again */
+    } finally {
+      refreshing = false;
+      seconds = wsConnected ? POLL_CONNECTED : POLL_FALLBACK;
+      if (refreshQueued) {
+        refreshQueued = false;
+        scheduleRefresh();
+      }
+    }
+  }
+
+  // Debounce: one order save can fire several events in a row.
+  function scheduleRefresh() {
+    clearTimeout(refreshDebounce);
+    refreshDebounce = setTimeout(refreshBoard, 300);
+  }
+
+  // Status buttons (Start Preparing / Mark Ready) are sent in the background
+  // so the page does not reload and Display Mode is not interrupted.
+  document.addEventListener('submit', async (e) => {
+    const form = e.target;
+    if (!form.closest || !form.closest('.order-actions')) return;
+    e.preventDefault();
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+    }
+    try {
+      const res = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      await refreshBoard();
+    } catch (err) {
+      form.submit(); // fall back to a normal form post
+    }
+  });
+
+  function connectOrdersSocket() {
+    const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    let retry = 0;
+
+    function open() {
+      const ws = new WebSocket(`${proto}://${window.location.host}/ws/orders/`);
+
+      ws.onopen = () => {
+        wsConnected = true;
+        retry = 0;
+        seconds = POLL_CONNECTED;
+        updateTimerLabel();
+        refreshBoard(); // catch up on anything missed while disconnected
+      };
+
+      ws.onmessage = (e) => {
+        let data;
+        try { data = JSON.parse(e.data); } catch (err) { return; }
+        if (data.type === 'orders_changed') scheduleRefresh();
+      };
+
+      ws.onclose = () => {
+        wsConnected = false;
+        seconds = POLL_FALLBACK;
+        updateTimerLabel();
+        setTimeout(open, Math.min(1000 * 2 ** retry++, 15000));
+      };
+    }
+    open();
+  }
+
+  setInterval(() => {
     seconds--;
     if (seconds <= 0) {
-      location.reload();
-    } else {
-      countdownEl.textContent = seconds;
+      seconds = wsConnected ? POLL_CONNECTED : POLL_FALLBACK;
+      refreshBoard();
+      return;
+    }
+    if (!wsConnected) {
+      const el = document.getElementById('countdown');
+      if (el) el.textContent = seconds;
     }
   }, 1000);
+
+  connectOrdersSocket();
+
+  // ---- Display Mode (fullscreen kitchen display) ----
+  let wakeLock = null;
+
+  async function setWakeLock(on) {
+    try {
+      if (on && 'wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+      } else if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+      }
+    } catch (err) { /* not supported or denied: safe to ignore */ }
+  }
+
+  function toggleKds() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+      return;
+    }
+    const root = document.getElementById('kdsRoot');
+    if (root && root.requestFullscreen) {
+      root.requestFullscreen().catch(() => {});
+    }
+  }
+
+  document.addEventListener('fullscreenchange', () => {
+    const on = !!document.fullscreenElement;
+    document.getElementById('kdsToggleLabel').textContent = on ? 'Exit Display' : 'Display Mode';
+    setWakeLock(on);
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.fullscreenElement && document.visibilityState === 'visible') {
+      setWakeLock(true);
+    }
+  });
 </script>
 {% endblock %}

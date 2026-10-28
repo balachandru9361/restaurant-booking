@@ -327,7 +327,7 @@
     <div class="auth-form">
         <div class="auth-icon">🔐</div>
         <h1>Welcome Back</h1>
-        <p class="auth-subtitle">Login to continue to My Restaurant</p>
+        <p class="auth-subtitle">Login with your phone number</p>
 
         <form method="post" id="loginForm">
             {% csrf_token %}
@@ -347,11 +347,9 @@
                 </div>
             {% endfor %}
 
-            <div class="form-extra">
-                <label class="remember-me">
-                    <input type="checkbox" name="remember_me">
-                    Remember me
-                </label>
+            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+            <div class="form-extra" style="justify-content: flex-end;">
                 <a href="{% url 'accounts:password_reset' %}" class="forgot-link">Forgot password?</a>
             </div>
 
@@ -363,7 +361,7 @@
 
         <div class="divider">or</div>
 
-        <p>Don't have an account? <a href="{% url 'accounts:signup' %}">Sign up</a></p>
+        <p>Don't have an account? <a href="{% url 'accounts:signup' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Sign up</a></p>
     </div>
 </div>
 

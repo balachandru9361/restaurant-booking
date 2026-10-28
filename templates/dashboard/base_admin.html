@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block messages %}{% endblock %}
 {% block content %}
 <style>
   .admin-wrapper {
@@ -95,6 +96,11 @@
     box-shadow: 0 4px 10px rgba(246,58,58,0.4);
   }
 
+  /* NEW: links added by the Alt + Shift + S shortcut get a dashed border so you can tell they are the hidden ones */
+  .admin-nav a.secret-injected:not(.active) {
+    border: 1px dashed rgba(255,255,255,0.25);
+  }
+
   .admin-logout {
     margin-top: 20px;
     border-top: 1px solid rgba(255,255,255,0.1);
@@ -121,6 +127,75 @@
     flex: 1;
     padding: 30px 35px;
     min-width: 0;
+  }
+
+  /* NEW: styled Django messages (success / error / warning / info) */
+  .admin-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .admin-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 13px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    border-left: 5px solid #3498db;
+    background: #e8f4fd;
+    color: #1b5e8a;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    animation: alertIn 0.3s ease;
+    transition: opacity 0.4s ease;
+  }
+  .admin-alert.success { background: #e6f9ef; color: #1e7a4a; border-left-color: #2bb673; }
+  .admin-alert.error   { background: #ffe9e9; color: #b42323; border-left-color: #F63A3A; }
+  .admin-alert.warning { background: #fff6dd; color: #8a6100; border-left-color: #f39c12; }
+  .admin-alert .alert-icon { font-size: 16px; line-height: 1.3; }
+  .admin-alert .alert-text { flex: 1; }
+  .admin-alert .alert-close {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 16px;
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 0 2px;
+    line-height: 1;
+  }
+  .admin-alert .alert-close:hover { opacity: 1; }
+  @keyframes alertIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* live connection indicator in the sidebar */
+  .live-pill {
+    margin-top: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    align-self: flex-start;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: #d0d0e0;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .live-pill .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #e0a800;
+  }
+  .live-pill[data-state="live"] .dot { background: #2bb673; box-shadow: 0 0 0 0 rgba(43,182,115,0.6); animation: livePulse 1.8s infinite; }
+  .live-pill[data-state="poll"] .dot { background: #e0a800; }
+  @keyframes livePulse {
+    0%   { box-shadow: 0 0 0 0 rgba(43,182,115,0.55); }
+    70%  { box-shadow: 0 0 0 7px rgba(43,182,115,0); }
+    100% { box-shadow: 0 0 0 0 rgba(43,182,115,0); }
   }
 
   /* nav badge for unread admin notifications */
@@ -173,6 +248,9 @@
   }
   .live-toast.alert { border-left-color: #F63A3A; }
   .live-toast.good { border-left-color: #2bb673; }
+  .live-toast.expired, .live-toast.spoiled { border-left-color: #7c3aed; }
+  .live-toast.urgent { border-left-color: #f59e0b; }
+  .live-toast.quality { border-left-color: #0ea5e9; }
   .live-toast small { display: block; font-weight: 400; color: #a0a0c0; margin-top: 2px; }
   @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
 </style>
@@ -194,7 +272,7 @@
       </div>
     </div>
 
-    <div class="admin-nav">
+    <div class="admin-nav" id="adminNav">
       {% if request.user.is_superuser %}
         <a href="{% url 'dashboard:admin_home' %}" class="{% if request.resolver_match.url_name == 'admin_home' %}active{% endif %}">📊 Dashboard</a>
         <a href="{% url 'dashboard:admin_home' %}#serviceUpdates" id="navServiceUpdates">🔔 Service Updates <span class="nav-badge" id="notifBadge">0</span></a>
@@ -208,13 +286,18 @@
         <a href="{% url 'dashboard:kitchen_dashboard' %}" class="{% if request.resolver_match.url_name == 'kitchen_dashboard' %}active{% endif %}">👨‍🍳 Kitchen</a>
         <a href="{% url 'dashboard:server_dashboard' %}" class="{% if request.resolver_match.url_name == 'server_dashboard' %}active{% endif %}">🛎️ Server</a>
         <a href="{% url 'dashboard:sales_reports' %}" class="{% if request.resolver_match.url_name == 'sales_reports' %}active{% endif %}">📈 Sales / Reports</a>
+        <!-- <a href="{% url 'store:dashboard' %}">🛒 Store Dashboard</a> -->
       {% elif request.user.profile.role == 'server' %}
         <a href="{% url 'dashboard:server_dashboard' %}" class="{% if request.resolver_match.url_name == 'server_dashboard' %}active{% endif %}">🛎️ Server</a>
       {% else %}
         <a href="{% url 'dashboard:kitchen_dashboard' %}" class="{% if request.resolver_match.url_name == 'kitchen_dashboard' %}active{% endif %}">👨‍🍳 Kitchen</a>
-        <a href="{% url 'dashboard:kitchen_stock' %}" class="{% if request.resolver_match.url_name == 'kitchen_stock' %}active{% endif %}">🚫 Out of Stock</a>
-        <a href="{% url 'dashboard:kitchen_stock_update' %}" class="{% if request.resolver_match.url_name == 'kitchen_stock_update' %}active{% endif %}">📦 Stock Update</a>
+        <!-- <a href="{% url 'dashboard:kitchen_stock' %}" class="{% if request.resolver_match.url_name == 'kitchen_stock' %}active{% endif %}">🚫 Out of Stock</a>
+        <a href="{% url 'dashboard:kitchen_stock_update' %}" class="{% if request.resolver_match.url_name == 'kitchen_stock_update' %}active{% endif %}">📦 Stock Update</a> -->
       {% endif %}
+    </div>
+
+    <div class="live-pill" id="livePill" data-state="poll">
+      <span class="dot"></span><span id="livePillText">Connecting</span>
     </div>
 
     <div class="admin-logout">
@@ -222,12 +305,95 @@
     </div>
   </nav>
 
+  {# NEW: Alt + Shift + S adds / removes the hidden menu links. The commented-out lines above stay hidden as they are. State is kept for this browser tab only. #}
+  <script>
+    (function () {
+      var nav = document.getElementById('adminNav');
+      if (!nav) return;
+      var KEY = 'showSecretMenu';
+
+      // The hidden links for each role (the same ones that are commented out above)
+      var ITEMS = [
+        {% if request.user.is_superuser %}
+        { href: "{% url 'store:dashboard' %}", label: "🛒 Store Dashboard" },
+        {% elif request.user.profile.role == 'server' %}
+        {% else %}
+        { href: "{% url 'dashboard:kitchen_stock' %}", label: "🚫 Out of Stock" },
+        { href: "{% url 'dashboard:kitchen_stock_update' %}", label: "📦 Stock Update" },
+        {% endif %}
+      ];
+      if (!ITEMS.length) return;
+
+      function isShown() { return nav.querySelector('a.secret-injected') !== null; }
+
+      function show() {
+        if (isShown()) return;
+        ITEMS.forEach(function (it) {
+          var a = document.createElement('a');
+          a.href = it.href;
+          a.textContent = it.label;
+          a.className = 'secret-injected';
+          if (a.pathname === location.pathname) a.classList.add('active');
+          nav.appendChild(a);
+        });
+      }
+
+      function hide() {
+        nav.querySelectorAll('a.secret-injected').forEach(function (a) { a.remove(); });
+      }
+
+      // If you are on one of the hidden pages, its link stays visible even without the shortcut
+      var onHiddenPage = ITEMS.some(function (it) {
+        var a = document.createElement('a'); a.href = it.href;
+        return a.pathname === location.pathname;
+      });
+
+      try {
+        if (sessionStorage.getItem(KEY) === '1' || onHiddenPage) show();
+      } catch (e) { if (onHiddenPage) show(); }
+
+      document.addEventListener('keydown', function (e) {
+        if (e.altKey && e.shiftKey && e.code === 'KeyS') {
+          e.preventDefault();
+          var on;
+          if (isShown()) { hide(); on = false; } else { show(); on = true; }
+          try { sessionStorage.setItem(KEY, on ? '1' : '0'); } catch (err) { /* ignore */ }
+          if (window.showToast) {
+            window.showToast(on ? '🔓 Hidden menu shown' : '🔒 Hidden menu hidden', '', '');
+          }
+        }
+      });
+    })();
+  </script>
+
   <main class="admin-main">
+    {% if messages %}
+    <div class="admin-messages">
+      {% for message in messages %}
+      <div class="admin-alert {{ message.tags }}" role="alert">
+        <span class="alert-icon">{% if 'success' in message.tags %}✅{% elif 'error' in message.tags %}⛔{% elif 'warning' in message.tags %}⚠️{% else %}ℹ️{% endif %}</span>
+        <span class="alert-text">{{ message }}</span>
+        <button type="button" class="alert-close" aria-label="Close" onclick="this.parentElement.remove();">&times;</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     {% block admin_content %}{% endblock %}
   </main>
 </div>
 
 <div id="liveToasts"></div>
+
+<script>
+  // ---- NEW: messages fade out by themselves after 6 seconds ----
+  (function () {
+    document.querySelectorAll('.admin-alert').forEach(function (el) {
+      setTimeout(function () { el.style.opacity = '0'; }, 6000);
+      setTimeout(function () { if (el.parentElement) el.remove(); }, 6500);
+    });
+  })();
+</script>
 
 <script>
   // ---- shared helpers for live messages ----
@@ -241,10 +407,23 @@
     setTimeout(() => el.remove(), 7500);
   };
 
-  window.beep = function () {
+  // CHANGED: every kitchen report option has its own beep pattern (frequencies played one after another).
+  // beep() with no argument still plays the old two-tone sound, so other pages keep working.
+  const BEEP_PATTERNS = {
+    default:      [660, 880],
+    out_of_stock: [660, 880],
+    finished:     [660, 520],
+    expired:      [440, 440, 440],
+    spoiled:      [330, 260, 200],
+    urgent:       [880, 1100, 880, 1100, 880],
+    quality:      [700, 500, 700]
+  };
+
+  window.beep = function (reason) {
     try {
+      const freqs = BEEP_PATTERNS[reason] || BEEP_PATTERNS.default;
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      [660, 880].forEach((freq, i) => {
+      freqs.forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.frequency.value = freq;
@@ -255,6 +434,17 @@
         osc.start(t); osc.stop(t + 0.16);
       });
     } catch (e) { /* browser blocked audio until first click - toast still shows */ }
+  };
+
+  // NEW: short spoken line (browser voice). Silent if the browser has no speech support.
+  window.speakAlert = function (text) {
+    try {
+      if (!window.speechSynthesis || !text) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 1;
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* ignore */ }
   };
 
   // Re-fetch this page and swap only the #liveRegion block (no full reload)
@@ -270,6 +460,142 @@
     } catch (e) { /* try again on next poll */ }
   };
 </script>
+
+{# Shared live-update client for admin and store pages. Include once per base template. #}
+<script>
+  (function () {
+    // Kitchen and Server pages already have their own live logic, so they are skipped here.
+    var SKIP = {% if request.resolver_match.url_name == 'kitchen_dashboard' or request.resolver_match.url_name == 'server_dashboard' %}true{% else %}false{% endif %};
+
+    var pill = document.getElementById('livePill');
+    var pillText = document.getElementById('livePillText');
+    function setState(state, text) {
+      if (!pill) return;
+      pill.setAttribute('data-state', state);
+      if (pillText) pillText.textContent = text;
+    }
+
+    // ---- restore scroll position after a soft reload ----
+    try {
+      var saved = JSON.parse(sessionStorage.getItem('liveScroll') || 'null');
+      if (saved && saved.url === location.pathname + location.search) {
+        sessionStorage.removeItem('liveScroll');
+        window.addEventListener('load', function () { window.scrollTo(0, saved.y); });
+      }
+    } catch (e) { /* storage not available */ }
+
+    // ---- never refresh while someone is filling a POST form ----
+    var dirty = false;
+    document.addEventListener('input', function (e) {
+      var f = e.target && e.target.closest ? e.target.closest('form') : null;
+      if (f && (f.method || '').toLowerCase() === 'post') dirty = true;
+    });
+
+    function isBusy() {
+      if (dirty) return true;
+      if (typeof window.liveBusy === 'function' && window.liveBusy()) return true;
+      var a = document.activeElement;
+      if (a && (a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable)) return true;
+      if (a && a.tagName === 'INPUT' && a.type !== 'checkbox' && a.type !== 'radio' && a.type !== 'button' && a.type !== 'submit') return true;
+      if (document.querySelector('.modal.show, .modal.open, .modal.active, dialog[open], [aria-modal="true"]:not([hidden])')) return true;
+      return false;
+    }
+
+    var timer = null;
+    function tryRefresh() {
+      if (SKIP) return;
+      if (document.hidden || isBusy()) {
+        clearTimeout(timer);
+        timer = setTimeout(tryRefresh, 3000);
+        return;
+      }
+      // Pages with a #liveRegion block swap only that block.
+      if (document.getElementById('liveRegion') && typeof window.refreshLive === 'function') {
+        window.refreshLive();
+        return;
+      }
+      // Pages can provide their own refresh function.
+      if (typeof window.onLiveUpdate === 'function') {
+        window.onLiveUpdate();
+        return;
+      }
+      // Default: reload the same page with a GET request (never re-submits a form).
+      try {
+        sessionStorage.setItem('liveScroll', JSON.stringify({
+          url: location.pathname + location.search,
+          y: window.scrollY
+        }));
+      } catch (e) { /* ignore */ }
+      location.assign(location.pathname + location.search);
+    }
+
+    function requestRefresh(delay) {
+      clearTimeout(timer);
+      timer = setTimeout(tryRefresh, delay || 900);
+    }
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) requestRefresh(400);
+    });
+
+    // ---- fallback when WebSockets are not available (for example on PythonAnywhere) ----
+    var fallbackTimer = null;
+    function startFallback() {
+      if (fallbackTimer || SKIP) return;
+      fallbackTimer = setInterval(function () { requestRefresh(100); }, 20000);
+    }
+    function stopFallback() {
+      if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
+    }
+
+    // ---- WebSocket ----
+    var ws = null;
+    var tries = 0;
+
+    function connect() {
+      var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      try {
+        ws = new WebSocket(proto + location.host + '/ws/orders/');
+      } catch (e) {
+        setState('poll', 'Auto refresh');
+        startFallback();
+        return;
+      }
+
+      ws.onopen = function () {
+        tries = 0;
+        setState('live', 'Live');
+        stopFallback();
+      };
+
+      ws.onmessage = function (ev) {
+        var data = null;
+        try { data = JSON.parse(ev.data); } catch (e) { return; }
+        if (data && data.type === 'orders_changed') requestRefresh(900);
+      };
+
+      ws.onclose = function (ev) {
+        setState('poll', 'Auto refresh');
+        startFallback();
+        if (ev && ev.code === 4403) return;   // not allowed on the socket, do not retry
+        tries += 1;
+        setTimeout(connect, Math.min(30000, 2000 * tries));
+      };
+
+      ws.onerror = function () {
+        try { ws.close(); } catch (e) { /* ignore */ }
+      };
+    }
+
+    if (!SKIP) {
+      setState('poll', 'Connecting');
+      connect();
+    } else {
+      setState('live', 'Live');
+    }
+  })();
+</script>
+
 
 {% if request.user.is_superuser %}
 <script>
@@ -320,7 +646,7 @@
 
 {% if not request.user.is_superuser and request.user.profile.role != 'server' %}
 <script>
-  // ---- Kitchen: live "admin restocked" notification ----
+  // ---- Kitchen: live "store restocked" notification ----
   (function () {
     const KEY = 'kitchenLastStockInId';
 
@@ -357,7 +683,9 @@
           }
           if (data.stock_in_id > parseInt(stored, 10)) {
             localStorage.setItem(KEY, data.stock_in_id);
-            alertToast('📦 Stock updated by admin', data.stock_in_message);
+            // CHANGED: the store does the restock (not the admin), so the title says Store
+            var restocked = (data.stock_in_message || '').indexOf('restocked') !== -1;
+            alertToast(restocked ? '📦 Store restocked an item' : '📋 Store updated stock', data.stock_in_message);
             if (typeof beep === 'function') beep();
           }
         })
@@ -371,10 +699,50 @@
 
 {% if request.user.is_superuser %}
 <script>
-  // ---- Admin: live "order served" messages (stock related toasts skipped) ----
+  // ---- Admin: live "order served" messages + kitchen reports ----
   (function () {
     const KEY = 'lastSeenNotificationId';
     const badge = document.getElementById('notifBadge');
+
+    // CHANGED: the kitchen report message says which option the chef clicked, e.g.
+    // "🚫 Kitchen → Store: Tomato is expired (0 kg left). Please restock."
+    // Find that option here so each one gets its own title, beep and voice line.
+    const STOCK_PHRASES = [
+      ['out_of_stock', 'is out of stock'],
+      ['finished',     'is finished'],
+      ['expired',      'is expired'],
+      ['spoiled',      'is spoiled'],
+      ['urgent',       'is needed URGENTLY'],
+      ['quality',      'has a quality issue']
+    ];
+    const STOCK_TITLE = {
+      out_of_stock: '🚫 Kitchen → Store: out of stock report',
+      finished:     '🚫 Kitchen → Store: item finished',
+      expired:      '⏰ Kitchen → Store: item EXPIRED',
+      spoiled:      '🤢 Kitchen → Store: item SPOILED',
+      urgent:       '🔥 URGENT: kitchen needs stock',
+      quality:      '⚠️ Kitchen → Store: quality issue'
+    };
+    const STOCK_VOICE = {
+      out_of_stock: function (n) { return n + ' is out of stock'; },
+      finished:     function (n) { return n + ' is finished'; },
+      expired:      function (n) { return n + ' is expired'; },
+      spoiled:      function (n) { return n + ' is spoiled'; },
+      urgent:       function (n) { return 'Urgent. ' + n + ' is needed urgently'; },
+      quality:      function (n) { return n + ' has a quality issue'; }
+    };
+
+    function stockReason(msg) {
+      msg = msg || '';
+      for (let i = 0; i < STOCK_PHRASES.length; i++) {
+        if (msg.indexOf(' ' + STOCK_PHRASES[i][1] + ' (') !== -1) return STOCK_PHRASES[i][0];
+      }
+      return 'out_of_stock';
+    }
+    function stockName(msg) {
+      const m = /Store:\s*(.+?)\s+(?:is out of stock|is finished|is expired|is spoiled|is needed URGENTLY|has a quality issue)/i.exec(msg || '');
+      return m ? m[1] : null;
+    }
 
     function poll() {
       fetch("{% url 'dashboard:notifications_poll' %}", { credentials: 'same-origin' })
@@ -392,12 +760,20 @@
           if (data.latest_id > parseInt(stored, 10)) {
             localStorage.setItem(KEY, data.latest_id);
             // admin only watches: show every kind of update as a toast
-            var title = '🛎️ Order served', tone = '';
-            if (data.latest_kind === 'stock_out') { title = '🚫 Kitchen → Store: out of stock report'; tone = 'alert'; }
+            var title = '🛎️ Order served', tone = '', reason = null;
+            if (data.latest_kind === 'stock_out') {
+              reason = stockReason(data.latest_message);
+              title = STOCK_TITLE[reason];
+              tone = reason === 'out_of_stock' || reason === 'finished' ? 'alert' : reason;
+            }
             else if (data.latest_kind === 'stock_in') { title = '📦 Store → Kitchen: restocked'; tone = 'good'; }
             else if (data.latest_kind === 'stock') { title = '📋 Kitchen stock update'; }
             showToast(title, data.latest_message, tone);
-            beep();
+            beep(reason);                                   // CHANGED: pattern depends on the option
+            if (reason) {
+              const name = stockName(data.latest_message);
+              if (name) speakAlert(STOCK_VOICE[reason](name));
+            }
             refreshLive();
           }
         })

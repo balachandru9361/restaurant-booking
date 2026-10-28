@@ -1,32 +1,155 @@
-{% extends 'store/store_base.html' %}
+{% extends "store/store_base.html" %}
 {% block title %}{{ cfg.title }}{% endblock %}
 {% block content %}
-<h1>{{ cfg.title }}</h1>
-<p class="muted">{{ cfg.hint }}</p>
+<style>
+.mv{--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;color:var(--ink)}
+.mv *{box-sizing:border-box}
+.mv .hd{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;margin-bottom:18px}
+.mv h1{margin:0;font-size:26px;display:flex;align-items:center;gap:12px}
+.mv .ico{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;background:color-mix(in srgb,var(--acc) 14%,#fff)}
+.mv .hd p{margin:6px 0 0;color:var(--mut);font-size:14px}
+.mv .add{background:var(--acc);color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:11px 20px;border-radius:12px;box-shadow:0 6px 16px color-mix(in srgb,var(--acc) 35%,transparent);transition:.2s}
+.mv .add:hover{transform:translateY(-2px)}
+.mv .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:16px}
+.mv .card{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(20,30,60,.05)}
+.mv .st{padding:16px 18px;border-left:4px solid var(--acc)}
+.mv .st small{display:block;color:var(--mut);font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px}
+.mv .st b{font-size:22px}
+.mv .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:16px 18px;border-bottom:1px solid var(--bd)}
+.mv input#q{flex:1 1 260px;width:auto;margin:0;color:var(--ink);background:#fff;min-width:200px;border:1px solid var(--bd);border-radius:10px;padding:10px 14px;font-size:14px}
+.mv input#q:focus,.mv select:focus{outline:2px solid color-mix(in srgb,var(--acc) 40%,transparent);border-color:var(--acc)}
+.mv select{width:auto;margin:0;color:var(--ink);border:1px solid var(--bd);border-radius:10px;padding:10px;font-size:13px;background:#fff}
+.mv .seg{display:inline-flex;background:#f2f3f7;border-radius:10px;padding:3px}
+.mv .seg button{border:0;background:none;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:600;color:var(--mut);cursor:pointer}
+.mv .seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.mv .btn{width:auto;margin:0;color:var(--ink)!important;border:1px solid var(--bd);background:#fff;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center}
+.mv .btn:hover{background:#f7f8fb}
+.mv .tw{overflow:auto;max-height:640px}
+.mv table{width:100%;border-collapse:collapse;font-size:14px;min-width:820px}
+.mv th{position:sticky;top:0;background:#fafbfd;text-align:left;font-size:11px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase;padding:12px 14px;border-bottom:1px solid var(--bd);z-index:1}
+.mv td{padding:12px 14px;border-bottom:1px solid var(--bd);vertical-align:middle}
+.mv tbody tr{transition:.15s}.mv tbody tr:hover{background:#fafbff}
+.mv .dt b{display:block;font-weight:600}.mv .dt small{color:var(--mut);font-size:12px}
+.mv .it{display:flex;align-items:center;gap:11px;font-weight:600}
+.mv .av{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+.mv .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:22px;flex:none}
+.mv .ph{width:42px;height:42px;object-fit:cover;border-radius:12px;flex:none;border:1px solid var(--bd)}
+.mv .av.sm{width:26px;height:26px;border-radius:50%;font-size:11px}
+.mv .by{display:flex;align-items:center;gap:8px;color:var(--mut)}
+.mv .tag{font-size:11px;font-weight:700;padding:4px 10px;border-radius:99px;white-space:nowrap}
+.mv .tag.IN{background:#dcfce7;color:#15803d}.mv .tag.OUT{background:#dbeafe;color:#1d4ed8}
+.mv .tag.DAMAGE{background:#fee2e2;color:#b91c1c}.mv .tag.EXPIRY{background:#f3e8ff;color:#7e22ce}.mv .tag.ADJUST{background:#f1f5f9;color:#475569}
+.mv .qty{font-weight:700;padding:4px 10px;border-radius:8px;white-space:nowrap}
+.mv .qty.up{background:#f0fdf4;color:#16a34a}.mv .qty.dn{background:#fef2f2;color:#dc2626}
+.mv .note{color:var(--mut);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mv .empty{display:none;text-align:center;padding:50px 10px;color:var(--mut)}
+.mv .empty div{font-size:40px;margin-bottom:6px}
+.mv .ft{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;color:var(--mut);font-size:13px}
+</style>
 
-<form method="get" class="toolbar">
-  <input type="text" name="q" value="{{ q }}" placeholder="Search item...">
-  <button class="btn" type="submit">Search</button>
-  <a class="btn light" href="{% url cfg.list_url %}">Reset</a>
-  <a class="btn" href="{% url cfg.add_url %}" style="margin-left:auto">➕ Add {{ cfg.title }}</a>
-</form>
+<div class="mv" style="--acc:{% if cfg.title == 'Stock In' %}#16a34a{% elif cfg.title == 'Stock Out' %}#f59e0b{% else %}#dc2626{% endif %}">
+  <div class="hd">
+    <div>
+      <h1><span class="ico">{% if cfg.title == 'Stock In' %}📥{% elif cfg.title == 'Stock Out' %}📤{% else %}🗑️{% endif %}</span>{{ cfg.title }}</h1>
+      <p>{{ cfg.hint }}</p>
+    </div>
+    <a class="add" href="{% url cfg.add_url %}">＋ Add {{ cfg.title }}</a>
+  </div>
 
-<div class="card table-wrap">
-  <table>
-    <tr><th>Date</th><th>Item</th><th>Type</th><th>Quantity</th><th>Stock after</th><th>Note</th><th>By</th></tr>
-    {% for m in rows %}
-    <tr>
-      <td>{{ m.created_at|date:"d M Y, H:i" }}</td>
-      <td>{{ m.item.name }}</td>
-      <td><span class="badge">{{ m.movement_type }}</span></td>
-      <td>{{ m.change|floatformat:"-3" }} {{ m.item.unit }}</td>
-      <td>{{ m.stock_after|floatformat:"-3" }} {{ m.item.unit }}</td>
-      <td>{{ m.note }}</td>
-      <td>{{ m.created_by.username|default:"-" }}</td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="7" class="muted">No entries yet.</td></tr>
-    {% endfor %}
-  </table>
+  <div class="stats" id="stats"></div>
+
+  <div class="card">
+    <div class="bar">
+      <input id="q" placeholder="🔍 Search item, note or user…" value="{{ q }}">
+      <div class="seg" id="range">
+        <button class="on" data-d="0">All</button><button data-d="1">Today</button><button data-d="7">7 days</button><button data-d="30">30 days</button>
+      </div>
+      {% if cfg.reasons %}
+      <div class="seg" id="types">
+        <button class="on" data-t="">Both</button>{% for v, l in cfg.reasons %}<button data-t="{{ v }}">{{ l }}</button>{% endfor %}
+      </div>
+      {% endif %}
+      <select id="sort">
+        <option value="new">Newest first</option><option value="old">Oldest first</option>
+        <option value="val">Highest value</option><option value="name">Item A–Z</option>
+      </select>
+      <button class="btn" id="csv">⬇ CSV</button>
+    </div>
+
+    <div class="tw">
+      <table>
+        <thead><tr><th>Date</th><th>Item</th><th>Type</th><th>Quantity</th><th>Stock after</th><th>Value</th><th>Note</th><th>By</th></tr></thead>
+        <tbody id="tb">
+        {% for r in rows %}
+          <tr data-ts="{{ r.created_at|date:'U' }}" data-type="{{ r.movement_type }}"
+              data-val="{% if r.value is not None %}{{ r.value|stringformat:'f' }}{% endif %}"
+              data-name="{{ r.item.name }}" data-unit="{{ r.item.unit }}" data-qty="{{ r.change|stringformat:'f' }}"
+              data-after="{{ r.stock_after|stringformat:'f' }}" data-note="{{ r.note }}"
+              data-user="{{ r.created_by.username }}" data-date="{{ r.created_at|date:'d M Y H:i' }}"
+              data-s="{{ r.item.name|lower }} {{ r.note|lower }} {{ r.created_by.username|lower }}">
+            <td class="dt"><b>{{ r.created_at|date:"d M Y" }}</b><small>{{ r.created_at|date:"h:i A" }}</small></td>
+            <td><div class="it">{% if r.item.image %}<img class="ph" src="{{ r.item.image.url }}" alt="">{% else %}<span class="ic" data-n="{{ r.item.name }}"></span>{% endif %}{{ r.item.name }}</div></td>
+            <td><span class="tag {{ r.movement_type }}">{% if r.movement_type == 'IN' %}Stock In{% elif r.movement_type == 'OUT' %}Stock Out{% elif r.movement_type == 'DAMAGE' %}Damaged{% elif r.movement_type == 'EXPIRY' %}Expired{% else %}Correction{% endif %}</span></td>
+            <td><span class="qty {% if r.change > 0 %}up{% else %}dn{% endif %}">{% if r.change > 0 %}+{% endif %}{{ r.change|floatformat:"-3" }} {{ r.item.unit }}</span></td>
+            <td><b>{{ r.stock_after|floatformat:"-3" }}</b> <small style="color:#6b7488">{{ r.item.unit }}</small></td>
+            <td class="val"></td>
+            <td class="note" title="{{ r.note }}">{{ r.note|default:"—" }}</td>
+            <td>{% if r.created_by %}<div class="by"><span class="av sm" data-n="{{ r.created_by.username }}">{{ r.created_by.username|first|upper }}</span>{{ r.created_by.username }}</div>{% else %}<span style="color:#aab">—</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="empty" id="empty"><div>🔎</div>No entries match your filters.</div>
+    </div>
+
+    <div class="ft"><span id="count"></span><button class="btn" id="more" style="display:none">Show more ↓</button></div>
+  </div>
 </div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s), rows=[...document.querySelectorAll('#tb tr')];
+let range=0,type='',lim=30;
+const fm=n=>'₹'+Number(n).toLocaleString('en-IN',{maximumFractionDigits:2});
+const fd=t=>new Date(t*1000).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+
+rows.forEach(r=>{const v=r.dataset.val;r.querySelector('.val').innerHTML=v===''?'<span style="color:#aab">—</span>':'<b>'+fm(v)+'</b>'});
+const EM=[['lpg','🔥'],['cylinder','🔥'],['biryani','🍱'],['container','🥡'],['box','📦'],['coconut oil','🥥'],['gingelly','🛢️'],['oil','🛢️'],['coconut','🥥'],['watermelon','🍉'],['strawberry','🍓'],['blueberry','🫐'],['orange','🍊'],['mango','🥭'],['apple','🍎'],['banana','🍌'],['grape','🍇'],['lemon','🍋'],['pineapple','🍍'],['papaya','🍈'],['rice','🍚'],['spice','🌶️'],['ice','🧊'],['soda','🥤'],['water','💧'],['sugar','🍬'],['salt','🧂'],['onion','🧅'],['tomato','🍅'],['potato','🥔'],['carrot','🥕'],['chilli','🌶️'],['garlic','🧄'],['ginger','🫚'],['milk','🥛'],['curd','🥛'],['cheese','🧀'],['butter','🧈'],['egg','🥚'],['chicken','🍗'],['mutton','🥩'],['fish','🐟'],['prawn','🦐'],['flour','🌾'],['wheat','🌾'],['maida','🌾'],['bread','🍞'],['tea','🍵'],['coffee','☕'],['cashew','🥜'],['almond','🥜'],['nut','🥜'],['raisin','🍇'],['syrup','🍯'],['honey','🍯'],['pulp','🥭'],['masala','🌶️'],['powder','🧂'],['cup','🥤'],['straw','🥤'],['tissue','🧻'],['cover','🛍️'],['bag','🛍️'],['glove','🧤'],['foil','🪙']];
+const ico=nm=>{const s=String(nm).toLowerCase();const m=EM.find(x=>s.includes(x[0]));return m?m[1]:'📦'};
+document.querySelectorAll('.av,.ic').forEach(a=>{let h=0;for(const c of a.dataset.n)h=(h*31+c.charCodeAt(0))%360;
+  a.style.background='hsl('+h+',70%,92%)';a.style.color='hsl('+h+',55%,35%)';if(a.classList.contains('ic'))a.textContent=ico(a.dataset.n)});
+
+function apply(){
+  const q=$('#q').value.trim().toLowerCase(), now=Date.now();
+  const cut=range===0?0:range===1?new Date().setHours(0,0,0,0):now-range*864e5;
+  const vis=rows.filter(r=>{const d=r.dataset;return (!cut||d.ts*1000>=cut)&&(!type||d.type===type)&&(!q||d.s.includes(q))});
+  const s=$('#sort').value;
+  vis.sort((a,b)=>s==='old'?a.dataset.ts-b.dataset.ts:s==='val'?(+b.dataset.val||0)-(+a.dataset.val||0):s==='name'?a.dataset.name.localeCompare(b.dataset.name):b.dataset.ts-a.dataset.ts);
+  const tb=$('#tb');rows.forEach(r=>r.style.display='none');
+  vis.forEach((r,i)=>{tb.appendChild(r);r.style.display=i<lim?'':'none'});
+  const tot=vis.reduce((a,r)=>a+(+r.dataset.val||0),0), hasV=vis.some(r=>r.dataset.val!==''),
+        uniq=new Set(vis.map(r=>r.dataset.name)).size, last=Math.max(0,...vis.map(r=>+r.dataset.ts));
+  $('#stats').innerHTML=[['Entries',vis.length],['Total value',hasV?fm(tot):'—'],['Items involved',uniq],['Latest entry',last?fd(last):'—']]
+    .map(c=>`<div class="card st"><small>${c[0]}</small><b>${c[1]}</b></div>`).join('');
+  $('#empty').style.display=vis.length?'none':'block';
+  $('#count').textContent=`Showing ${Math.min(lim,vis.length)} of ${vis.length} entries`;
+  $('#more').style.display=vis.length>lim?'':'none';
+  return vis;
+}
+function seg(id,fn){const el=$(id);if(!el)return;el.onclick=e=>{const b=e.target.closest('button');if(!b)return;
+  el.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');fn(b);lim=30;apply()}}
+seg('#range',b=>range=+b.dataset.d);
+seg('#types',b=>type=b.dataset.t);
+$('#q').oninput=()=>{lim=30;apply()};
+$('#sort').onchange=()=>{lim=30;apply()};
+$('#more').onclick=()=>{lim+=30;apply()};
+$('#csv').onclick=()=>{
+  const out=[['Date','Item','Type','Quantity','Unit','Stock after','Value (INR)','Note','By']];
+  apply().forEach(r=>{const d=r.dataset;out.push([d.date,d.name,d.type,d.qty,d.unit,d.after,d.val,d.note,d.user])});
+  const csv=out.map(l=>l.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download='{{ cfg.title|slugify }}.csv';a.click()};
+apply();
+})();
+</script>
 {% endblock %}

@@ -1,51 +1,240 @@
 {% extends 'store/store_base.html' %}
 {% block title %}Groceries & Stock{% endblock %}
 {% block content %}
-<h1>Groceries & Stock</h1>
+<style>
+.gl{--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;--bg:#f7f8fb;--ok:#16a34a;--ok-bg:#e8f7ee;--low:#d97706;--low-bg:#fff4db;--out:#dc2626;--out-bg:#fde8e8;--brand:#ff6b6b;--adj:#2563eb;color:var(--ink)}
+.gl *{box-sizing:border-box}
+.gl-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.gl-head h1{margin:0;font-size:26px;line-height:1.1}
+.gl-head p{margin:4px 0 0;color:var(--mut);font-size:13px}
+.gl-actions{display:flex;gap:8px;flex-wrap:wrap}
+.gl-btn{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:9px 14px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.gl-btn:hover{border-color:#cfd3de}
+.gl-btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.gl-btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
+.gl-btn.go{background:var(--ink);border-color:var(--ink);color:#fff}
+.gl-btn.danger{color:var(--out);border-color:#f6c9c9}
+.gl-btn.danger:hover{background:var(--out-bg)}
+.gl-btn:focus-visible,.gl-chip:focus-visible,.gl input:focus-visible,.gl select:focus-visible{outline:2px solid var(--adj);outline-offset:2px}
 
-<form method="get" class="toolbar">
-  <input type="text" name="q" value="{{ q }}" placeholder="Search item or supplier…">
-  <select name="category">
-    <option value="">All categories</option>
-    {% for c in categories %}<option value="{{ c.pk }}" {% if cat == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
-  </select>
-  <select name="filter">
-    <option value="">All stock</option>
-    <option value="low" {% if flt == 'low' %}selected{% endif %}>Low stock</option>
-    <option value="out" {% if flt == 'out' %}selected{% endif %}>Out of stock</option>
-  </select>
-  <button class="btn" type="submit">Filter</button>
-  <a class="btn light" href="{% url 'store:item_list' %}">Reset</a>
-  <a class="btn light" href="{% url 'store:categories' %}" style="margin-left:auto">🏷️ Categories</a>
-  <a class="btn" href="{% url 'store:item_add' %}">➕ Add Item</a>
-</form>
+.gl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.gl-kpi{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:14px 16px;border-left-width:4px}
+.gl-kpi b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.gl-kpi span{font-size:12.5px;color:var(--mut)}
+.gl-kpi.k-all{border-left-color:var(--ink)}
+.gl-kpi.k-low{border-left-color:var(--low)}
+.gl-kpi.k-out{border-left-color:var(--out)}
+.gl-kpi.k-val{border-left-color:var(--ok)}
 
-<div class="card table-wrap">
-  <table>
-    <tr><th>Item</th><th>Category</th><th>Stock</th><th>Reorder at</th><th>Cost / unit</th><th>Status</th><th></th></tr>
-    {% for i in items %}
-    <tr>
-      <td><strong>{{ i.name }}</strong>{% if i.supplier %}<div class="muted">{{ i.supplier }}</div>{% endif %}</td>
-      <td>{{ i.category.name|default:"—" }}</td>
-      <td><strong>{{ i.current_stock|floatformat:"-3" }}</strong> {{ i.unit }}</td>
-      <td>{{ i.reorder_level|floatformat:"-3" }} {{ i.unit }}</td>
-      <td>₹{{ i.cost_per_unit }}</td>
-      <td>
-        {% if i.is_out %}<span class="badge out">Out</span>
-        {% elif i.is_low %}<span class="badge low">Low</span>
-        {% else %}<span class="badge ok">OK</span>{% endif %}
-      </td>
-      <td style="white-space:nowrap">
-        <a class="btn small" href="{% url 'store:stock_update' i.pk %}">Update Stock</a>
-        <a class="btn small light" href="{% url 'store:item_edit' i.pk %}">Edit</a>
-        <form method="post" action="{% url 'store:item_remove' i.pk %}" style="display:inline" onsubmit="return confirm('Remove {{ i.name|escapejs }}?')">
-          {% csrf_token %}<button class="btn small danger" type="submit">Remove</button>
-        </form>
-      </td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="7" class="muted">No items found. <a href="{% url 'store:item_add' %}">Add your first grocery item</a>.</td></tr>
-    {% endfor %}
-  </table>
+.gl-tools{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:14px}
+.gl-form{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.gl-search{flex:1 1 240px;position:relative}
+.gl-search input{width:100%;padding:10px 12px 10px 34px;border:1px solid var(--bd);border-radius:10px;font-size:14px;background:var(--bg);font-family:inherit}
+.gl-search svg{position:absolute;left:11px;top:50%;translate:0 -50%;width:16px;height:16px;color:var(--mut)}
+.gl select{padding:10px 12px;border:1px solid var(--bd);border-radius:10px;font-size:14px;background:#fff;max-width:100%;font-family:inherit}
+.gl-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.gl-chip{border:1px solid var(--bd);background:#fff;color:var(--mut);padding:6px 12px;border-radius:99px;font-size:13px;font-weight:600;text-decoration:none}
+.gl-chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+
+.gl-card{background:#fff;border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+.gl-scroll{overflow-x:auto}
+.gl table{width:100%;border-collapse:collapse;font-size:14px}
+.gl thead th{background:var(--bg);text-align:left;font-size:12.5px;color:var(--mut);font-weight:600;padding:11px 14px;border-bottom:1px solid var(--bd);white-space:nowrap}
+.gl th.num,.gl td.num{text-align:right}
+.gl td{padding:12px 14px;border-bottom:1px solid var(--bd);vertical-align:middle}
+.gl tbody tr.row:hover td{background:#fbfbfd}
+.gl tr.row.is-out td:first-child{box-shadow:inset 4px 0 0 var(--out)}
+.gl tr.row.is-low td:first-child{box-shadow:inset 4px 0 0 var(--low)}
+.gl tr.row.is-ok td:first-child{box-shadow:inset 4px 0 0 var(--ok)}
+.gl .who{display:flex;align-items:center;gap:12px}
+.gl .th{width:52px;height:52px;border-radius:12px;overflow:hidden;background:var(--bg);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:var(--mut);flex:none}
+.gl .th img{width:100%;height:100%;object-fit:cover;display:block}
+.gl .th.emo{font-size:28px;background:#fff7ed;border-color:#fde3c8}
+.gl .gl-form select{width:auto;flex:0 1 230px}
+.gl .gl-form .gl-btn{width:auto}
+.gl .nm b{display:block;font-size:15px}
+.gl .nm small{color:var(--mut)}
+.gl .cat{display:inline-block;background:var(--bg);border:1px solid var(--bd);border-radius:99px;padding:2px 10px;font-size:12.5px;color:var(--mut)}
+.gl .stk{min-width:150px}
+.gl .stk b{font-size:16px;font-variant-numeric:tabular-nums}
+.gl .bar{height:6px;background:var(--bd);border-radius:99px;margin-top:6px;overflow:hidden}
+.gl .bar i{display:block;height:100%;border-radius:99px;width:0}
+.is-ok .bar i{background:var(--ok)}
+.is-low .bar i{background:var(--low)}
+.is-out .bar i{background:var(--out)}
+.gl .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:700}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.low{background:var(--low-bg);color:var(--low)}
+.pill.out{background:var(--out-bg);color:var(--out)}
+.gl .mut{color:var(--mut)}
+.gl .acts{white-space:nowrap;display:flex;gap:6px;justify-content:flex-end;align-items:center}
+.gl .acts form{display:inline;margin:0}
+.gl-empty{padding:34px 16px;text-align:center;color:var(--mut)}
+.gl-empty b{display:block;color:var(--ink);margin-bottom:6px;font-size:15px}
+.gl-foot{padding:10px 14px;color:var(--mut);font-size:12.5px;border-top:1px solid var(--bd);background:var(--bg)}
+
+@media (max-width:900px){.gl-kpis{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){
+  .gl thead{display:none}
+  .gl table,.gl tbody{display:block}
+  .gl tr.row{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:14px;border-bottom:1px solid var(--bd)}
+  .gl tr.row td{display:block;padding:0;border:0}
+  .gl tr.row td:first-child{box-shadow:none!important}
+  .gl tr.row.is-out{border-left:4px solid var(--out)}
+  .gl tr.row.is-low{border-left:4px solid var(--low)}
+  .gl tr.row.is-ok{border-left:4px solid var(--ok)}
+  .gl td.nm{grid-column:1;grid-row:1}
+  .gl td.st{grid-column:2;grid-row:1;text-align:right}
+  .gl td.catc{grid-column:1 / -1;grid-row:2}
+  .gl td.stk{grid-column:1 / -1;grid-row:3;margin-top:4px}
+  .gl td.rl{grid-column:1;grid-row:4;font-size:12.5px;color:var(--mut)}
+  .gl td.cost{grid-column:2;grid-row:4;text-align:right;font-size:12.5px;color:var(--mut)}
+  .gl td.ac{grid-column:1 / -1;grid-row:5;margin-top:8px}
+  .gl .acts{justify-content:flex-start;flex-wrap:wrap}
+  .gl td.rl::before{content:"Reorder at "}
+  .gl td.cost::before{content:"Cost "}
+}
+@media (prefers-reduced-motion:reduce){.gl *{transition:none!important;animation:none!important}}
+</style>
+
+<div class="gl">
+  <div class="gl-head">
+    <div>
+      <h1>Groceries &amp; Stock</h1>
+      <p>Live stock level for every grocery item. Update stock right from the row.</p>
+    </div>
+    <div class="gl-actions">
+      <a class="gl-btn" href="{% url 'store:categories' %}">Categories</a>
+      <a class="gl-btn primary" href="{% url 'store:item_add' %}">+ Add item</a>
+    </div>
+  </div>
+
+  <div class="gl-kpis">
+    <div class="gl-kpi k-all"><b id="kAll">0</b><span>Items shown</span></div>
+    <div class="gl-kpi k-low"><b id="kLow">0</b><span>Running low</span></div>
+    <div class="gl-kpi k-out"><b id="kOut">0</b><span>Out of stock</span></div>
+    <div class="gl-kpi k-val"><b id="kVal">₹0</b><span>Stock value</span></div>
+  </div>
+
+  <div class="gl-tools">
+    <form method="get" class="gl-form" id="glForm">
+      <div class="gl-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" name="q" value="{{ q }}" placeholder="Search item or supplier" aria-label="Search item or supplier" autocomplete="off">
+      </div>
+      <select name="category" aria-label="Category" onchange="this.form.submit()">
+        <option value="">All categories</option>
+        {% for c in categories %}<option value="{{ c.pk }}" {% if cat == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select>
+      <input type="hidden" name="filter" value="{{ flt }}">
+      <button class="gl-btn go" type="submit">Search</button>
+      {% if q or cat or flt %}<a class="gl-btn" href="{% url 'store:item_list' %}">Reset</a>{% endif %}
+    </form>
+    <div class="gl-chips" role="group" aria-label="Filter by stock level">
+      <a class="gl-chip {% if not flt %}on{% endif %}" href="?q={{ q|urlencode }}&category={{ cat }}">All stock</a>
+      <a class="gl-chip {% if flt == 'low' %}on{% endif %}" href="?q={{ q|urlencode }}&category={{ cat }}&filter=low">Low stock</a>
+      <a class="gl-chip {% if flt == 'out' %}on{% endif %}" href="?q={{ q|urlencode }}&category={{ cat }}&filter=out">Out of stock</a>
+    </div>
+  </div>
+
+  <div class="gl-card">
+    <div class="gl-scroll">
+      <table id="glTable">
+        <thead>
+          <tr><th>Item</th><th>Category</th><th>Stock</th><th class="num">Reorder at</th><th class="num">Cost / unit</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for i in items %}
+          <tr class="row {% if i.is_out %}is-out{% elif i.is_low %}is-low{% else %}is-ok{% endif %}"
+              data-stock="{{ i.current_stock|stringformat:'f' }}" data-level="{{ i.reorder_level|stringformat:'f' }}" data-cost="{{ i.cost_per_unit|stringformat:'f' }}"
+              data-state="{% if i.is_out %}out{% elif i.is_low %}low{% else %}ok{% endif %}">
+            <td class="nm">
+              <div class="who">
+                <span class="th{% if i.image %} has-img{% endif %}" data-n="{{ i.name|lower }}" data-c="{{ i.category.name|lower }}">{% if i.image %}<img src="{{ i.image.url }}" alt="{{ i.name }}" loading="lazy">{% else %}{{ i.name|slice:":1"|upper }}{% endif %}</span>
+                <div><b>{{ i.name }}</b>{% if i.supplier %}<small>{{ i.supplier }}</small>{% endif %}</div>
+              </div>
+            </td>
+            <td class="catc">{% if i.category %}<span class="cat">{{ i.category.name }}</span>{% else %}<span class="mut">—</span>{% endif %}</td>
+            <td class="stk"><b>{{ i.current_stock|floatformat:"-3" }}</b> <span class="mut">{{ i.unit }}</span><div class="bar"><i></i></div></td>
+            <td class="num rl">{{ i.reorder_level|floatformat:"-3" }} {{ i.unit }}</td>
+            <td class="num cost">₹{{ i.cost_per_unit }}</td>
+            <td class="st">{% if i.is_out %}<span class="pill out">Out of stock</span>{% elif i.is_low %}<span class="pill low">Running low</span>{% else %}<span class="pill ok">In stock</span>{% endif %}</td>
+            <td class="ac">
+              <div class="acts">
+                <a class="gl-btn sm go" href="{% url 'store:stock_update' i.pk %}">Update stock</a>
+                <a class="gl-btn sm" href="{% url 'store:item_edit' i.pk %}">Edit</a>
+                <form method="post" action="{% url 'store:item_remove' i.pk %}" onsubmit="return confirm('Remove {{ i.name|escapejs }}? Its stock history is kept.')">
+                  {% csrf_token %}<button class="gl-btn sm danger" type="submit">Remove</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if not items %}
+    <div class="gl-empty">
+      <b>{% if q or cat or flt %}No items match these filters{% else %}No grocery items yet{% endif %}</b>
+      {% if q or cat or flt %}<a href="{% url 'store:item_list' %}">Clear filters</a>{% else %}<a href="{% url 'store:item_add' %}">Add your first grocery item</a>{% endif %}
+    </div>
+    {% endif %}
+    <div class="gl-foot" id="glFoot"></div>
+  </div>
 </div>
+
+<script>
+(function () {
+  // Picture for items with no uploaded photo: match on item name first, then category
+  var BY_NAME = [
+    ['banana leaf','🍃'],['curry leaf','🌿'],['coriander','🌿'],['mint','🌿'],['bay leaf','🍃'],
+    ['chicken','🍗'],['mutton','🥩'],['lamb','🥩'],['beef','🥩'],['egg','🥚'],
+    ['prawn','🦐'],['shrimp','🦐'],['crab','🦀'],['squid','🦑'],['anchovy','🐟'],['fish','🐟'],['seer','🐟'],['tuna','🐟'],['sardine','🐟'],
+    ['basmati','🍚'],['rice','🍚'],['atta','🌾'],['maida','🌾'],['flour','🌾'],['rava','🌾'],['semolina','🌾'],
+    ['oil','🛢️'],['ghee','🧈'],['butter','🧈'],['curd','🥛'],['milk','🥛'],['paneer','🧀'],['cheese','🧀'],['cream','🥛'],
+    ['salt','🧂'],['sugar','🍬'],['jaggery','🍯'],['honey','🍯'],
+    ['onion','🧅'],['garlic','🧄'],['ginger','🫚'],['tomato','🍅'],['potato','🥔'],['carrot','🥕'],['brinjal','🍆'],['capsicum','🫑'],['beans','🫘'],['peas','🫛'],['cabbage','🥬'],['cauliflower','🥦'],['mushroom','🍄'],['corn','🌽'],['cucumber','🥒'],
+    ['chilli','🌶️'],['chili','🌶️'],['pepper','🌶️'],['masala','🌶️'],['turmeric','🧡'],['cumin','🌿'],['cardamom','🌿'],['clove','🌿'],['cinnamon','🪵'],['star anise','⭐'],
+    ['apple','🍎'],['banana','🍌'],['lemon','🍋'],['lime','🍋'],['orange','🍊'],['mango','🥭'],['grape','🍇'],['pineapple','🍍'],['watermelon','🍉'],['strawberry','🍓'],['blueberry','🫐'],['coconut','🥥'],
+    ['dal','🫘'],['lentil','🫘'],['chickpea','🫘'],['gram','🫘'],
+    ['tea','🍵'],['coffee','☕'],['juice','🧃'],['soda','🥤'],['water','💧'],['mojito','🍹'],
+    ['bread','🍞'],['bun','🍞'],['noodle','🍜'],['pasta','🍝'],['sauce','🥫'],['vinegar','🍶'],['lpg','🔥'],['cylinder','🔥'],['container','📦'],['box','📦'],['tissue','🧻'],['glove','🧤'],['cover','🛍️'],['bag','🛍️']
+  ];
+  var BY_CAT = [
+    ['meat','🥩'],['seafood','🐟'],['vegetable','🥬'],['herb','🌿'],['spice','🌶️'],['rice','🍚'],['flour','🌾'],
+    ['drink','🍹'],['fruit','🍎'],['dairy','🥛'],['oil','🛢️'],['bakery','🍞'],['packag','📦'],['clean','🧴']
+  ];
+  function pick(list, text) {
+    for (var k = 0; k < list.length; k++) if (text.indexOf(list[k][0]) !== -1) return list[k][1];
+    return '';
+  }
+  document.querySelectorAll('.gl .th:not(.has-img)').forEach(function (t) {
+    var e = pick(BY_NAME, t.dataset.n || '') || pick(BY_CAT, t.dataset.c || '');
+    if (e) { t.textContent = e; t.classList.add('emo'); }
+  });
+
+  var rows = document.querySelectorAll('#glTable tr.row');
+  var low = 0, out = 0, val = 0;
+  rows.forEach(function (r) {
+    var s = parseFloat(r.dataset.stock) || 0;
+    var lv = parseFloat(r.dataset.level) || 0;
+    var c = parseFloat(r.dataset.cost) || 0;
+    if (r.dataset.state === 'low') low++;
+    if (r.dataset.state === 'out') out++;
+    if (s > 0) val += s * c;
+    // bar is full at twice the reorder level; items with no reorder level show full when in stock
+    var pct = lv > 0 ? Math.min(100, (s / (lv * 2)) * 100) : (s > 0 ? 100 : 0);
+    if (s > 0 && pct < 6) pct = 6;
+    var bar = r.querySelector('.bar i');
+    if (bar) bar.style.width = pct + '%';
+  });
+  document.getElementById('kAll').textContent = rows.length;
+  document.getElementById('kLow').textContent = low;
+  document.getElementById('kOut').textContent = out;
+  document.getElementById('kVal').textContent = '₹' + Math.round(val).toLocaleString('en-IN');
+  document.getElementById('glFoot').textContent = rows.length ? ('Showing ' + rows.length + ' item' + (rows.length === 1 ? '' : 's')) : '';
+  if (!rows.length) document.getElementById('glFoot').style.display = 'none';
+})();
+</script>
 {% endblock %}

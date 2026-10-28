@@ -29,13 +29,11 @@ class Coupon(models.Model):
 class Order(models.Model):
     # Flow: pending -> confirmed -> preparing -> ready
     #   dine-in / takeaway : ready -> delivered ("Served" in the staff dashboards)
-    #   home delivery      : ready -> out_for_delivery -> delivered
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('confirmed', 'Confirmed'),
         ('preparing', 'Preparing'),
         ('ready', 'Ready'),
-        ('out_for_delivery', 'Out for Delivery'),
         ('delivered', 'Delivered'),  # shown as "Served" in the staff dashboards
         ('cancelled', 'Cancelled'),
     ]
@@ -54,7 +52,6 @@ class Order(models.Model):
     ORDER_TYPE_CHOICES = [
         ('dine_in', 'Dine-in'),
         ('takeaway', 'Take away'),
-        ('delivery', 'Home delivery'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
@@ -73,24 +70,36 @@ class Order(models.Model):
     )
     note = models.CharField(max_length=255, blank=True)
 
-    # Home delivery details (only used when order_type is 'delivery')
-    delivery_address = models.TextField(blank=True)
-    delivery_phone = models.CharField(max_length=15, blank=True)
-    delivery_person = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='deliveries',
-        help_text="Delivery staff who picked up this order.",
-    )
-
     # Payment tracking
     payment_method = models.CharField(max_length=10, choices=PAYMENT_METHOD_CHOICES, default='online')
     payment_status = models.CharField(max_length=15, choices=PAYMENT_STATUS_CHOICES, default='pending')
 
+    # Razorpay payment id (pay_xxxxx). Saved when the online payment is verified.
+    # Needed to refund the customer automatically when the order is rejected.
+    razorpay_payment_id = models.CharField(max_length=100, blank=True, default='')
+
     # Admin can open the table early (before the 2-hour hold ends)
     table_released = models.BooleanField(default=False)
 
-    # True once the admin has paid the money back for a cancelled online order
+    # True once the money has been paid back for a cancelled online order
+    # (automatically through Razorpay, or by the admin pressing "Mark Refunded")
     refunded = models.BooleanField(default=False)
+
+    # Time the kitchen promised the order will be ready.
+    # Set by the chef when preparing starts; blank until then.
+    ready_by = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Estimated ready time chosen by the chef when preparing starts."
+    )
+
+    # The chef who clicked "Start Preparing" for this order.
+    # SET_NULL: if the chef's login is deleted later, the order stays safe.
+    prepared_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='prepared_orders',
+        help_text="Chef who took this order (set when preparing starts)."
+    )
 
     class Meta:
         ordering = ['-created_at']
@@ -102,16 +111,16 @@ class Order(models.Model):
     def is_takeaway(self):
         return self.order_type == 'takeaway'
 
-    @property
-    def is_delivery(self):
-        return self.order_type == 'delivery'
-
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
-    food_item = models.ForeignKey(FoodItem, on_delete=models.CASCADE)
+    # PROTECT: a dish that was ordered before cannot be deleted, so old orders
+    # and sales reports stay correct. Hide the dish with is_available=False instead.
+    food_item = models.ForeignKey(FoodItem, on_delete=models.PROTECT)
     quantity = models.PositiveIntegerField(default=1)
     price = models.DecimalField(max_digits=8, decimal_places=2)
+    # Chosen options for this line (for the kitchen). The price above already includes the extras.
+    options_text = models.CharField(max_length=500, blank=True)
 
     def subtotal(self):
         return self.quantity * self.price

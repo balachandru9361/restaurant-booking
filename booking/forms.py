@@ -13,14 +13,11 @@ def tables_needed(guests):
 
 
 class TableBookingForm(forms.ModelForm):
-    # Hidden field, filled in by the JS table-grid on the booking page.
-    # Optional at the form level - if left blank, the view auto-assigns the
-    # smallest free table (same fallback behaviour as before).
-    table = forms.ModelChoiceField(
-        queryset=Table.objects.all(),
-        required=False,
-        widget=forms.HiddenInput(),
-    )
+    """Customer booking form.
+
+    CHANGED: the customer no longer picks a table. The booking is saved as
+    'pending' with no table, and the admin chooses the table(s) when approving.
+    """
 
     guests = forms.IntegerField(
         min_value=1,
@@ -38,7 +35,8 @@ class TableBookingForm(forms.ModelForm):
 
     class Meta:
         model = TableBooking
-        fields = ['name', 'phone', 'guests', 'booking_date', 'booking_time', 'occasion', 'special_request', 'table']
+        fields = ['name', 'phone', 'guests', 'booking_date', 'booking_time',
+                  'occasion', 'special_request']
         widgets = {
             'booking_date': forms.DateInput(attrs={'type': 'date'}),
             'booking_time': forms.TimeInput(attrs={'type': 'time'}),
@@ -53,16 +51,6 @@ class TableBookingForm(forms.ModelForm):
                 'Please enter a valid 10-digit Indian mobile number.'
             )
         return phone
-
-    def clean(self):
-        cleaned = super().clean()
-        guests = cleaned.get('guests')
-        table = cleaned.get('table')
-        # A single picked table can only hold 6. Bigger parties are given several
-        # tables by the view, so the one hidden table is ignored for them.
-        if guests and table and guests > SEATS_PER_TABLE:
-            cleaned['table'] = None
-        return cleaned
 
 
 class TableForm(forms.ModelForm):

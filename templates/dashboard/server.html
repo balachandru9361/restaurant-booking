@@ -110,6 +110,8 @@
   .order-card.dining { border-left-color: #6366f1; }
   .order-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
   .order-id { font-family: 'Sora', sans-serif; font-weight: 700; color: #0d1b2a; font-size: 14px; }
+  /* order date & time under the order number */
+  .order-when { font-size: 11.5px; color: #6b7280; font-weight: 600; margin-top: 2px; }
   .order-user { font-size: 13px; color: #374151; margin-bottom: 6px; font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
   .order-table-badge {
     display: inline-flex; align-items: center; gap: 4px;
@@ -156,6 +158,8 @@
     background: #fef3c7; color: #92400e;
   }
   .pay-badge.paid { background: #dcfce7; color: #166534; }
+  /* unpaid (cash not collected yet) */
+  .pay-badge.unpaid { background: #fee2e2; color: #b91c1c; }
   .table-select {
     width: 100%; padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 8px;
     font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: #0d1b2a;
@@ -171,6 +175,29 @@
   .btn-reject:hover { background: #b91c1c; color: #fff; }
   .btn-send:disabled, .btn-reject:disabled { opacity: 0.6; cursor: not-allowed; }
 
+  /* Bill button (now a link to the combined table bill page) */
+  .btn-bill {
+    border: 0; cursor: pointer; padding: 9px 14px; border-radius: 8px; white-space: nowrap;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700;
+    background: #eef1f5; color: #0d1b2a; transition: all 0.2s ease;
+    text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .btn-bill:hover { background: #0d1b2a; color: #fff; }
+  .btn-bill.mini { padding: 5px 10px; font-size: 12px; }
+  .bill-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bill-actions .btn-free-table { flex: 1; min-width: 180px; width: auto; }
+  .served-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
+
+  /* NEW: whole-table total shown on the Dining Now card */
+  .table-total-box {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    background: #eef2ff; border-radius: 10px; padding: 8px 12px; margin-bottom: 10px;
+    font-size: 13px; font-weight: 700; color: #3730a3;
+  }
+  .table-total-box .amt { font-family: 'Sora', sans-serif; font-size: 16px; color: #0d1b2a; }
+  .table-total-box.has-due { background: #fef2f2; color: #b91c1c; }
+  .table-total-box.has-due .amt { color: #b91c1c; }
+
   /* Dining Now + Free Table */
   .dining-since { font-size: 12px; color: #6b7280; margin-bottom: 10px; }
   .btn-free-table {
@@ -180,14 +207,54 @@
   }
   .btn-free-table:hover { background: #3730a3; color: #fff; }
   .btn-free-table:disabled { opacity: 0.6; cursor: not-allowed; }
+  /* locked until the bill is paid */
+  .btn-free-table.locked { background: #fef3c7; color: #92400e; opacity: 1; cursor: not-allowed; }
+  .btn-free-table.locked:hover { background: #fef3c7; color: #92400e; }
+
+  /* how long the customer has been dining (filled by JS), turns red after 2 hours */
+  .dining-elapsed {
+    display: inline-block; font-size: 12.5px; font-weight: 700;
+    color: #3730a3; background: #eef2ff;
+    border-radius: 20px; padding: 3px 12px; margin-bottom: 8px;
+  }
+  .order-card.dining.overdue { border-left-color: #ef4444; background: #fffafa; }
+  .order-card.dining.overdue .dining-elapsed {
+    color: #b91c1c; background: #fee2e2; animation: warnPulse 1.8s ease-in-out infinite;
+  }
+  /* when overdue and the bill is paid, make the Free Table button stand out */
+  .order-card.dining.overdue .btn-free-table:not(.locked) { background: #3730a3; color: #fff; }
+
+  /* Cash Received (server collects the cash at the table / counter) */
+  .btn-cash {
+    border: 0; cursor: pointer; padding: 10px 14px; border-radius: 8px; white-space: nowrap;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700;
+    background: #dcfce7; color: #166534; transition: all 0.2s ease;
+    flex: 1; min-width: 180px;
+  }
+  .btn-cash:hover { background: #166534; color: #fff; }
+  .btn-cash:disabled { opacity: 0.6; cursor: not-allowed; }
 
   .booking-row {
     background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
-    display: flex; justify-content: space-between; align-items: center;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   }
   .booking-name { font-weight: 700; color: #0d1b2a; font-size: 13.5px; }
   .booking-meta { font-size: 12px; color: #6b7280; margin-top: 2px; }
+  /* booking waiting for the admin / rejected (no table is held for these) */
+  .booking-row.is-pending { border-left: 4px solid #f59e0b; background: #fffdf5; }
+  .booking-row.is-rejected { border-left: 4px solid #ef4444; opacity: 0.7; }
+  /* booking state on the server board */
+  .booking-row.is-active { border-left: 4px solid #dc2626; background: #fff5f5; }
+  .booking-row.is-upcoming { border-left: 4px solid #2563eb; background: #f5f9ff; }
+  .booking-row.is-completed { border-left: 4px solid #16a34a; background: #f3f4f6; opacity: 0.6; }
+  .booking-row.is-completed .booking-name { text-decoration: line-through; }
+  .bk-state { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 6px; vertical-align: middle; white-space: nowrap; }
+  .bk-state.active { background: #fee2e2; color: #b91c1c; }
+  .bk-state.upcoming { background: #dbeafe; color: #1d4ed8; }
+  .bk-state.completed { background: #dcfce7; color: #15803d; }
+  /* table numbers of a booking (same text the customer sees on the pass) */
+  .booking-tables { color: #0d1b2a; font-weight: 700; }
   .booking-time {
     background: #0d1b2a; color: #d4af37; font-size: 12px; font-weight: 700;
     padding: 4px 10px; border-radius: 20px; white-space: nowrap;
@@ -311,6 +378,8 @@
     background: #fef2f2; border-color: #fecaca; color: #b91c1c;
     cursor: not-allowed; opacity: 0.9;
   }
+  .to-chip.in-use { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+  .to-chip.in-use.active { border-color: #0f766e; background: #e6f6f4; color: #0f766e; }
   .to-search {
     width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px;
     font-size: 14px; margin-bottom: 12px; box-sizing: border-box;
@@ -341,6 +410,47 @@
   .btn-place:disabled { background: #9ca3af; cursor: not-allowed; }
   .to-error { color: #b91c1c; font-size: 13px; font-weight: 600; margin-top: 8px; display: none; }
 
+  /* --- Reject reason popup (quick-select reasons) --- */
+  .rj-overlay {
+    position: fixed; inset: 0; background: rgba(13,27,42,0.6); z-index: 9500;
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .rj-overlay.open { display: flex; }
+  .rj-modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 560px; max-height: 92vh;
+    overflow-y: auto; padding: 22px 22px 18px; box-sizing: border-box;
+    font-family: 'Inter', sans-serif; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  }
+  .rj-title { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 800; color: #0d1b2a; margin-bottom: 4px; }
+  .rj-sub { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
+  .rj-sub b { color: #0d1b2a; }
+  .rj-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .rj-chip {
+    border: 1.5px solid #e5e7eb; background: #fff; color: #374151;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700;
+    padding: 9px 14px; border-radius: 22px; cursor: pointer; transition: all 0.15s ease; text-align: left;
+  }
+  .rj-chip:hover { border-color: #ef4444; color: #b91c1c; }
+  .rj-chip.selected { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+  .rj-other {
+    width: 100%; min-height: 80px; resize: vertical; margin-bottom: 14px; box-sizing: border-box;
+    border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 10px 12px;
+    font-size: 14px; font-family: 'Inter', sans-serif;
+  }
+  .rj-other:focus { outline: none; border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,0.1); }
+  .rj-other[hidden] { display: none; }
+  .rj-note { font-size: 12px; color: #9ca3af; margin-bottom: 14px; }
+  .rj-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+  .rj-cancel, .rj-confirm {
+    border: 0; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 800;
+    padding: 10px 20px; border-radius: 8px; transition: all 0.15s ease;
+  }
+  .rj-cancel { background: #eef1f5; color: #374151; }
+  .rj-cancel:hover { background: #d1d5db; }
+  .rj-confirm { background: #dc2626; color: #fff; }
+  .rj-confirm:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(220,38,38,0.35); }
+  .rj-confirm:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
   /* --- Mobile / tablet responsive --- */
   .server-board > * { min-width: 0; }
   @media (max-width: 1100px) {
@@ -363,7 +473,8 @@
     .order-user { flex-wrap: wrap; }
     .booking-row { gap: 8px; }
     .btn-to-delivered { padding: 12px; font-size: 14px; }
-    .btn-send, .btn-reject, .btn-free-table { padding: 12px; font-size: 14px; }
+    .btn-send, .btn-reject, .btn-free-table, .btn-bill, .btn-cash { padding: 12px; font-size: 14px; }
+    .btn-bill.mini { padding: 6px 10px; font-size: 12px; }
 
     #toastStack { top: 10px; left: 10px; right: 10px; }
     .server-toast { min-width: 0; max-width: none; width: 100%; box-sizing: border-box; }
@@ -375,6 +486,9 @@
     .to-qty button { width: 38px; height: 38px; font-size: 20px; }
     .to-foot { padding: 12px 14px; }
     .btn-place { padding: 14px 16px; font-size: 14px; flex: 1; }
+
+    .rj-overlay { padding: 0; align-items: flex-end; }
+    .rj-modal { max-width: none; border-radius: 16px 16px 0 0; }
   }
 
   /* Keep the modal inside the screen no matter what the page layout does */
@@ -400,8 +514,9 @@
       <div class="to-tables" id="toTables">
         {% for t in tables_info %}
           {% if t.held_by %}
-            <button type="button" class="to-chip occupied" disabled>
-              🪑 Table {{ t.number }}<small>🔴 Occupied · Order #{{ t.held_by }}</small>
+            {# customer is still at this table: the server can add a new order (juice, dessert...) to it #}
+            <button type="button" class="to-chip in-use" data-table="{{ t.id }}" data-label="TABLE {{ t.number }} (add more)">
+              🪑 Table {{ t.number }}<small>🟠 Eating · Order #{{ t.held_by }} · add more</small>
             </button>
           {% elif t.busy %}
             <button type="button" class="to-chip occupied" disabled>
@@ -438,6 +553,35 @@
     <div class="to-foot">
       <div class="to-total"><small id="toCount">0 items · Cash payment</small>₹<span id="toTotal">0</span></div>
       <button type="button" class="btn-place" id="toPlace" disabled>Place Order → Kitchen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reject reason popup: pick a quick reason, or choose "Other" and type your own -->
+<div class="rj-overlay" id="rjOverlay">
+  <div class="rj-modal" role="dialog" aria-modal="true" aria-labelledby="rjTitle">
+    <div class="rj-title" id="rjTitle">❌ Reject this order</div>
+    <div class="rj-sub">Order <b id="rjOrderLabel"></b>. Choose a reason, the customer will see it.</div>
+
+    <div class="rj-grid" id="rjGrid">
+      <button type="button" class="rj-chip" data-reason="Dish not available">Dish not available</button>
+      <button type="button" class="rj-chip" data-reason="Ingredients finished">Ingredients finished</button>
+      <button type="button" class="rj-chip" data-reason="Kitchen closed for the day">Kitchen closed for the day</button>
+      <button type="button" class="rj-chip" data-reason="Item out of stock">Item out of stock</button>
+      <button type="button" class="rj-chip" data-reason="Chef not available for this item">Chef not available</button>
+      <button type="button" class="rj-chip" data-reason="Item will take too long to prepare">Will take too long</button>
+      <button type="button" class="rj-chip" data-reason="Wrong item ordered, please re-order">Wrong item ordered</button>
+      <button type="button" class="rj-chip" data-reason="Duplicate order">Duplicate order</button>
+      <button type="button" class="rj-chip" data-reason="Item temporarily unavailable">Item temporarily unavailable</button>
+      <button type="button" class="rj-chip" data-reason="__other__">✍️ Other (type your own)</button>
+    </div>
+
+    <textarea class="rj-other" id="rjOther" maxlength="200" placeholder="Type your reason here..." hidden></textarea>
+    <div class="rj-note">Reason is optional. You can reject without selecting any reason.</div>
+
+    <div class="rj-actions">
+      <button type="button" class="rj-cancel" id="rjCancel">Cancel</button>
+      <button type="button" class="rj-confirm" id="rjConfirm">❌ Confirm Reject</button>
     </div>
   </div>
 </div>
@@ -480,7 +624,7 @@
 
   <div>
 
-    <!-- customer orders waiting for the server -->
+    <!-- customer orders waiting for the server (newest first) -->
     <div class="board-col new-col">
       <div class="board-col-header">
         <h3>🆕 New Orders — Send to Kitchen</h3>
@@ -492,7 +636,10 @@
              data-send-url="{% url 'dashboard:server_send_to_kitchen' order.id %}"
              data-reject-url="{% url 'dashboard:server_reject_order' order.id %}">
           <div class="order-card-top">
-            <span class="order-id">Order #{{ order.id }}</span>
+            <div>
+              <span class="order-id">Order #{{ order.id }}</span>
+              <div class="order-when">🕒 {{ order.created_at|date:"d M Y" }} · {{ order.created_at|time:"h:i A" }}</div>
+            </div>
             {% if order.payment_status == 'paid' %}
               <span class="pay-badge paid">💳 PAID ONLINE</span>
             {% else %}
@@ -509,14 +656,12 @@
               </span>
             {% elif order.is_takeaway %}
               <span class="order-table-badge takeaway">🥡 Takeaway</span>
-            {% elif order.is_delivery %}
-              <span class="order-table-badge takeaway">🛵 Home delivery</span>
             {% endif %}
           </div>
           {% include 'dashboard/_order_meta.html' %}
           <ul class="order-items">
             {% for item in order.items.all %}
-              <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+              <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span>{% if item.options_text %}<small style="display:block;font-size:.8em;font-weight:600;color:#d97706;margin-top:2px">{{ item.options_text }}</small>{% endif %}</li>
             {% endfor %}
           </ul>
           <div class="order-total">₹{{ order.total_amount|inr }}</div>
@@ -539,7 +684,19 @@
       {% for order in ready_orders %}
         <div class="order-card" data-order-id="{{ order.id }}">
           <div class="order-card-top">
-            <span class="order-id">Order #{{ order.id }}</span>
+            <div>
+              <span class="order-id">Order #{{ order.id }}</span>
+              <div class="order-when">🕒 {{ order.created_at|date:"d M Y" }} · {{ order.created_at|time:"h:i A" }}</div>
+            </div>
+            {% if order.payment_status == 'paid' %}
+              {% if order.payment_method == 'online' %}
+                <span class="pay-badge paid">💳 PAID ONLINE</span>
+              {% else %}
+                <span class="pay-badge paid">💵 PAID CASH</span>
+              {% endif %}
+            {% else %}
+              <span class="pay-badge unpaid">⏳ UNPAID</span>
+            {% endif %}
           </div>
           <div class="order-user">
             <span>👤 {{ order.user.username }}</span>
@@ -552,7 +709,7 @@
           {% include 'dashboard/_order_meta.html' %}
           <ul class="order-items">
             {% for item in order.items.all %}
-              <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span></li>
+              <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span>{% if item.options_text %}<small style="display:block;font-size:.8em;font-weight:600;color:#d97706;margin-top:2px">{{ item.options_text }}</small>{% endif %}</li>
             {% endfor %}
           </ul>
           <div class="order-total">₹{{ order.total_amount|inr }}</div>
@@ -561,6 +718,8 @@
               {% csrf_token %}
               <button type="submit" class="btn-to-delivered">🍽️ Mark Served ✓</button>
             </form>
+            {# CHANGED: opens the combined table bill #}
+            <a class="btn-bill" href="{% url 'dashboard:server_table_bill' order.id %}">🧾 Print Bill</a>
           </div>
         </div>
       {% empty %}
@@ -568,7 +727,8 @@
       {% endfor %}
     </div>
 
-    <!-- customers still eating -> server frees the table -->
+    <!-- customers still eating -> ONE card per table. Server collects the cash for the whole table
+         and frees it (only after the whole bill is paid) -->
     <div class="board-col dining-col">
       <div class="board-col-header">
         <h3>🍴 Dining Now — Free Table</h3>
@@ -577,15 +737,50 @@
       {% for order in dining_orders %}
         <div class="order-card dining" data-order-id="{{ order.id }}">
           <div class="order-card-top">
-            <span class="order-id">Order #{{ order.id }}</span>
-            <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
+            <div>
+              <span class="order-id">🪑 Table {{ order.table.number }}</span>
+              <div class="order-when">🧾 {{ order.table_order_count }} order{{ order.table_order_count|pluralize }} · seated since {{ order.created_at|time:"h:i A" }}</div>
+            </div>
+            {% if order.table_due > 0 %}
+              <span class="pay-badge unpaid">⏳ UNPAID</span>
+            {% else %}
+              <span class="pay-badge paid">✅ PAID</span>
+            {% endif %}
           </div>
-          <div class="order-user"><span>👤 {{ order.user.username }}</span></div>
-          <div class="dining-since">Served · customer is still eating</div>
-          <button type="button" class="btn-free-table"
-                  data-url="{% url 'dashboard:server_free_table' order.id %}"
-                  data-table="{{ order.table.number }}"
-                  data-order="{{ order.id }}">✅ Customer Left — Free Table {{ order.table.number }}</button>
+          <div class="order-user">
+            <span>👤 {{ order.user.username }}</span>
+          </div>
+
+          {# NEW: combined amount of the whole table #}
+          <div class="table-total-box{% if order.table_due > 0 %} has-due{% endif %}">
+            <span>Table total</span>
+            <span class="amt">₹{{ order.table_total|inr }}</span>
+          </div>
+
+          {# time since the first order was placed; JS keeps it live and turns the card red after 2 hours #}
+          <div class="dining-elapsed" data-since="{{ order.created_at|date:'c' }}">🕒 Dining for {{ order.created_at|timesince }}</div>
+          <div class="dining-since">
+            {% if order.table_due > 0 %}Served · collect ₹{{ order.table_due|inr }} for the whole table, then tap Cash Received
+            {% else %}Whole table bill paid, you can free the table after the customer leaves{% endif %}
+          </div>
+          <div class="bill-actions">
+            {% if order.table_due > 0 %}
+              {# CHANGED: one click marks EVERY unpaid cash order of this table as paid #}
+              <button type="button" class="btn-cash"
+                      data-url="{% url 'dashboard:server_table_cash_received' order.id %}"
+                      data-order="{{ order.id }}"
+                      data-amount="{{ order.table_due|inr }}"
+                      data-table="{{ order.table.number }}">✅ Cash Received · ₹{{ order.table_due|inr }}</button>
+              <button type="button" class="btn-free-table locked" disabled
+                      title="Collect the payment first">🔒 Payment pending — collect ₹{{ order.table_due|inr }}</button>
+            {% else %}
+              <button type="button" class="btn-free-table"
+                      data-url="{% url 'dashboard:server_free_table' order.id %}"
+                      data-table="{{ order.table.number }}"
+                      data-order="{{ order.id }}">✅ Customer Left — Free Table {{ order.table.number }}</button>
+            {% endif %}
+            <a class="btn-bill" href="{% url 'dashboard:server_table_bill' order.id %}">🧾 Print Bill</a>
+          </div>
         </div>
       {% empty %}
         <div class="empty-col"><span class="empty-icon">🍴</span>No one is dining right now</div>
@@ -601,11 +796,25 @@
         <span class="board-count">{{ todays_bookings|length }}</span>
       </div>
       {% for booking in todays_bookings %}
-        <div class="booking-row">
+        <div class="booking-row{% if booking.status == 'pending' %} is-pending{% elif booking.status == 'rejected' %} is-rejected{% else %} is-{{ booking.ui_state }}{% endif %}">
           <div>
-            <div class="booking-name">{{ booking.name }} · {{ booking.guests }} guest{{ booking.guests|pluralize }}</div>
+            <div class="booking-name">{{ booking.name }} · {{ booking.guests }} guest{{ booking.guests|pluralize }}
+              {% if booking.ui_state == 'completed' %}<span class="bk-state completed">✅ Completed · table opened</span>
+              {% elif booking.ui_state == 'active' %}<span class="bk-state active">🔴 Booked now · table held</span>
+              {% elif booking.ui_state == 'upcoming' %}<span class="bk-state upcoming">⏳ Upcoming</span>{% endif %}
+            </div>
             <div class="booking-meta">
-              {% if booking.table %}Table {{ booking.table.number }}{% else %}No table assigned{% endif %}
+              {# tables come from booking.all_tables (via table_numbers / total_seats). #}
+              {# It is the SAME data the customer sees on the booking pass, always sorted: Tables 1, 2, 5 #}
+              {% if booking.has_tables %}
+                <span class="booking-tables">🪑 {{ booking.table_numbers }}</span> · {{ booking.total_seats }} seats
+              {% elif booking.status == 'pending' %}
+                ⏳ Table not chosen yet (waiting for admin)
+              {% elif booking.status == 'rejected' %}
+                ❌ Rejected
+              {% else %}
+                No table assigned
+              {% endif %}
               {% if booking.phone %} · {{ booking.phone }}{% endif %}
             </div>
           </div>
@@ -626,8 +835,17 @@
           <div>
             <div class="booking-name">Order #{{ order.id }} · {{ order.user.username }}</div>
             <div class="booking-meta">
-              {% if order.table %}Table {{ order.table.number }}{% elif order.is_takeaway %}Takeaway{% else %}Dine-in{% endif %} · ₹{{ order.total_amount|inr }}
+              {% if order.table %}Table {{ order.table.number }}{% elif order.is_takeaway %}Takeaway{% else %}Dine-in{% endif %} · ₹{{ order.total_amount|inr }} · 🕒 {{ order.created_at|time:"h:i A" }}
             </div>
+          </div>
+          <div class="served-right">
+            {% if order.payment_status == 'paid' %}
+              <span class="pay-badge paid">{% if order.payment_method == 'online' %}💳 PAID ONLINE{% else %}💵 PAID CASH{% endif %}</span>
+            {% else %}
+              <span class="pay-badge unpaid">⏳ UNPAID</span>
+            {% endif %}
+            {# CHANGED: opens the combined table bill (a table that already left gets its own single bill) #}
+            <a class="btn-bill mini" href="{% url 'dashboard:server_table_bill' order.id %}">🧾 Bill</a>
           </div>
         </div>
       {% empty %}
@@ -648,6 +866,26 @@
   }
   setInterval(updateClock, 1000);
   updateClock();
+
+  // ---- Dining Now elapsed time (live) + overdue highlight ----
+  // A customer who has been dining for this many minutes or more gets a red card,
+  // so the server remembers to check the table and free it after the customer leaves.
+  var OVERDUE_MINUTES = 120;
+
+  function updateDining() {
+    document.querySelectorAll('.dining-elapsed').forEach(function (el) {
+      var started = new Date(el.dataset.since);
+      if (isNaN(started.getTime())) return;
+      var mins = Math.max(0, Math.floor((Date.now() - started.getTime()) / 60000));
+      var h = Math.floor(mins / 60);
+      var m = mins % 60;
+      el.textContent = '🕒 Dining for ' + (h ? h + 'h ' : '') + m + 'm';
+      var card = el.closest('.order-card');
+      if (card) card.classList.toggle('overdue', mins >= OVERDUE_MINUTES);
+    });
+  }
+  updateDining();
+  setInterval(updateDining, 30000);
 
   // ---- Rich bell chime (Web Audio API) - same premium chime as Kitchen ----
   let sharedAudioCtx = null;
@@ -765,6 +1003,9 @@
           currentRegion.dataset.readyIds = freshRegion.dataset.readyIds;
           currentRegion.dataset.newIds = freshRegion.dataset.newIds;
 
+          // the dining cards were re-rendered, so fill the elapsed time again
+          updateDining();
+
           // refresh Take Order table chips (occupied / free)
           const curTables = document.getElementById('toTables');
           const freshTables = freshDoc.getElementById('toTables');
@@ -782,17 +1023,32 @@
       .catch(() => { /* keep old DOM if refresh fails; next poll will retry */ });
   }
 
-  // ---- Live messages: new customer order + kitchen marked Ready ----
+  // Every 20 sec refresh the page data, so a "Payment pending" lock opens
+  // by itself once the cash is marked as received (by the server or the admin).
+  // This also refreshes Today's Bookings, so when the admin approves a booking or
+  // changes its tables, the new tables show here by themselves.
+  setInterval(refreshLive, 20000);
+
+  // ---- Live messages: new customer order + kitchen marked Ready + cash received ----
   (function () {
     const region = () => document.getElementById('liveRegion');
     const toSet = str => new Set((str || '').split(',').filter(Boolean).map(Number));
     let knownReady = toSet(region().dataset.readyIds);
     let knownNew = toSet(region().dataset.newIds);
+    let knownSig = null;       // first poll only sets the baseline
+    let knownCashId = null;    // first poll only sets the baseline
 
     function poll() {
       fetch("{% url 'dashboard:server_poll' %}", { credentials: 'same-origin' })
         .then(r => r.json())
         .then(data => {
+          // NEW: the admin pressed "Mark Received" -> toast + sound on this screen
+          if (knownCashId !== null && data.cash_id > knownCashId) {
+            showToast('Cash Received', '💵 Payment done', data.cash_message, '✅');
+            beep();
+          }
+          if (typeof data.cash_id === 'number') knownCashId = data.cash_id;
+
           const ready = data.orders || [];
           const fresh = data.new_orders || [];
 
@@ -805,11 +1061,15 @@
           const removedReady = [...knownReady].some(id => !readyIds.has(id));
           const removedNew = [...knownNew].some(id => !newIds.has(id));
 
-          if (freshReady.length || freshNew.length || removedReady || removedNew) {
+          // NEW: payment / status / table-release changed somewhere (admin or server)
+          const sigChanged = knownSig !== null && data.sig && data.sig !== knownSig;
+          if (data.sig) knownSig = data.sig;
+
+          if (freshReady.length || freshNew.length || removedReady || removedNew || sigChanged) {
             freshNew.forEach(o => showToast(
               'New Order',
               o.table ? '🪑 TABLE ' + o.table : '🆕 NEW ORDER',
-              'Order #' + o.id + ' - send to kitchen',
+              'Order #' + o.id + (o.created_at ? ' · ' + o.created_at : '') + ' - send to kitchen',
               '🆕',
               { takeaway: !o.table }
             ));
@@ -889,34 +1149,97 @@
         });
     }
 
-    function rejectOrder(card) {
-      const orderId = card.dataset.orderId;
-      const reason = prompt('Reason for rejecting order #' + orderId + ' (optional):');
-      if (reason === null) return;
+    // ---- Reject reason popup ----
+    const rjOverlay    = document.getElementById('rjOverlay');
+    const rjOrderLabel = document.getElementById('rjOrderLabel');
+    const rjGrid       = document.getElementById('rjGrid');
+    const rjOther      = document.getElementById('rjOther');
+    const rjConfirm    = document.getElementById('rjConfirm');
+    document.body.appendChild(rjOverlay);   // keep it outside the re-rendered liveRegion / page layout
+    let rjOrderId = null;       // order being rejected
+    let rjUrl = '';             // reject url of that order
+    let rjReason = '';          // chosen quick reason ('__other__' = type your own)
 
-      const btn = card.querySelector('.btn-send');
-      const rej = card.querySelector('.btn-reject');
-      btn.disabled = true; rej.disabled = true;
-      rej.textContent = 'Rejecting...';
+    function openRejectPopup(card) {
+      // the card can be re-rendered while the popup is open, so remember id + url here
+      rjOrderId = card.dataset.orderId;
+      rjUrl = card.dataset.rejectUrl;
+      rjReason = '';
+      rjOrderLabel.textContent = '#' + rjOrderId;
+      rjOther.value = '';
+      rjOther.hidden = true;
+      rjConfirm.disabled = false;
+      rjGrid.querySelectorAll('.rj-chip').forEach(c => c.classList.remove('selected'));
+      rjOverlay.classList.add('open');
+    }
+
+    function closeRejectPopup() {
+      rjOverlay.classList.remove('open');
+      rjOrderId = null;
+      rjUrl = '';
+    }
+
+    rjGrid.addEventListener('click', function (e) {
+      const chip = e.target.closest('.rj-chip');
+      if (!chip) return;
+      // click the same chip again to un-select it (reason is optional)
+      if (chip.classList.contains('selected')) {
+        chip.classList.remove('selected');
+        rjReason = '';
+        rjOther.hidden = true;
+        return;
+      }
+      rjGrid.querySelectorAll('.rj-chip').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      rjReason = chip.dataset.reason;
+      rjOther.hidden = (rjReason !== '__other__');
+      if (!rjOther.hidden) rjOther.focus();
+    });
+
+    document.getElementById('rjCancel').addEventListener('click', closeRejectPopup);
+    rjOverlay.addEventListener('click', function (e) { if (e.target === rjOverlay) closeRejectPopup(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && rjOverlay.classList.contains('open')) closeRejectPopup();
+    });
+
+    rjConfirm.addEventListener('click', function () {
+      if (!rjOrderId) return;
+      const reason = (rjReason === '__other__') ? rjOther.value.trim() : rjReason;
+      const orderId = rjOrderId;
+      const url = rjUrl;
+      closeRejectPopup();
+      rejectOrder(orderId, url, reason);
+    });
+
+    function rejectOrder(orderId, url, reason) {
+      // find the card again (it may have been re-rendered)
+      const card = document.querySelector('.order-card.new-order[data-order-id="' + orderId + '"]');
+      const btn = card && card.querySelector('.btn-send');
+      const rej = card && card.querySelector('.btn-reject');
+      if (btn) btn.disabled = true;
+      if (rej) { rej.disabled = true; rej.textContent = 'Rejecting...'; }
+
+      function resetButtons() {
+        if (btn) btn.disabled = false;
+        if (rej) { rej.disabled = false; rej.textContent = '❌ Reject'; }
+      }
 
       const params = new URLSearchParams();
       params.set('reason', reason);
 
-      post(card.dataset.rejectUrl, params)
+      post(url, params)
         .then(res => {
           if (res.data && res.data.ok) {
             showToast('Order Rejected', '❌ Order #' + orderId, res.data.refund ? 'Online payment needs a refund' : 'Customer informed', '❌');
             return refreshLive();
           }
           showToast('Could not reject', (res.data && res.data.error) || 'Something went wrong', 'Order #' + orderId, '⚠️', { error: true });
-          btn.disabled = false; rej.disabled = false;
-          rej.textContent = '❌ Reject';
+          resetButtons();
           if (res.status === 409) refreshLive();
         })
         .catch(() => {
           showToast('Network error', 'Please try again', 'Order #' + orderId, '⚠️', { error: true });
-          btn.disabled = false; rej.disabled = false;
-          rej.textContent = '❌ Reject';
+          resetButtons();
         });
     }
 
@@ -927,14 +1250,44 @@
       const card = e.target.closest('.order-card');
       if (!card) return;
       if (sendBtn) sendToKitchen(card, false);
-      else rejectOrder(card);
+      else openRejectPopup(card);
     });
   })();
+
+  // ---- Cash Received (ONE click pays the WHOLE table, Free Table unlocks) ----
+  // The server view marks every unpaid cash order of the table as paid and then redirects
+  // to the bill page. fetch() follows that redirect, so we only check that the request worked
+  // and then refresh this dashboard.
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.btn-cash');
+    if (!btn || btn.disabled) return;
+    if (!confirm('Received Rs.' + btn.dataset.amount + ' cash for Table ' + btn.dataset.table + '?')) return;
+
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    fetch(btn.dataset.url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': CSRF_TOKEN }
+    })
+      .then(r => {
+        if (!r.ok) throw new Error('Could not mark cash received');
+        showToast('Cash Received', '💵 Rs.' + btn.dataset.amount, 'Table ' + btn.dataset.table + ' · you can free the table when the customer leaves', '✅');
+        return refreshLive();
+      })
+      .catch(err => {
+        showToast('Could not save', err.message, 'Table ' + btn.dataset.table, '⚠️', { error: true });
+        btn.disabled = false;
+        btn.textContent = label;
+      });
+  });
 
   // ---- Free Table (customer left) ----
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('.btn-free-table');
-    if (!btn) return;
+    if (!btn || btn.disabled) return;
     if (!confirm('Free Table ' + btn.dataset.table + '? Has the customer finished eating?')) return;
 
     const label = btn.textContent;
@@ -949,11 +1302,11 @@
       .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
       .then(res => {
         if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Could not free table');
-        showToast('Table Free', '🪑 TABLE ' + res.data.table, 'Order #' + btn.dataset.order + ' · ready for new guests', '✅');
+        showToast('Table Free', '🪑 TABLE ' + res.data.table, 'Table ' + btn.dataset.table + ' · ready for new guests', '✅');
         return refreshLive();
       })
       .catch(err => {
-        showToast('Could not free', err.message, 'Order #' + btn.dataset.order, '⚠️', { error: true });
+        showToast('Could not free', err.message, 'Table ' + btn.dataset.table, '⚠️', { error: true });
         btn.disabled = false;
         btn.textContent = label;
       });

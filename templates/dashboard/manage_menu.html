@@ -39,6 +39,7 @@
   .mm-btn { padding:6px 14px; border-radius:8px; font-size:13px; font-weight:700; text-decoration:none; border:0; cursor:pointer; font-family:inherit; }
   .mm-edit { background:#e0f2fe; color:#0369a1; }
   .mm-del { background:#fee2e2; color:#b91c1c; }
+  .mm-delform { display:inline; margin:0; padding:0; }
 
   /* availability switch */
   .mm-sw { display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:12.5px; font-weight:700; color:#374151; user-select:none; }
@@ -100,8 +101,11 @@
             <span class="js-label">{% if item.is_available %}Available{% else %}Not available{% endif %}</span>
           </label>
           <a href="{% url 'dashboard:edit_menu_item' item.pk %}" class="mm-btn mm-edit">Edit</a>
-          <a href="{% url 'dashboard:delete_menu_item' item.pk %}" class="mm-btn mm-del"
-             onclick="return confirm('Delete {{ item.name|escapejs }} ?');">Delete</a>
+          <form method="post" action="{% url 'dashboard:delete_menu_item' item.pk %}" class="mm-delform"
+                onsubmit="return confirm('Delete {{ item.name|escapejs }} ?');">
+            {% csrf_token %}
+            <button type="submit" class="mm-btn mm-del">Delete</button>
+          </form>
         </div>
       </td>
     </tr>

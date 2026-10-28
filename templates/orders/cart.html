@@ -104,18 +104,10 @@
     box-shadow:0 20px 45px rgba(17,24,39,.35); opacity:0; animation:rise .6s .2s cubic-bezier(.2,.8,.2,1) forwards; }
   .summary h2 { font-family:'Sora',sans-serif; color:#fff; font-size:1.25rem; margin:0 0 18px; }
   .row { display:flex; justify-content:space-between; margin:10px 0; font-size:.95rem; }
-  .row.discount { color:#4ade80; }
   .row.tip { color:#fcd34d; }
   .row.total { border-top:1px dashed rgba(255,255,255,.18); padding-top:16px; margin-top:16px; font-family:'Sora',sans-serif; font-size:1.35rem; color:#fff; }
   .mini { display:flex; justify-content:space-between; font-size:.82rem; color:#9ca3af; margin-top:4px; }
   .mini b { color:#e5e7eb; font-weight:600; }
-  .coupon { display:flex; gap:8px; margin:18px 0 6px; }
-  .coupon input { flex:1; min-width:0; background:rgba(255,255,255,.08); border:1px dashed rgba(255,255,255,.3); color:#fff; border-radius:12px; padding:11px 14px; font:inherit; outline:none; text-transform:uppercase; }
-  .coupon input:focus { border-color:var(--gold); }
-  .coupon button { background:var(--gold); color:#1f2937; border:0; border-radius:12px; padding:0 16px; font-weight:700; cursor:pointer; transition:.2s; }
-  .coupon button:hover { transform:translateY(-1px); filter:brightness(1.08); }
-  .coupon-chip { display:flex; align-items:center; justify-content:space-between; margin:16px 0 4px; background:rgba(74,222,128,.15); color:#4ade80; border-radius:12px; padding:9px 14px; font-size:.85rem; font-weight:600; }
-  .coupon-chip form { margin:0; } .coupon-chip button { background:none; border:0; color:#fca5a5; cursor:pointer; font:inherit; font-size:.8rem; }
 
   /* tip */
   .tipbox { margin:18px 0 4px; padding-top:16px; border-top:1px dashed rgba(255,255,255,.18); }
@@ -228,6 +220,53 @@
     padding:6px 16px; font:inherit; font-size:.82rem; font-weight:600; cursor:pointer; transition:.2s; }
   .change-table-btn:hover { background:#10b981; color:#fff; }
 </style>
+<style>
+/* cart-mobile-fix : stop grid blowout on small screens */
+.cart-grid > * { min-width: 0; }
+@media (max-width: 900px) {
+  .cart-grid { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (max-width: 700px) {
+  .cart-wrap, .cart-page { padding-left: 14px; padding-right: 14px; }
+  .cart-item {
+    grid-template-columns: 64px minmax(0, 1fr) auto !important;
+    gap: 8px 12px !important;
+    padding: 12px !important;
+  }
+  .ci-name { flex-wrap: wrap; font-size: .98rem; }
+  .ci-price { min-width: 0 !important; font-size: 1rem; white-space: nowrap; align-self: start; }
+  .stepper, .remove-form { grid-column: 2 / 4 !important; }
+  .journey li { font-size: .7rem; }
+  .summary { position: static !important; }
+}
+</style>
+<style>
+/* cart-mobile-fix-v2 : tighter side gaps, name row, suggestion cards */
+@media (max-width: 700px) {
+  /* page wrapper: whichever element holds the hero */
+  *:has(> .cart-hero) { padding-left: 10px !important; padding-right: 10px !important; }
+
+  .card { padding: 16px 14px !important; }
+  .cart-item { padding: 12px 12px !important; }
+
+  /* veg dot and name stay on one row */
+  .ci-name { flex-wrap: nowrap !important; align-items: flex-start; gap: 6px; line-height: 1.25; }
+  .ci-name .veg-dot { margin-top: 3px; }
+
+  /* suggestions: two compact columns, space between price and button */
+  .sug-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+  .sug .body { padding: 10px 10px 12px !important; gap: 4px; }
+  .sug b { font-size: .82rem; }
+  .sug .body > :not(button):not(b) { margin-bottom: 6px; }
+  .sug button { margin-top: 10px !important; padding: 8px !important; font-size: .8rem; }
+}
+</style>
+
+
+
+<style>
+.ci-opts { margin:3px 0 0; font-size:.8rem; color:#6b7280; line-height:1.35; word-break:break-word; }
+</style>
 
 <div class="cart-page">
   <header class="cart-hero">
@@ -260,15 +299,15 @@
         <div class="ci-img">{% if item.image_url %}<img src="{{ item.image_url }}" alt="{{ item.name }}" style="width:100%;height:100%;object-fit:cover">{% else %}🍽️{% endif %}</div>
         <div>
           <h3 class="ci-name"><span class="veg-dot{% if not item.is_veg %} non{% endif %}" title="{% if item.is_veg %}Veg{% else %}Non-veg{% endif %}"></span>{{ item.name }}</h3>
-          <p class="ci-each">₹{{ item.price|inr }} each</p>
+          <p class="ci-each">₹{{ item.price|inr }} each</p>{% if item.options_text %}<p class="ci-opts">{{ item.options_text }}</p>{% endif %}
         </div>
         <div class="stepper">
-          <button type="button" class="qty-btn" data-action="dec" data-url="{% url 'orders:update_cart_qty' item.id %}" {% if item.quantity <= 1 %}disabled{% endif %} aria-label="Decrease quantity">&minus;</button>
+          <button type="button" class="qty-btn" data-action="dec" data-url="{% url 'orders:update_cart_qty' item.id %}" data-line="{{ item.line }}" {% if item.quantity <= 1 %}disabled{% endif %} aria-label="Decrease quantity">&minus;</button>
           <span class="qty-num">{{ item.quantity }}</span>
-          <button type="button" class="qty-btn" data-action="inc" data-url="{% url 'orders:update_cart_qty' item.id %}" aria-label="Increase quantity">+</button>
+          <button type="button" class="qty-btn" data-action="inc" data-url="{% url 'orders:update_cart_qty' item.id %}" data-line="{{ item.line }}" aria-label="Increase quantity">+</button>
         </div>
         <strong class="ci-price">₹<span class="line-total">{{ item.subtotal|inr }}</span></strong>
-        <form class="remove-form" method="post" action="{% url 'orders:remove_from_cart' item.id %}">{% csrf_token %}<button type="submit" class="remove-btn">Remove</button></form>
+        <form class="remove-form" method="post" action="{% url 'orders:remove_from_cart' item.id %}">{% csrf_token %}<input type="hidden" name="line" value="{{ item.line }}"><button type="submit" class="remove-btn">Remove</button></form>
       </article>
       {% endfor %}
 
@@ -286,8 +325,6 @@
         <h3 id="arrivalTitle">When will you arrive?</h3>
         <div class="chips">
           <input type="radio" id="am-asap" name="arrival_mode" value="asap" form="checkoutForm" checked><label for="am-asap">ASAP</label>
-          <input type="radio" id="am-15" name="arrival_mode" value="15" form="checkoutForm"><label for="am-15">In 15 min</label>
-          <input type="radio" id="am-30" name="arrival_mode" value="30" form="checkoutForm"><label for="am-30">In 30 min</label>
           <input type="radio" id="am-45" name="arrival_mode" value="45" form="checkoutForm"><label for="am-45">In 45 min</label>
           <input type="radio" id="am-60" name="arrival_mode" value="60" form="checkoutForm"><label for="am-60">In 1 hour</label>
           <input type="radio" id="am-custom" name="arrival_mode" value="custom" form="checkoutForm"><label for="am-custom">Pick a time</label>
@@ -326,19 +363,6 @@
       <h2>Order Summary</h2>
       <div class="row"><span>Items</span><span>{{ cart_items|length }}</span></div>
       <div class="row"><span>Subtotal</span><span>₹<span id="sumSubtotal">{{ subtotal|inr }}</span></span></div>
-      {% if discount_amount %}
-      <div class="row discount"><span>Discount</span><span>- ₹<span id="sumDiscount">{{ discount_amount|inr }}</span></span></div>
-      {% endif %}
-
-      {% if coupon %}
-      <div class="coupon-chip"><span>🎟️ {{ coupon.code }} applied ({{ coupon.discount_percent }}% off)</span>
-        <form method="post" action="{% url 'orders:remove_coupon' %}">{% csrf_token %}<button type="submit">Remove</button></form></div>
-      {% else %}
-      <form class="coupon" method="post" action="{% url 'orders:apply_coupon' %}">{% csrf_token %}
-        <input type="text" name="coupon_code" placeholder="Coupon code" autocomplete="off">
-        <button type="submit">Apply</button>
-      </form>
-      {% endif %}
 
       <div class="tipbox">
         <p class="tip-title">💝 Add a tip for our team</p>
@@ -394,7 +418,7 @@
 
 <script>
 (function () {
-  var PREP_MINUTES = 25; // rough kitchen preparation time shown to the customer, change as needed
+  var PREP_MINUTES = 25; // rough estimate only; the chef sets the exact time when cooking starts
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var form = document.getElementById('checkoutForm');
   if (!form) return;
@@ -410,20 +434,36 @@
   }
 
   // ---- animated numbers ----
+  // FIXED: the old version only saved el.dataset.value when the animation FINISHED,
+  // and never cancelled a running animation. Clicking +/- quickly started a new
+  // animation from a stale "from" value while the old one was still writing to the
+  // same element, so the Total jumped to wrong numbers. Now we cancel the running
+  // frame, save the current value on every frame, and always end on the exact value.
   function countTo(el, to) {
-    var from = parseFloat(el.dataset.value || '0'), t0 = null, dur = reduce ? 0 : 700;
+    if (el._raf) { cancelAnimationFrame(el._raf); el._raf = null; }
+    var from = parseFloat(el.dataset.value || '0');
+    if (isNaN(from)) from = 0;
+    var t0 = null, dur = reduce ? 0 : 700;
     function step(ts) {
       if (t0 === null) t0 = ts;
       var p = dur ? Math.min((ts - t0) / dur, 1) : 1;
-      el.textContent = inr(from + (to - from) * (1 - Math.pow(1 - p, 3)));
-      if (p < 1) requestAnimationFrame(step); else el.dataset.value = to;
+      var cur = from + (to - from) * (1 - Math.pow(1 - p, 3));
+      el.textContent = inr(cur);
+      el.dataset.value = cur;            // keep the on-screen value up to date every frame
+      if (p < 1) {
+        el._raf = requestAnimationFrame(step);
+      } else {
+        el._raf = null;
+        el.textContent = inr(to);        // always finish on the exact value
+        el.dataset.value = to;
+      }
     }
-    requestAnimationFrame(step);
+    el._raf = requestAnimationFrame(step);
   }
 
   // ---- tip (5% / 10%) ----
   var totalEl = $('#sumTotal');
-  var baseTotal = parseFloat(totalEl.dataset.base) || 0;   // subtotal - discount (no tip)
+  var baseTotal = parseFloat(totalEl.dataset.base) || 0;   // subtotal (no tip)
   var TIP_KEY = 'cartTipPercent';
 
   function tipPercent() {
@@ -441,11 +481,16 @@
     $('#tipPctText').textContent = pct;
     $('#sumTip').textContent = inr(tip);
     var total = baseTotal + tip;
-    if (animate) countTo(totalEl, total);
-    else { totalEl.textContent = inr(total); totalEl.dataset.value = total; }
+    if (animate) {
+      countTo(totalEl, total);
+    } else {
+      if (totalEl._raf) { cancelAnimationFrame(totalEl._raf); totalEl._raf = null; }
+      totalEl.textContent = inr(total);
+      totalEl.dataset.value = total;
+    }
   }
 
-  // restore the tip the customer picked before a reload (coupon apply etc.)
+  // restore the tip the customer picked before a reload
   try {
     var saved = sessionStorage.getItem(TIP_KEY);
     if (saved === '5' || saved === '10') {
@@ -471,7 +516,7 @@
       fetch(btn.dataset.url, {
         method: 'POST',
         headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
-        body: new URLSearchParams({ action: btn.dataset.action })
+        body: new URLSearchParams({ action: btn.dataset.action, line: btn.dataset.line || '' })
       })
         .then(function (r) { return r.json(); })
         .then(function (d) {
@@ -482,8 +527,6 @@
           card.querySelector('[data-action=dec]').disabled = d.quantity <= 1;
           card.querySelector('.line-total').textContent = inr(d.line_subtotal);
           $('#sumSubtotal').textContent = inr(d.subtotal);
-          var disc = $('#sumDiscount');
-          if (disc) disc.textContent = inr(d.discount);
           baseTotal = parseFloat(String(d.total).replace(/,/g, '')) || 0;
           renderTotals(true);
         })
@@ -526,7 +569,9 @@
 
     var eta, label;
     if (mode === 'asap') {
-      eta = 'Ready in about ' + PREP_MINUTES + ' minutes.'; label = 'ASAP';
+      // CHANGED: shown as an estimate, the chef confirms the exact time later
+      eta = 'Estimated ready time: about ' + PREP_MINUTES + ' minutes. The chef will confirm the exact time once cooking starts.';
+      label = 'ASAP';
     } else if (mode === 'custom') {
       if (customTime.value) {
         var p = customTime.value.split(':'), d = new Date();
@@ -640,4 +685,20 @@
   }).observe(ov, { attributes: true, attributeFilter: ['class'] });
 })();
 </script>
+<script>
+/* custom-time-picker : open the native clock dialog on tap */
+document.addEventListener('DOMContentLoaded', function () {
+  var t = document.getElementById('customTime');
+  if (!t) return;
+  t.setAttribute('type', 'time');
+  function openPicker() {
+    try { if (t.showPicker) t.showPicker(); } catch (e) {}
+  }
+  t.addEventListener('click', openPicker);
+  t.addEventListener('focus', openPicker);
+  var pick = document.getElementById('am-pick');
+  if (pick) pick.addEventListener('change', function () { setTimeout(openPicker, 50); });
+});
+</script>
+
 {% endblock %}

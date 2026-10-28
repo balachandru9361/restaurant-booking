@@ -6,17 +6,211 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}Restaurant{% endblock %}</title>
 <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<style>
+/* footer-match-header : style the footer like the header */
+.site-footer {
+  background: #0f172a !important;
+  border-top: 3px solid #d9a441 !important;
+  box-shadow: 0 -2px 12px rgba(0,0,0,.35) !important;
+}
+/* Brand name + section headings = header gold + Playfair */
+.site-footer h1, .site-footer h2, .site-footer h3,
+.site-footer h4, .site-footer h5, .site-footer h6 {
+  color: #f5c451 !important;
+  font-family: "Playfair Display", Georgia, serif !important;
+  letter-spacing: 0.5px;
+}
+/* Social icons = header cart button style */
+.footer-social a {
+  background: rgba(255,255,255,.08) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  color: #f5c451 !important;
+}
+.footer-social a:hover { background: rgba(255,255,255,.16) !important; color: #f5c451 !important; }
+/* Links hover = gold */
+.site-footer a:hover { color: #f5c451 !important; }
+/* Small icons (location, phone, mail, clock) = gold */
+.site-footer i, .site-footer svg { color: #d9a441; }
+/* Bottom divider line = gold tint */
+.site-footer hr, .footer-bottom { border-color: rgba(217,164,65,.35) !important; }
+</style>
+
+<style>
+/* footer-match-header-v2 */
+.site-footer .footer-brand-name {
+  color: #f5c451 !important;
+  font-family: "Playfair Display", Georgia, serif !important;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.site-footer .footer-brand-desc { color: rgba(255,255,255,.72) !important; }
+.site-footer .footer-rating .stars { color: #f5c451 !important; }
+.site-footer .footer-rating .rating-text { color: rgba(255,255,255,.72) !important; }
+
+/* social icons: round gold ring like header icons */
+.site-footer .footer-social a {
+  border-radius: 50% !important;
+  border: 1.5px solid #d9a441 !important;
+  background: transparent !important;
+  color: #f5c451 !important;
+}
+.site-footer .footer-social a:hover {
+  background: #d9a441 !important;
+  color: #0f172a !important;
+}
+
+/* contact icons gold */
+.site-footer .footer-contact-item svg { fill: #d9a441; color: #d9a441; }
+
+/* badges */
+.site-footer .footer-badge {
+  border: 1px solid rgba(217,164,65,.5) !important;
+  color: #f5c451 !important;
+  background: transparent !important;
+}
+
+/* bottom bar */
+.site-footer .footer-bottom {
+  border-top: 1px solid rgba(217,164,65,.35) !important;
+}
+.site-footer .footer-bottom-links a:hover { color: #f5c451 !important; }
+</style>
+
+<style>
+/* footer-match-header-v3 : exact values copied from the home page header */
+.site-footer {
+  background: #0f172a !important;
+  border-top: 3px solid #d9a441 !important;
+  box-shadow: 0 -2px 12px rgba(0,0,0,.35) !important;
+}
+.site-footer .footer-brand-name {
+  color: #f5c451 !important;
+  font-family: "Playfair Display", Georgia, serif !important;
+  font-weight: 700;
+}
+.site-footer .footer-col h4 {
+  color: #f5c451 !important;
+  font-family: "Playfair Display", Georgia, serif !important;
+}
+.site-footer .footer-brand-desc,
+.site-footer .footer-rating .rating-text { color: #9ca3af !important; }
+
+/* social icons use the header cart-button style */
+.site-footer .footer-social a {
+  background: rgba(255,255,255,.08) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  color: #f5c451 !important;
+}
+.site-footer .footer-social a:hover {
+  background: rgba(255,255,255,.16) !important;
+  color: #f5c451 !important;
+}
+.site-footer .footer-col a:hover,
+.site-footer .footer-bottom-links a:hover { color: #f5c451 !important; }
+.site-footer .footer-bottom { border-top: 1px solid rgba(255,255,255,.12) !important; }
+</style>
+
+<style>
+/* fix-hscroll : stop sideways scroll caused by 100vw header */
+html, body { overflow-x: hidden; }
+</style>
+
+<style>
+/* fix-hscroll-v2 : clip sideways overflow from the 100vw header */
+html { overflow-x: hidden !important; }
+body { overflow-x: clip !important; max-width: 100%; }
+</style>
+
+<style>
+/* navbar-mobile-fix : keep the old navbar compact on phones */
+@media (max-width: 700px) {
+  .navbar { flex-wrap: wrap; gap: 6px; padding: 10px 12px !important; }
+  .navbar .brand { width: 100%; font-size: 1.05rem; }
+  .navbar .nav-links {
+    display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 4px; width: 100%;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .navbar .nav-links::-webkit-scrollbar { display: none; }
+  .navbar .nav-links a { white-space: nowrap; padding: 6px 10px; font-size: .85rem; flex: none; }
+}
+</style>
+<style>
+/* site-messages : styled Django messages (success / error / warning / info) */
+.site-messages { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.site-alert {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 13px 16px; border-radius: 10px;
+  font-size: 14px; font-weight: 600; line-height: 1.4;
+  border-left: 5px solid #3498db; background: #e8f4fd; color: #1b5e8a;
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+  transition: opacity .4s ease;
+}
+.site-alert.success { background: #e6f9ef; color: #1e7a4a; border-left-color: #2bb673; }
+.site-alert.error   { background: #ffe9e9; color: #b42323; border-left-color: #F63A3A; }
+.site-alert.warning { background: #fff6dd; color: #8a6100; border-left-color: #f39c12; }
+.site-alert-icon { font-size: 16px; line-height: 1.3; }
+.site-alert-text { flex: 1; }
+.site-alert-close { background: none; border: none; color: inherit; font-size: 16px; cursor: pointer; opacity: .6; padding: 0 2px; line-height: 1; }
+.site-alert-close:hover { opacity: 1; }
+</style>
+
+<style>
+/* no-bounce : prevent over-scroll bounce at the top and bottom of the page */
+html, body { overscroll-behavior: none; }
+</style>
+
+<style>
+/* mobile-header-fix : keep the login button from being cut off on phones */
+@media (max-width: 480px) {
+  .site-header { overflow: visible !important; }
+  .site-header .brand {
+    min-width: 0;
+    flex: 1 1 auto;
+    gap: 6px !important;
+    font-size: .85rem !important;
+    line-height: 1.1;
+  }
+  .site-header .brand .logo-img { width: 36px !important; height: 36px !important; flex-shrink: 0; }
+  .site-header a[href*="login"],
+  .site-header a[href*="logout"],
+  .site-header a[href*="signup"] {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    padding: 7px 12px !important;
+    font-size: .8rem !important;
+  }
+  .site-header button, .site-header .icon-btn { flex-shrink: 0; }
+  .site-header > *, .site-header .header-inner, .site-header .nav-actions { gap: 6px !important; }
+}
+</style>
 </head>
 <body>
 
-    {% include 'includes/navbar.html' %}
+    {% include 'includes/site_header.html' %}
 
 <main class="container">
         {% block messages %}
         {% if messages %}
+<div class="site-messages">
             {% for message in messages %}
-<div class="alert alert-{{ message.tags }}">{{ message }}</div>
+<div class="site-alert {{ message.tags }}" role="alert">
+<span class="site-alert-icon">{% if 'success' in message.tags %}✅{% elif 'error' in message.tags %}⛔{% elif 'warning' in message.tags %}⚠️{% else %}ℹ️{% endif %}</span>
+<span class="site-alert-text">{{ message }}</span>
+<button type="button" class="site-alert-close" aria-label="Close" onclick="this.parentElement.remove();">&times;</button>
+</div>
             {% endfor %}
+</div>
+<script>
+  /* site messages fade out by themselves after 6 seconds */
+  (function () {
+    document.querySelectorAll('.site-alert').forEach(function (el) {
+      setTimeout(function () { el.style.opacity = '0'; }, 6000);
+      setTimeout(function () { if (el.parentElement) el.remove(); }, 6500);
+    });
+  })();
+</script>
         {% endif %}
         {% endblock %}
 
@@ -25,7 +219,7 @@
 </main>
 
 <style>
-.site-footer { background: #101827; color: #d1d5db; padding: 0; font-family: 'Inter', sans-serif; margin-top: 60px; position: relative; }
+.site-footer { background: #0f172a; color: #d1d5db; padding: 0; font-family: 'Inter', sans-serif; margin-top: 60px; position: relative; }
 .footer-main { padding: 56px 24px 0; }
 .footer-inner { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.2fr; gap: 36px; padding-bottom: 40px; border-bottom: 1px solid rgba(255,255,255,0.08); }
 .footer-brand-name { display: flex; align-items: center; gap: 8px; font-size: 1.3rem; font-weight: 800; color: #ff6b6b; margin-bottom: 12px; }
@@ -43,6 +237,10 @@
 .footer-col a:hover { color: #ff6b6b; text-decoration: none; padding-left: 3px; }
 .footer-contact-item { display: flex; align-items: flex-start; gap: 10px; font-size: 0.88rem; color: #9aa4b2; line-height: 1.5; margin-bottom: 14px; }
 .footer-contact-item svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; color: #ff6b6b; }
+/* Tappable contact rows (address, phone, email) */
+a.footer-contact-item { text-decoration: none; font-size: 0.88rem; transition: color 0.2s ease; }
+.footer-col a.footer-contact-item:hover { padding-left: 0; }
+a.footer-contact-item:hover svg { color: #f5c451; fill: #f5c451; }
 .footer-badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
 .footer-badge { background: rgba(255,255,255,0.06); color: #9aa4b2; font-size: 0.68rem; font-weight: 700; padding: 5px 10px; border-radius: 6px; letter-spacing: 0.03em; }
 .footer-bottom { max-width: 1100px; margin: 0 auto; padding: 22px 24px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 0.8rem; color: #6b7280; }
@@ -54,8 +252,40 @@
 .back-to-top.show, .scroll-to-bottom.show { opacity: 1; visibility: visible; transform: translateY(0); }
 .back-to-top:hover, .scroll-to-bottom:hover { background: #e63946; }
 .back-to-top svg, .scroll-to-bottom svg { width: 20px; height: 20px; }
+
+/* Find Us: GTA-style round minimap. Click it to open the full map. */
+.footer-map { max-width: 1100px; margin: 0 auto; padding: 28px 0; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.footer-map-info h4 { margin: 0 0 8px; font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.footer-map-info p { margin: 0 0 14px; font-size: 0.88rem; color: #9aa4b2; line-height: 1.5; }
+.footer-map-btn { display: inline-block; background: #d9a441; color: #0f172a !important; font-size: 0.8rem; font-weight: 700; padding: 7px 14px; border-radius: 20px; text-decoration: none; }
+.footer-map-btn:hover { background: #f5c451; }
+
+.minimap { position: relative; width: 170px; height: 170px; flex: 0 0 auto; border-radius: 50%; border: 4px solid #d9a441; box-shadow: 0 0 0 3px #0f172a, 0 0 22px rgba(217,164,65,.55), inset 0 0 18px rgba(0,0,0,.6); overflow: hidden; cursor: pointer; background: #1b2438; padding: 0; transition: transform .2s ease, box-shadow .2s ease; }
+.minimap:hover { transform: scale(1.05); box-shadow: 0 0 0 3px #0f172a, 0 0 30px rgba(245,196,81,.8), inset 0 0 18px rgba(0,0,0,.6); }
+/* the iframe is larger than the circle so Google's info card and buttons are cropped out */
+.minimap iframe { position: absolute; top: 50%; left: 50%; width: 440px; height: 440px; transform: translate(-50%, -50%); border: 0 !important; border-radius: 0 !important; pointer-events: none; filter: grayscale(.55) contrast(1.15) brightness(.85) sepia(.15); }
+/* player arrow in the centre, like the GTA radar */
+.minimap-pin { position: absolute; top: 50%; left: 50%; width: 0; height: 0; transform: translate(-50%, -62%); border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid #ff3b3b; filter: drop-shadow(0 0 4px rgba(0,0,0,.8)); z-index: 2; }
+.minimap-n { position: absolute; top: 6px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 800; color: #f5c451; text-shadow: 0 0 4px #000; z-index: 2; }
+.minimap-hint { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 700; letter-spacing: .08em; color: #fff; background: rgba(15,23,42,.75); padding: 2px 8px; border-radius: 10px; z-index: 2; white-space: nowrap; }
+
+/* full map popup */
+.map-modal { position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+.map-modal.open { display: flex; }
+.map-modal-box { position: relative; width: min(900px, 100%); height: min(560px, 85vh); background: #0f172a; border: 3px solid #d9a441; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.map-modal-box iframe { width: 100%; height: 100%; border: 0; display: block; }
+.map-modal-close { position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: 50%; border: 2px solid #d9a441; background: #0f172a; color: #f5c451; font-size: 20px; line-height: 1; cursor: pointer; z-index: 3; }
+.map-modal-close:hover { background: #d9a441; color: #0f172a; }
+
 @media (max-width: 800px) { .footer-inner { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 520px) { .footer-inner { grid-template-columns: 1fr; } .footer-bottom { flex-direction: column; text-align: center; } .footer-bottom-links a { margin-left: 0; margin-right: 12px; } }
+@media (max-width: 520px) {
+  .footer-inner { grid-template-columns: 1fr; }
+  .footer-bottom { flex-direction: column; text-align: center; }
+  .footer-bottom-links a { margin-left: 0; margin-right: 12px; }
+  .footer-map { padding: 24px 0; flex-direction: column; align-items: center; text-align: center; gap: 18px; }
+  .footer-map-btn { text-align: center; padding: 11px 14px; }
+  .minimap { width: 150px; height: 150px; }
+}
 </style>
 
 <footer class="site-footer">
@@ -103,18 +333,18 @@
 
 <div class="footer-col">
 <h4>Contact Us</h4>
-<div class="footer-contact-item">
+<a class="footer-contact-item" href="https://www.google.com/maps/dir/?api=1&destination=Musiri+Tiruchirappalli+Tamil+Nadu+621211" target="_blank" rel="noopener noreferrer" aria-label="Open address in Google Maps">
 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>
-<span>123, Anna Salai, Chennai, Tamil Nadu 600002</span>
-</div>
-<div class="footer-contact-item">
+<span>Musiri, Trichy, Tamil Nadu 621211</span>
+</a>
+<a class="footer-contact-item" href="tel:+919361941312" aria-label="Call us">
 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1C10.61 21 3 13.39 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.25 1.01l-2.2 2.2z"/></svg>
-<span>+91 98765 43210</span>
-</div>
-<div class="footer-contact-item">
+<span>+91 93619 41312</span>
+</a>
+<a class="footer-contact-item" href="mailto:hello@chandrurestaurant.com" aria-label="Send us an email">
 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5-8-5V6l8 5 8-5z"/></svg>
 <span>hello@chandrurestaurant.com</span>
-</div>
+</a>
 <div class="footer-contact-item">
 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 10.41 4 2.31-.75 1.3-4.75-2.75V7h1.5z"/></svg>
 <span>Open daily: 11:00 AM – 11:00 PM</span>
@@ -122,8 +352,38 @@
 
 <div class="footer-badges">
 <span class="footer-badge">🔒 SECURE PAYMENTS</span>
-<span class="footer-badge">🚚 FAST DELIVERY</span>
 </div>
+</div>
+</div>
+
+<div class="footer-map">
+<div class="footer-map-info">
+<h4>Find Us</h4>
+<p>Musiri, Trichy, Tamil Nadu 621211<br>Tap the minimap to open the full map.</p>
+<a href="https://www.google.com/maps/dir/?api=1&destination=Musiri+Tiruchirappalli+Tamil+Nadu+621211" target="_blank" rel="noopener noreferrer" class="footer-map-btn">Get Directions ↗</a>
+</div>
+
+<button type="button" class="minimap" id="minimapBtn" aria-label="Open full map">
+<iframe
+  title="Chandru Restaurant minimap"
+  src="https://www.google.com/maps?q=Musiri+Tiruchirappalli+Tamil+Nadu+621211&z=15&output=embed"
+  tabindex="-1" loading="lazy"
+  referrerpolicy="no-referrer-when-downgrade"></iframe>
+<span class="minimap-n">N</span>
+<span class="minimap-pin"></span>
+<span class="minimap-hint">TAP TO EXPAND</span>
+</button>
+</div>
+
+<div class="map-modal" id="mapModal" aria-hidden="true">
+<div class="map-modal-box">
+<button type="button" class="map-modal-close" id="mapModalClose" aria-label="Close map">&times;</button>
+<iframe
+  id="mapModalFrame"
+  title="Chandru Restaurant location"
+  data-src="https://www.google.com/maps?q=Musiri+Tiruchirappalli+Tamil+Nadu+621211&output=embed"
+  allowfullscreen
+  referrerpolicy="no-referrer-when-downgrade"></iframe>
 </div>
 </div>
 
@@ -151,59 +411,96 @@
 </button>
 
 <script>
+/* minimap : open and close the full map popup */
 (function () {
-  if (document.body.hasAttribute('data-no-autorefresh')) return;
-  if (location.pathname.indexOf('/dashboard') !== 0) return;              // admin dashboard pages mattum
-  if (location.pathname.indexOf('/dashboard/kitchen') !== -1) return;     // kitchen page-ku own refresh irukku
+  var btn = document.getElementById('minimapBtn');
+  var modal = document.getElementById('mapModal');
+  var frame = document.getElementById('mapModalFrame');
+  var closeBtn = document.getElementById('mapModalClose');
+  if (!btn || !modal || !frame) return;
 
-  var INTERVAL = 300;          // seconds (300 = 5 minutes). 5 sec venumna 5 nu maathunga
-  var left = INTERVAL;
+  function openMap() {
+    if (!frame.getAttribute('src')) frame.setAttribute('src', frame.getAttribute('data-src'));
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+  function closeMap() {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  btn.addEventListener('click', openMap);
+  closeBtn.addEventListener('click', closeMap);
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeMap(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMap(); });
+})();
+</script>
 
-  function fmt(s) {
-    if (s < 60) return s + 's';
-    var m = Math.floor(s / 60), r = s % 60;
-    return m + ':' + (r < 10 ? '0' : '') + r;
+<script>
+/* sidebar-dock : the admin sidebar is fixed below the header and only the page scrolls.
+   Class names are unknown, so the sidebar is located using the "Management Panel" text. */
+(function () {
+  if (location.pathname.indexOf('/dashboard') !== 0) return;
+
+  function findSidebar() {
+    var all = document.querySelectorAll('body *'), seed = null, i;
+    for (i = 0; i < all.length; i++) {
+      if (all[i].children.length === 0 && /Management Panel/.test(all[i].textContent)) { seed = all[i]; break; }
+    }
+    if (!seed) return null;
+    var el = seed, best = null;
+    while (el && el !== document.body) {
+      if (el.getBoundingClientRect().width > 420) break;      // stop once a full-width wrapper is reached
+      if (/Logout/.test(el.textContent)) best = el;           // the largest narrow container with Logout is the sidebar
+      el = el.parentElement;
+    }
+    return best;
   }
 
-  // Pill ippo top-right-la (navbar-ku keezha) irukku
-  var css = document.createElement('style');
-  css.textContent =
-    '#autoRefreshPill{position:fixed;top:84px;right:24px;z-index:900;display:flex;align-items:center;gap:7px;' +
-    'background:#fff;color:#374151;border:1px solid #e5e7eb;border-radius:999px;padding:6px 14px;font-size:.75rem;font-weight:600;' +
-    'box-shadow:0 4px 14px rgba(0,0,0,.12);font-family:inherit}' +
-    '#autoRefreshPill i{width:8px;height:8px;border-radius:50%;background:#22c55e;animation:arPulse 1.2s infinite}' +
-    '#autoRefreshPill.paused i{background:#f59e0b;animation:none}' +
-    '@keyframes arPulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}100%{box-shadow:0 0 0 8px rgba(34,197,94,0)}}' +
-    '@media(max-width:900px){#autoRefreshPill{right:12px;top:76px}}';
-  document.head.appendChild(css);
+  function init() {
+    if (window.innerWidth <= 900) return;                      // do not apply on mobile
+    var sb = findSidebar();
+    if (!sb || sb.getAttribute('data-docked')) return;
+    var hdr = document.querySelector('header, .site-header, .navbar');
+    var r = sb.getBoundingClientRect(), cs = getComputedStyle(sb);
 
-  var pill = document.createElement('div');
-  pill.id = 'autoRefreshPill';
-  document.body.appendChild(pill);
+    // Once the sidebar is fixed, add a same-size spacer so the content layout does not shift
+    var sp = document.createElement('div');
+    sp.setAttribute('aria-hidden', 'true');
+    sp.style.cssText = 'flex:0 0 ' + r.width + 'px;width:' + r.width + 'px;min-width:' + r.width +
+                       'px;height:1px;visibility:hidden;pointer-events:none;';
+    sp.style.margin = '0 ' + cs.marginRight + ' 0 ' + cs.marginLeft;
+    sp.style.gridArea = cs.gridArea;
+    sp.style.order = cs.order;
+    sb.parentNode.insertBefore(sp, sb);
 
-  function show(text, paused) {
-    pill.className = paused ? 'paused' : '';
-    pill.innerHTML = '<i></i><span>' + text + '</span>';
+    function S(p, v) { sb.style.setProperty(p, v, 'important'); }
+    sb.setAttribute('data-docked', '1');
+    S('position', 'fixed');
+    S('bottom', '0');
+    S('width', r.width + 'px');
+    S('height', 'auto');
+    S('max-height', 'none');
+    S('margin', '0');
+    S('overflow-y', 'auto');
+    S('overscroll-behavior', 'contain');
+    S('z-index', '50');
+
+    var lastTop = null, lastLeft = null;
+    function place() {
+      var top = hdr ? Math.max(0, Math.ceil(hdr.getBoundingClientRect().bottom)) : 0;
+      var left = Math.round(sp.getBoundingClientRect().left);
+      if (top !== lastTop)   { S('top', top + 'px');   lastTop = top; }
+      if (left !== lastLeft) { S('left', left + 'px'); lastLeft = left; }
+    }
+    place();
+    window.addEventListener('scroll', place, { passive: true });
+    window.addEventListener('resize', place);
+    // The sidebar follows the navbar even if the navbar bounces or moves
+    (function tick() { place(); requestAnimationFrame(tick); })();
   }
 
-  // type pannittu irundha / modal open / text select pannirundha refresh pause aagum
-  function userIsBusy() {
-    var a = document.activeElement;
-    if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return true;
-    if (document.querySelector('.modal.show, dialog[open], .modal[style*="display: block"], .stock-overlay')) return true;
-    if (window.getSelection && String(window.getSelection()).length) return true;
-    return false;
-  }
-
-  show('Auto refresh in ' + fmt(left), false);
-
-  setInterval(function () {
-    if (document.hidden) return;
-    if (userIsBusy()) { left = INTERVAL; show('Paused while you work', true); return; }
-    left--;
-    if (left <= 0) { show('Refreshing...', false); location.reload(); return; }
-    show('Auto refresh in ' + fmt(left), false);
-  }, 1000);
+  if (document.readyState === 'complete') init();
+  else window.addEventListener('load', init);
 })();
 </script>
 

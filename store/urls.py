@@ -23,4 +23,9 @@ urlpatterns = [
     path("damage/", views.damage, name="damage"),
     path("damage/add/", views.damage_add, name="damage_add"),
     path("alerts/", views.stock_alert, name="stock_alert"),
+    path("alerts/report/<int:pk>/done/", views.kitchen_report_done, name="kitchen_report_done"),
+    path("recipes/", views.recipe_list, name="recipes"),
+    path("recipes/<int:pk>/", views.recipe_edit, name="recipe_edit"),
+    path("recipes/line/<int:pk>/delete/", views.recipe_line_delete, name="recipe_line_delete"),
+    path("api/dashboard/", views.dashboard_api, name="dashboard_api"),
 ]

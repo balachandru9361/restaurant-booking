@@ -10,12 +10,11 @@ from django.views.decorators.http import require_POST
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
-from django.db.models import F
 from django.utils import timezone
-from menu.models import FoodItem
+from menu.models import FoodItem, Option
 from booking.models import Table
 from booking.availability import table_status_map, is_table_busy_now, upcoming_holds, WALKIN_BUFFER
-from .models import Order, OrderItem, Coupon
+from .models import Order, OrderItem
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +40,68 @@ def _safe_qty(raw, default=1):
     return max(1, min(qty, MAX_QTY))
 
 
+def _parse_line(key):
+    """'12' -> (12, []), '12:5-7' -> (12, [5, 7]). A cart line is a dish plus its chosen options."""
+    item_part, _, option_part = str(key).partition(':')
+    try:
+        item_id = int(item_part)
+    except ValueError:
+        return None, []
+    option_ids = [int(p) for p in option_part.split('-') if p.isdigit()]
+    return item_id, option_ids
+
+
+def _line_key(item_id, option_ids):
+    ids = sorted(set(option_ids))
+    if not ids:
+        return str(item_id)
+    return str(item_id) + ':' + '-'.join(str(i) for i in ids)
+
+
+def _load_options(food_item, option_ids):
+    """Option rows for a cart line. Only options that still belong to the dish and are available."""
+    if not option_ids:
+        return []
+    found = {
+        o.id: o
+        for o in Option.objects.filter(
+            id__in=option_ids, group__food_item=food_item, is_available=True
+        )
+    }
+    return [found[i] for i in option_ids if i in found]
+
+
+def _validate_options(food_item, raw_ids):
+    """Checks the chosen options against the dish's option groups.
+    Returns (clean_option_ids, error_message). The message is empty when all is fine."""
+    chosen = set()
+    for raw in raw_ids:
+        try:
+            chosen.add(int(raw))
+        except (TypeError, ValueError):
+            return [], 'Invalid option.'
+
+    clean = []
+    known = set()
+    for group in food_item.option_groups.prefetch_related('options'):
+        group_options = [o for o in group.options.all() if o.is_available]
+        group_ids = {o.id for o in group_options}
+        known |= group_ids
+        picked = sorted(chosen & group_ids)
+
+        if group.group_type == 'single' and len(picked) > 1:
+            return [], 'Pick only one for ' + group.title + '.'
+        if group.group_type == 'multi' and group.max_select and len(picked) > group.max_select:
+            return [], 'Pick at most ' + str(group.max_select) + ' for ' + group.title + '.'
+        if group.is_required and group_options and not picked:
+            return [], 'Please choose an option for ' + group.title + '.'
+        clean.extend(picked)
+
+    if chosen - known:
+        return [], 'One of the chosen options is not available.'
+    return clean, ''
+
+
 def _add_to_session_cart(cart, item_id, quantity):
     """Adds quantity to the cart dict, never going above MAX_QTY."""
     key = str(item_id)
@@ -58,8 +119,17 @@ def add_to_cart(request, item_id):
         messages.error(request, 'This item is not available.')
         return redirect('menu_list')
 
+    # Chosen options (Choose Your Side, Add-ons ...). Empty for plain dishes.
+    food_item = FoodItem.objects.get(id=item_id)
+    option_ids, option_error = _validate_options(food_item, request.POST.getlist('options'))
+    if option_error:
+        if _is_ajax(request):
+            return JsonResponse({'success': False, 'error': option_error}, status=400)
+        messages.error(request, option_error)
+        return redirect('menu_list')
+
     cart = request.session.get('cart', {})
-    _add_to_session_cart(cart, item_id, quantity)
+    _add_to_session_cart(cart, _line_key(item_id, option_ids), quantity)
 
     request.session['cart'] = cart
     request.session.modified = True
@@ -79,7 +149,7 @@ def add_to_order(request, item_id):
 
     if not FoodItem.objects.filter(id=item_id, is_available=True).exists():
         messages.error(request, 'This item is not available.')
-        return redirect('menu_detail', item_id=item_id)
+        return redirect('item_detail', item_id=item_id)
 
     cart = request.session.get('cart', {})
     _add_to_session_cart(cart, item_id, quantity)
@@ -116,7 +186,13 @@ def bulk_add_to_cart(request):
 
         quantity = _safe_qty(entry.get('quantity', 1))
 
-        if not FoodItem.objects.filter(id=item_id, is_available=True).exists():
+        food_item = FoodItem.objects.filter(id=item_id, is_available=True).first()
+        if food_item is None:
+            continue
+
+        # A dish that needs a choice (required option group) cannot be bulk added
+        _, option_error = _validate_options(food_item, [])
+        if option_error:
             continue
 
         _add_to_session_cart(cart, item_id, quantity)
@@ -137,7 +213,7 @@ def select_table(request, table_id):
     sends the customer to the menu to start ordering for that table."""
     table = get_object_or_404(Table, id=table_id)
 
-    # CHANGED: if the table is held by someone else right now, don't attach it
+    # If the table is held by someone else right now, don't attach it
     if is_table_busy_now(table.id, request.user):
         messages.warning(
             request,
@@ -167,9 +243,8 @@ def clear_table(request):
 def _get_tables_with_status(user=None):
     """Returns all tables tagged with whether they're currently held.
 
-    A table is hidden/held for 2 hours after it is booked (reservation time or
-    dine-in order) and then opens again automatically. The admin can also open
-    it early. The customer who holds the table can still use it.
+    A held table stays held until the admin opens it (see booking/availability.py).
+    The customer who holds the table can still use it.
 
     A table with an upcoming reservation starting within WALKIN_BUFFER is also
     shown as booked, so a walk-in doesn't get seated right before the
@@ -201,50 +276,47 @@ def _get_tables_with_status(user=None):
 
 
 def _get_cart_totals(request):
-    """Shared helper: computes subtotal, discount and final total for the
-    current session cart + any applied coupon. Used by view_cart and confirm_order
-    so both stay in sync. The total here does NOT include the tip."""
+    """Shared helper: computes the cart lines, subtotal and total for the
+    current session cart. Used by view_cart and confirm_order so both stay in sync.
+    There is no coupon any more, so total == subtotal. The total does NOT include the tip."""
     cart = request.session.get('cart', {})
     cart_items = []
     subtotal = Decimal('0.00')
 
-    for item_id_str, quantity in cart.items():
+    for line_key, quantity in cart.items():
+        item_id, option_ids = _parse_line(line_key)
+        if item_id is None:
+            continue
         try:
-            food_item = FoodItem.objects.get(id=item_id_str, is_available=True)
-        except (FoodItem.DoesNotExist, ValueError):
+            food_item = FoodItem.objects.get(id=item_id, is_available=True)
+        except FoodItem.DoesNotExist:
             continue
 
-        item_subtotal = food_item.price * quantity
+        options = _load_options(food_item, option_ids)
+        unit_price = food_item.price + sum((o.extra_price for o in options), Decimal('0.00'))
+        item_subtotal = unit_price * quantity
         subtotal += item_subtotal
 
         cart_items.append({
             'id': food_item.id,
+            'line': line_key,
             'name': food_item.name,
-            'price': food_item.price,
+            'price': unit_price,
             'quantity': quantity,
             'subtotal': item_subtotal,
             'image': food_item.image if hasattr(food_item, 'image') else None,
             'image_url': food_item.image.url if food_item.image else '',
             'is_veg': food_item.is_veg,
+            'options_text': ', '.join(o.name for o in options),
         })
 
-    coupon = None
-    discount_amount = Decimal('0.00')
-    coupon_code = request.session.get('coupon_code')
-    if coupon_code:
-        coupon = Coupon.objects.filter(code__iexact=coupon_code).first()
-        if coupon and coupon.is_valid():
-            discount_amount = (
-                Decimal(subtotal) * coupon.discount_percent / Decimal('100')
-            ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        else:
-            # Coupon expired/used up/deactivated since it was applied - drop it silently
-            coupon = None
-            request.session.pop('coupon_code', None)
-            request.session.modified = True
+    # A coupon applied in an older session is simply forgotten
+    if 'coupon_code' in request.session:
+        request.session.pop('coupon_code', None)
+        request.session.modified = True
 
-    total = subtotal - discount_amount
-    return cart_items, subtotal, coupon, discount_amount, total
+    total = subtotal
+    return cart_items, subtotal, total
 
 
 def _money(value):
@@ -253,7 +325,7 @@ def _money(value):
 
 def _cart_payload(request, **extra):
     """JSON used by the menu page side cart panel and the cart page."""
-    cart_items, subtotal, coupon, discount_amount, total = _get_cart_totals(request)
+    cart_items, subtotal, total = _get_cart_totals(request)
     data = {
         'success': True,
         'items': [
@@ -265,11 +337,13 @@ def _cart_payload(request, **extra):
                 'subtotal': _money(i['subtotal']),
                 'image_url': i['image_url'],
                 'is_veg': i['is_veg'],
+                'line': i['line'],
+                'options_text': i['options_text'],
             }
             for i in cart_items
         ],
         'subtotal': _money(subtotal),
-        'discount': _money(discount_amount),
+        'discount': '0.00',   # kept so the menu page side panel JS does not break
         'total': _money(total),
         'count': len(cart_items),
         'total_qty': sum(i['quantity'] for i in cart_items),
@@ -278,13 +352,41 @@ def _cart_payload(request, **extra):
     return data
 
 
+def item_options(request, item_id):
+    """Option groups of one dish as JSON. The menu popup calls this when ADD is clicked."""
+    food_item = get_object_or_404(FoodItem, id=item_id, is_available=True)
+    groups = []
+    for group in food_item.option_groups.prefetch_related('options'):
+        options = [
+            {
+                'id': o.id,
+                'name': o.name,
+                'extra_price': _money(o.extra_price),
+                'image_url': o.image.url if o.image else '',
+                'is_default': o.is_default,
+            }
+            for o in group.options.all() if o.is_available
+        ]
+        if not options:
+            continue
+        groups.append({
+            'id': group.id,
+            'title': group.title,
+            'type': group.group_type,
+            'required': group.is_required,
+            'max_select': group.max_select,
+            'options': options,
+        })
+    return JsonResponse({'success': True, 'groups': groups})
+
+
 def cart_data(request):
     """Current cart as JSON. The menu page calls this on load to fill the side panel."""
     return JsonResponse(_cart_payload(request))
 
 
 def _calc_tip(total, tip_percent):
-    """Tip on the amount after discount. Rounds half-up to 2 places, the same
+    """Tip on the total amount. Rounds half-up to 2 places, the same
     way the cart page JavaScript does, so both show the same paisa."""
     if tip_percent not in ALLOWED_TIPS:
         return Decimal('0.00')
@@ -293,7 +395,7 @@ def _calc_tip(total, tip_percent):
 
 
 def view_cart(request):
-    cart_items, subtotal, coupon, discount_amount, total = _get_cart_totals(request)
+    cart_items, subtotal, total = _get_cart_totals(request)
 
     # "You may also like": other available dishes that are not in the cart yet
     cart_ids = [i['id'] for i in cart_items]
@@ -310,8 +412,6 @@ def view_cart(request):
     context = {
         'cart_items': cart_items,
         'subtotal': subtotal,
-        'coupon': coupon,
-        'discount_amount': discount_amount,
         'total': total,
         'suggestions': suggestions,
         'selected_table': selected_table,   # NEW
@@ -323,7 +423,8 @@ def view_cart(request):
 def update_cart_qty(request, item_id):
     """+ / - buttons on the cart page and the menu side panel. Returns JSON so the page updates live."""
     cart = request.session.get('cart', {})
-    key = str(item_id)
+    # 'line' picks one cart line when the same dish was added with different options
+    key = request.POST.get('line') or str(item_id)
 
     if key not in cart:
         return JsonResponse({'success': False, 'error': 'Item not in cart'}, status=404)
@@ -332,40 +433,31 @@ def update_cart_qty(request, item_id):
     if action == 'inc':
         cart[key] = min(cart[key] + 1, MAX_QTY)
     elif action == 'dec':
-        cart[key] = max(cart[key] - 1, 1)
+        if cart[key] <= 1 and request.POST.get('remove_at_zero') == '1':
+            del cart[key]
+        else:
+            cart[key] = max(cart[key] - 1, 1)
     else:
         return JsonResponse({'success': False, 'error': 'Bad action'}, status=400)
 
     request.session['cart'] = cart
     request.session.modified = True
 
-    cart_items, subtotal, coupon, discount_amount, total = _get_cart_totals(request)
-    line = next((i for i in cart_items if i['id'] == item_id), None)
+    cart_items, subtotal, total = _get_cart_totals(request)
+    line = next((i for i in cart_items if i['line'] == key), None)
 
     return JsonResponse(_cart_payload(
         request,
-        quantity=cart[key],
+        quantity=cart.get(key, 0),
         line_subtotal=_money(line['subtotal']) if line else '0.00',
     ))
 
 
+# Coupons are switched off. These two tiny views stay only so the old URLs in
+# orders/urls.py still work. You can delete them together with those 2 URL lines later.
 @require_POST
 def apply_coupon(request):
-    code = request.POST.get('coupon_code', '').strip()
-
-    if not code:
-        messages.error(request, 'Enter a coupon code.')
-        return redirect('orders:view_cart')
-
-    coupon = Coupon.objects.filter(code__iexact=code).first()
-
-    if not coupon or not coupon.is_valid():
-        messages.error(request, 'Invalid or expired coupon code.')
-        return redirect('orders:view_cart')
-
-    request.session['coupon_code'] = coupon.code
-    request.session.modified = True
-    messages.success(request, f'Coupon "{coupon.code}" applied - {coupon.discount_percent}% off!')
+    messages.info(request, 'Coupons are not available right now.')
     return redirect('orders:view_cart')
 
 
@@ -373,17 +465,17 @@ def apply_coupon(request):
 def remove_coupon(request):
     request.session.pop('coupon_code', None)
     request.session.modified = True
-    messages.success(request, 'Coupon removed.')
     return redirect('orders:view_cart')
 
 
 @require_POST
 def remove_from_cart(request, item_id):
     cart = request.session.get('cart', {})
-    item_id_str = str(item_id)
+    # 'line' picks one cart line when the same dish was added with different options
+    key = request.POST.get('line') or str(item_id)
 
-    if item_id_str in cart:
-        del cart[item_id_str]
+    if key in cart:
+        del cart[key]
         request.session['cart'] = cart
         request.session.modified = True
         if not _is_ajax(request):
@@ -431,21 +523,22 @@ def confirm_order(request):
         messages.error(request, 'Your cart is empty.')
         return redirect('orders:view_cart')
 
+    cart_lines, subtotal, total = _get_cart_totals(request)
+
     order_items_data = []
-    for item_id_str, quantity in cart.items():
-        try:
-            food_item = FoodItem.objects.get(id=item_id_str, is_available=True)
-        except (FoodItem.DoesNotExist, ValueError):
-            continue
-        order_items_data.append((food_item, quantity, food_item.price))
+    for line in cart_lines:
+        order_items_data.append((
+            FoodItem.objects.get(id=line['id']),
+            line['quantity'],
+            line['price'],
+            line['options_text'],
+        ))
 
     if not order_items_data:
         messages.error(request, 'No valid items in your cart.')
         return redirect('orders:view_cart')
 
-    _, subtotal, coupon, discount_amount, total = _get_cart_totals(request)
-
-    # Optional tip (5% or 10% of the amount after discount). Always calculated
+    # Optional tip (5% or 10% of the total). Always calculated
     # here on the server, the browser only sends the percent.
     tip_percent = request.POST.get('tip_percent', '0')
     total = Decimal(total) + _calc_tip(total, tip_percent)
@@ -453,25 +546,10 @@ def confirm_order(request):
     # Order options from the cart page (a plain GET, e.g. "Order now" from a
     # dish page, simply uses the defaults: dine-in, ASAP, no note, no tip)
     order_type = request.POST.get('order_type', 'dine_in')
-    if order_type not in ('dine_in', 'takeaway', 'delivery'):
+    if order_type not in ('dine_in', 'takeaway'):
         order_type = 'dine_in'
     arrival_time = _parse_arrival(request)
     note = request.POST.get('note', '').strip()[:255]
-
-    # Home delivery needs an address and a phone number the rider can call
-    delivery_address = ''
-    delivery_phone = ''
-    if order_type == 'delivery':
-        delivery_address = request.POST.get('delivery_address', '').strip()[:500]
-        delivery_phone = request.POST.get('delivery_phone', '').strip()
-        digits = ''.join(ch for ch in delivery_phone if ch.isdigit())
-        if len(delivery_address) < 10:
-            messages.error(request, 'Please enter your full delivery address.')
-            return redirect('orders:view_cart')
-        if not 10 <= len(digits) <= 13:
-            messages.error(request, 'Please enter a valid phone number for delivery.')
-            return redirect('orders:view_cart')
-        delivery_phone = delivery_phone[:15]
 
     # Customers no longer pick a table in the cart. A table is only attached
     # when they scanned a table QR code and are dining in; otherwise the server
@@ -492,27 +570,22 @@ def confirm_order(request):
             user=request.user,
             table=selected_table,
             status='pending',
-            coupon=coupon,
-            discount_amount=discount_amount,
+            coupon=None,
+            discount_amount=Decimal('0.00'),
             total_amount=total,
             order_type=order_type,
             arrival_time=arrival_time,
             note=note,
-            delivery_address=delivery_address,
-            delivery_phone=delivery_phone,
         )
 
-        for food_item, quantity, price in order_items_data:
+        for food_item, quantity, price, options_text in order_items_data:
             OrderItem.objects.create(
                 order=order,
                 food_item=food_item,
                 quantity=quantity,
                 price=price,
+                options_text=options_text,
             )
-
-        if coupon:
-            # F() makes the +1 happen in the database, safe when two people use the coupon together
-            Coupon.objects.filter(pk=coupon.pk).update(times_used=F('times_used') + 1)
 
     request.session['cart'] = {}
     request.session.pop('selected_table', None)
@@ -549,18 +622,28 @@ def payment_success(request, order_id):
     # status is NOT changed here - approval moves it to 'confirmed'
     order.payment_method = payment_method
     order.payment_status = 'cash_pending' if payment_method == 'cash' else 'paid'
-    order.save(update_fields=['payment_method', 'payment_status'])
+    fields = ['payment_method', 'payment_status']
+
+    if payment_method == 'online':
+        # This checkout is a MOCK, so no real Razorpay payment exists. A mock id is saved
+        # so the automatic refund on Reject works end to end (see _razorpay_refund in
+        # dashboard/views.py: ids starting with "mock_" are refunded without calling Razorpay).
+        # With the REAL Razorpay checkout, verify the signature and save the real "pay_xxx"
+        # id here instead. That real id is what the Razorpay refund API needs.
+        order.razorpay_payment_id = f'mock_pay_{order.id}'
+        fields.append('razorpay_payment_id')
+
+    order.save(update_fields=fields)
 
     if request.user.email:
         item_lines = "\n".join(
             f"- {oi.food_item.name} x{oi.quantity} = Rs.{oi.price * oi.quantity}"
             for oi in order.items.all()
         )
+        # Old orders placed before coupons were removed can still have a coupon
         discount_line = f"\nDiscount ({order.coupon.code}): -Rs.{order.discount_amount}\n" if order.coupon else ""
 
-        if payment_method == 'cash' and order.is_delivery:
-            payment_line = f"\nPayment: Cash on Delivery (Rs.{order.total_amount} to be paid to the delivery person)\n"
-        elif payment_method == 'cash':
+        if payment_method == 'cash':
             payment_line = f"\nPayment: Cash at Restaurant (Rs.{order.total_amount} to be paid on arrival)\n"
         else:
             payment_line = f"\nPayment: Paid Online (Rs.{order.total_amount})\n"
@@ -585,9 +668,7 @@ def payment_success(request, order_id):
         except Exception:
             logger.exception('Could not send order received email for order %s', order.id)
 
-    if payment_method == 'cash' and order.is_delivery:
-        messages.success(request, 'Order placed! Waiting for restaurant approval. Please pay in cash to the delivery person.')
-    elif payment_method == 'cash':
+    if payment_method == 'cash':
         messages.success(request, 'Order placed! Waiting for restaurant approval. Please pay in cash at the restaurant.')
     else:
         messages.success(request, 'Order placed! Waiting for restaurant approval.')

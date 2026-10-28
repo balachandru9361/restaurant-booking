@@ -1,50 +1,152 @@
-{% extends 'store/store_base.html' %}
-{% block title %}Store Dashboard{% endblock %}
+{% extends "store/store_base.html" %}
 {% block content %}
-<h1>Store Dashboard</h1>
+<style>
+.sd{--c:#ff6b6b;--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;--ok:#16a34a;--warn:#f59e0b;--bad:#dc2626;color:var(--ink)}
+.sd *{box-sizing:border-box}
+.sd .top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.sd h1{margin:0;font-size:26px}
+.sd .live{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);background:#fff;padding:6px 12px;border-radius:99px;border:1px solid var(--bd)}
+.sd .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);animation:pl 1.6s infinite}
+@keyframes pl{50%{opacity:.25}}
+.sd .btn{border:0;background:var(--c);color:#fff;padding:9px 16px;border-radius:10px;font-weight:600;cursor:pointer;font-size:13px}
+.sd .btn.g{background:#fff;color:var(--ink);border:1px solid var(--bd)}
+.sd .card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 2px 10px rgba(20,30,60,.05)}
+.sd .card h3{margin:0 0 14px;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+.sd .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:16px}
+.sd .kpi{display:flex;gap:14px;align-items:center;transition:.2s}
+.sd .kpi:hover{transform:translateY(-3px)}
+.sd .ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px}
+.sd .kpi b{display:block;font-size:26px;line-height:1.1}
+.sd .kpi small{color:var(--mut);font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.sd .g2{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:16px}
+.sd .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+@media(max-width:1000px){.sd .g2,.sd .g3{grid-template-columns:1fr}}
+.sd .leg{display:flex;gap:14px;font-size:12px;color:var(--mut)}
+.sd .leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px}
+.sd .row{padding:10px 0;border-bottom:1px solid var(--bd);font-size:14px}
+.sd .row:last-child{border:0}
+.sd .row .l{display:flex;justify-content:space-between;margin-bottom:6px}
+.sd .bar{height:7px;background:#f0f1f5;border-radius:9px;overflow:hidden}
+.sd .bar span{display:block;height:100%;border-radius:9px}
+.sd .empty{color:var(--mut);font-size:14px;padding:8px 0}
+.sd .tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px}
+.sd .chips{display:flex;gap:8px;flex-wrap:wrap}
+.sd .chip{border:1px solid var(--bd);background:#fff;padding:6px 13px;border-radius:99px;font-size:12px;cursor:pointer}
+.sd .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.sd input.s{border:1px solid var(--bd);border-radius:10px;padding:8px 12px;font-size:13px;min-width:200px}
+.sd table{width:100%;border-collapse:collapse;font-size:14px}
+.sd th{text-align:left;font-size:11px;color:var(--mut);letter-spacing:.06em;text-transform:uppercase;padding:10px 6px;border-bottom:1px solid var(--bd)}
+.sd td{padding:11px 6px;border-bottom:1px solid var(--bd)}
+.sd .tw{overflow-x:auto}
+.sd .pos{color:var(--ok);font-weight:700}.sd .neg{color:var(--bad);font-weight:700}
+.sd .rk{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#fff1f1;color:var(--c);font-weight:700;font-size:12px;margin-right:10px}
+</style>
 
-<div class="stats">
-  <div class="stat"><div class="n">{{ total_items }}</div><div class="l">Total items</div></div>
-  <div class="stat warn"><div class="n">{{ low_count }}</div><div class="l">Low stock</div></div>
-  <div class="stat bad"><div class="n">{{ out_count }}</div><div class="l">Out of stock</div></div>
-  <div class="stat"><div class="n">₹{{ stock_value|floatformat:2 }}</div><div class="l">Stock value</div></div>
-</div>
-
-<div class="grid2">
-  <div class="card">
-    <h3 style="margin-top:0">⚠️ Low stock</h3>
-    {% for i in low_items %}
-      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f1f4;">
-        <span>{{ i.name }}</span>
-        <span><span class="badge low">{{ i.current_stock|floatformat:"-3" }} {{ i.unit }}</span>
-        <a class="btn small" href="{% url 'store:stock_update' i.pk %}">Update</a></span>
-      </div>
-    {% empty %}<p class="muted">Nothing is running low. 👍</p>{% endfor %}
+<div class="sd">
+  <div class="top">
+    <h1>📊 Store Dashboard</h1>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="live"><span class="dot"></span><span id="upd">Live</span></span>
+      <button class="btn g" onclick="load()">↻ Refresh</button>
+      <button class="btn g" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
   </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="g2">
+    <div class="card">
+      <h3>Stock movement – last 7 days
+        <span class="leg"><span><i style="background:#16a34a"></i>In</span><span><i style="background:#ff6b6b"></i>Out</span></span></h3>
+      <div id="chart"></div>
+    </div>
+    <div class="card">
+      <h3>Stock health</h3>
+      <div id="donut" style="display:grid;place-items:center"></div>
+    </div>
+  </div>
+
+  <div class="g3">
+    <div class="card"><h3>⚠️ Low stock <span class="tag" id="lowTag" style="background:#fef3c7;color:#b45309"></span></h3><div id="low"></div></div>
+    <div class="card"><h3>🚫 Out of stock <span class="tag" id="outTag" style="background:#fee2e2;color:#b91c1c"></span></h3><div id="out"></div></div>
+    <div class="card"><h3>🔥 Most used (7 days)</h3><div id="top"></div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h3>🛒 Reorder list (auto-suggested)
+      <button class="btn" onclick="shareWA()">📲 Send on WhatsApp</button></h3>
+    <div id="reorder"></div>
+  </div>
+
   <div class="card">
-    <h3 style="margin-top:0">🚫 Out of stock</h3>
-    {% for i in out_items %}
-      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f1f4;">
-        <span>{{ i.name }}</span>
-        <a class="btn small" href="{% url 'store:stock_update' i.pk %}">Add stock</a>
-      </div>
-    {% empty %}<p class="muted">Everything is in stock. 🎉</p>{% endfor %}
+    <h3>Recent stock activity
+      <input class="s" id="q" placeholder="🔍 Search item / user…" oninput="renderAct()"></h3>
+    <div class="chips" id="chips" style="margin-bottom:12px"></div>
+    <div class="tw"><table><thead><tr><th>When</th><th>Item</th><th>Type</th><th>Change</th><th>Stock after</th><th>By</th></tr></thead><tbody id="act"></tbody></table></div>
   </div>
 </div>
 
-<div class="card">
-  <h3 style="margin-top:0">Recent stock activity</h3>
-  <div class="table-wrap"><table>
-    <tr><th>When</th><th>Item</th><th>Change</th><th>Stock after</th><th>By</th></tr>
-    {% for m in recent %}
-    <tr>
-      <td>{{ m.created_at|date:"d M, h:i A" }}</td>
-      <td>{{ m.item.name }}</td>
-      <td class="{% if m.change >= 0 %}in{% else %}outq{% endif %}">{% if m.change > 0 %}+{% endif %}{{ m.change|floatformat:"-3" }} {{ m.item.unit }}</td>
-      <td>{{ m.stock_after|floatformat:"-3" }}</td>
-      <td>{{ m.created_by.username|default:"—" }}</td>
-    </tr>
-    {% empty %}<tr><td colspan="5" class="muted">No activity yet.</td></tr>{% endfor %}
-  </table></div>
-</div>
+{{ initial|json_script:"sd-data" }}
+<script>
+(function(){
+const API="{% url 'store:dashboard_api' %}";
+let D=JSON.parse(document.getElementById('sd-data').textContent), F='all';
+const $=id=>document.getElementById(id);
+const n=x=>Number(x).toLocaleString('en-IN',{maximumFractionDigits:2});
+const e=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+const EM=[['lpg','🔥'],['cylinder','🔥'],['biryani','🍱'],['container','🥡'],['box','📦'],['coconut oil','🥥'],['gingelly','🛢️'],['oil','🛢️'],['coconut','🥥'],['watermelon','🍉'],['strawberry','🍓'],['blueberry','🫐'],['orange','🍊'],['mango','🥭'],['apple','🍎'],['banana','🍌'],['grape','🍇'],['lemon','🍋'],['pineapple','🍍'],['papaya','🍈'],['rice','🍚'],['spice','🌶️'],['ice','🧊'],['soda','🥤'],['water','💧'],['sugar','🍬'],['salt','🧂'],['onion','🧅'],['tomato','🍅'],['potato','🥔'],['carrot','🥕'],['chilli','🌶️'],['garlic','🧄'],['ginger','🫚'],['milk','🥛'],['curd','🥛'],['cheese','🧀'],['butter','🧈'],['egg','🥚'],['chicken','🍗'],['mutton','🥩'],['fish','🐟'],['prawn','🦐'],['flour','🌾'],['wheat','🌾'],['maida','🌾'],['bread','🍞'],['tea','🍵'],['coffee','☕'],['cashew','🥜'],['almond','🥜'],['nut','🥜'],['raisin','🍇'],['syrup','🍯'],['honey','🍯'],['pulp','🥭'],['masala','🌶️'],['powder','🧂'],['cup','🥤'],['straw','🥤'],['tissue','🧻'],['cover','🛍️'],['bag','🛍️'],['glove','🧤'],['foil','🪙']];
+const ico=nm=>{const s=String(nm).toLowerCase();const m=EM.find(x=>s.includes(x[0]));return m?m[1]:'📦'};
+function kpis(){const k=D.kpi;
+ const c=[['📦','#eef2ff',k.total,'Total items'],['⚠️','#fef3c7',k.low,'Low stock'],['🚫','#fee2e2',k.out,'Out of stock'],
+ ['💰','#dcfce7','₹'+n(k.value),'Stock value'],['🗑️','#f3e8ff','₹'+n(k.loss30),'Wastage (30 days)']];
+ $('kpis').innerHTML=c.map(a=>`<div class="card kpi"><div class="ic" style="background:${a[1]}">${a[0]}</div><div><b>${a[2]}</b><small>${a[3]}</small></div></div>`).join('')}
+
+function chart(){const W=600,H=230,p=28,w=D.week,m=Math.max(1,...w.flatMap(x=>[x.in,x.out])),bw=(W-p*2)/w.length;
+ let s=`<svg viewBox="0 0 ${W} ${H}" width="100%">`;
+ for(let i=0;i<=4;i++){const y=H-p-(H-p*2)*i/4;s+=`<line x1="${p}" x2="${W-p}" y1="${y}" y2="${y}" stroke="#eceef3"/><text x="0" y="${y+4}" font-size="10" fill="#6b7488">${n(m*i/4)}</text>`}
+ w.forEach((d,i)=>{const x=p+i*bw+bw*.15,b=bw*.3,hi=(H-p*2)*d.in/m,ho=(H-p*2)*d.out/m;
+  s+=`<rect x="${x}" y="${H-p-hi}" width="${b}" height="${hi}" rx="4" fill="#16a34a"><title>In: ${n(d.in)}</title></rect>
+  <rect x="${x+b+3}" y="${H-p-ho}" width="${b}" height="${ho}" rx="4" fill="#ff6b6b"><title>Out: ${n(d.out)}</title></rect>
+  <text x="${x+b}" y="${H-8}" font-size="11" text-anchor="middle" fill="#6b7488">${d.d}</text>`});
+ $('chart').innerHTML=s+'</svg>'}
+
+function donut(){const k=D.kpi,ok=Math.max(0,k.total-k.low-k.out),C=2*Math.PI*52,t=Math.max(1,k.total);
+ let off=0,s='<svg viewBox="0 0 140 140" width="170"><g transform="rotate(-90 70 70)">';
+ [[ok,'#16a34a'],[k.low,'#f59e0b'],[k.out,'#dc2626']].forEach(a=>{const l=C*a[0]/t;
+  s+=`<circle cx="70" cy="70" r="52" fill="none" stroke="${a[1]}" stroke-width="16" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}"/>`;off+=l});
+ s+=`</g><text x="70" y="68" text-anchor="middle" font-size="24" font-weight="700" fill="#1c2333">${Math.round(ok/t*100)}%</text><text x="70" y="86" text-anchor="middle" font-size="10" fill="#6b7488">healthy</text></svg>
+ <div class="leg" style="margin-top:10px"><span><i style="background:#16a34a"></i>OK ${ok}</span><span><i style="background:#f59e0b"></i>Low ${k.low}</span><span><i style="background:#dc2626"></i>Out ${k.out}</span></div>`;
+ $('donut').innerHTML=s}
+
+function lists(){
+ $('lowTag').textContent=D.low.length;$('outTag').textContent=D.out.length;
+ $('low').innerHTML=D.low.length?D.low.map(i=>{const pc=Math.min(100,i.stock/i.level*100);
+  return `<div class="row"><div class="l"><span>${ico(i.name)} ${e(i.name)}</span><b>${n(i.stock)} ${e(i.unit)}</b></div><div class="bar"><span style="width:${pc}%;background:#f59e0b"></span></div></div>`}).join(''):'<div class="empty">Nothing is running low 👍</div>';
+ $('out').innerHTML=D.out.length?D.out.map(i=>`<div class="row"><div class="l"><span>${ico(i.name)} ${e(i.name)}</span><span class="tag" style="background:#fee2e2;color:#b91c1c">EMPTY</span></div></div>`).join(''):'<div class="empty">Everything is in stock 🎉</div>';
+ const mx=Math.max(1,...D.top.map(t=>t.qty));
+ $('top').innerHTML=D.top.length?D.top.map((t,i)=>`<div class="row"><div class="l"><span><span class="rk">${i+1}</span>${ico(t.name)} ${e(t.name)}</span><b>${n(t.qty)} ${e(t.unit)}</b></div><div class="bar"><span style="width:${t.qty/mx*100}%;background:var(--c)"></span></div></div>`).join(''):'<div class="empty">No usage yet this week.</div>'}
+
+function reorderList(){return [...D.out.map(i=>({name:i.name,unit:i.unit,q:Math.max(1,i.level*2),s:i.supplier})),...D.low.map(i=>({name:i.name,unit:i.unit,q:Math.max(1,i.level*2-i.stock),s:i.supplier}))]}
+function reorder(){const r=reorderList();
+ $('reorder').innerHTML=r.length?`<div class="tw"><table><tbody>${r.map(i=>`<tr><td>${ico(i.name)} ${e(i.name)} <small style="color:#6b7488">${i.s?'· '+e(i.s):''}</small></td><td class="pos" style="text-align:right">Order ≈ ${n(i.q)} ${e(i.unit)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">No reorder needed right now ✅</div>'}
+
+const TYPE={in:['Stock In','#dcfce7','#15803d'],out:['Stock Out','#dbeafe','#1d4ed8'],adjust:['Correction','#f1f5f9','#475569'],damage:['Damage','#fee2e2','#b91c1c'],expiry:['Expired','#f3e8ff','#7e22ce']};
+function renderAct(){const q=$('q').value.toLowerCase();
+ const rows=D.recent.filter(r=>(F==='all'||r.reason===F)&&(r.item+r.by).toLowerCase().includes(q));
+ $('act').innerHTML=rows.length?rows.map(r=>{const t=TYPE[r.reason]||[r.reason,'#eee','#333'];
+  return `<tr><td>${e(r.when)}</td><td>${ico(r.item)} ${e(r.item)}</td><td><span class="tag" style="background:${t[1]};color:${t[2]}">${e(t[0])}</span></td><td class="${r.change>=0?'pos':'neg'}">${r.change>=0?'+':''}${n(r.change)} ${e(r.unit)}</td><td>${n(r.after)}</td><td>${r.by?e(r.by):'—'}</td></tr>`}).join(''):'<tr><td colspan="6" class="empty">No matching activity.</td></tr>'}
+function chips(){$('chips').innerHTML=[['all','All'],['in','Stock In'],['out','Stock Out'],['adjust','Correction'],['damage','Damage'],['expiry','Expired']]
+ .map(c=>`<span class="chip ${F===c[0]?'on':''}" data-f="${c[0]}">${c[1]}</span>`).join('');
+ document.querySelectorAll('#chips .chip').forEach(el=>el.onclick=()=>{F=el.dataset.f;chips();renderAct()})}
+
+function all(){kpis();chart();donut();lists();reorder();renderAct();$('upd').textContent='Live · updated '+D.updated}
+window.load=async()=>{try{const r=await fetch(API,{credentials:'same-origin'});if(r.ok){D=await r.json();all()}}catch(x){$('upd').textContent='Offline – retrying…'}};
+window.shareWA=()=>{const r=reorderList();if(!r.length)return alert('Nothing to reorder');
+ window.open('https://wa.me/?text='+encodeURIComponent('🛒 Reorder list\n'+r.map(i=>`• ${i.name} – ${n(i.q)} ${i.unit}`).join('\n')))};
+window.exportCSV=()=>{const l=['When,Item,Type,Change,Unit,Stock After,By',...D.recent.map(r=>[r.when,r.item,r.reason,r.change,r.unit,r.after,r.by].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','))];
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([l.join('\n')],{type:'text/csv'}));a.download='stock-activity.csv';a.click()};
+chips();all();setInterval(load,15000);
+})();
+</script>
 {% endblock %}

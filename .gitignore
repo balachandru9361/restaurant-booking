@@ -4,3 +4,5 @@ db.sqlite3
 .env
 *.bak*
 *.save
+*.sqlite3
+staticfiles/

@@ -1,29 +1,204 @@
 {% extends 'store/store_base.html' %}
 {% block title %}Categories{% endblock %}
 {% block content %}
-<h1>Grocery Categories</h1>
-<div class="grid2">
-  <div class="card">
-    <h3 style="margin-top:0">Add category</h3>
-    <form method="post">
-      {% csrf_token %}
-      <div class="field">
-        <input type="text" name="name" placeholder="e.g. Vegetables, Spices, Dairy" required maxlength="80">
-        {{ form.name.errors }}
-      </div>
-      <button class="btn" type="submit">Add</button>
-    </form>
+<style>
+.ct{--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;--bg:#f7f8fb;--out:#dc2626;--out-bg:#fde8e8;--brand:#ff6b6b;--adj:#2563eb;color:var(--ink)}
+.ct *{box-sizing:border-box}
+.ct-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.ct-head h1{margin:0;font-size:26px;line-height:1.1}
+.ct-head p{margin:4px 0 0;color:var(--mut);font-size:13px}
+.ct-btn{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:9px 14px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit;width:auto}
+.ct-btn:hover{border-color:#cfd3de}
+.ct-btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.ct-btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.ct-btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
+.ct-btn.danger{color:var(--out);border-color:#f6c9c9}
+.ct-btn.danger:hover{background:var(--out-bg)}
+.ct button:focus-visible,.ct a:focus-visible,.ct input:focus-visible{outline:2px solid var(--adj);outline-offset:2px}
+
+.ct-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.ct-kpi{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:14px 16px;border-left:4px solid var(--ink)}
+.ct-kpi b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.ct-kpi span{font-size:12.5px;color:var(--mut)}
+
+.ct-grid{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+.ct-card{background:#fff;border:1px solid var(--bd);border-radius:16px;padding:18px}
+.ct-card h2{margin:0 0 12px;font-size:17px}
+.ct-add{position:sticky;top:16px}
+.ct-add input[type=text]{width:100%;padding:13px 14px;border:1px solid var(--bd);border-radius:12px;font-size:16px;font-family:inherit}
+.ct-add .row{display:flex;gap:8px}
+.ct-add .row input{flex:1;min-width:0}
+.ct-hint{font-size:13px;margin-top:8px;min-height:18px;color:var(--mut)}
+.ct-hint.bad{color:var(--out)}
+.ct-sug-t{font-size:13px;font-weight:700;margin:16px 0 8px}
+.ct-chips{display:flex;gap:6px;flex-wrap:wrap}
+.ct-chip{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:6px 12px;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.ct-chip:hover{border-color:#cfd3de;background:var(--bg)}
+.ct-err{color:var(--out);font-size:13px;margin-top:6px}
+
+.ct-find{position:relative;margin-bottom:12px}
+.ct-find input{width:100%;padding:10px 12px 10px 34px;border:1px solid var(--bd);border-radius:10px;font-size:14px;background:var(--bg);font-family:inherit}
+.ct-find svg{position:absolute;left:11px;top:50%;translate:0 -50%;width:16px;height:16px;color:var(--mut)}
+
+.ct-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.ct-item{border:1px solid var(--bd);border-radius:14px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:12px}
+.ct-item:hover{border-color:#cfd3de}
+.ct-top{display:flex;align-items:center;gap:12px}
+.ct-ic{width:50px;height:50px;border-radius:14px;background:#fff7ed;border:1px solid #fde3c8;display:flex;align-items:center;justify-content:center;font-size:26px;flex:none}
+.ct-ic.plain{background:var(--bg);border-color:var(--bd);font-size:19px;font-weight:800;color:var(--mut)}
+.ct-nm{min-width:0}
+.ct-nm b{display:block;font-size:16px;overflow-wrap:anywhere}
+.ct-nm small{color:var(--mut)}
+.ct-bar{height:6px;background:var(--bd);border-radius:99px;overflow:hidden}
+.ct-bar i{display:block;height:100%;width:0;background:var(--ink);border-radius:99px}
+.ct-act{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.ct-act form{margin:0}
+.ct-empty{padding:30px 16px;text-align:center;color:var(--mut);grid-column:1 / -1}
+.ct-empty b{display:block;color:var(--ink);margin-bottom:4px;font-size:15px}
+#ctNone{display:none}
+
+@media (max-width:900px){.ct-grid{grid-template-columns:1fr}.ct-add{position:static}}
+@media (max-width:520px){.ct-kpis{grid-template-columns:1fr 1fr 1fr;gap:8px}.ct-kpi{padding:10px 12px}.ct-kpi b{font-size:20px}}
+@media (prefers-reduced-motion:reduce){.ct *{transition:none!important}}
+</style>
+
+<div class="ct">
+  <div class="ct-head">
+    <div>
+      <h1>Grocery Categories</h1>
+      <p>Group your items so they are easy to find and filter.</p>
+    </div>
+    <a class="ct-btn" href="{% url 'store:item_list' %}">Back to groceries</a>
   </div>
-  <div class="card">
-    <h3 style="margin-top:0">All categories</h3>
-    {% for c in categories %}
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f1f4;">
-        <span>{{ c.name }} <span class="muted">({{ c.items.count }} items)</span></span>
-        <form method="post" action="{% url 'store:category_delete' c.pk %}" onsubmit="return confirm('Delete {{ c.name|escapejs }}? Items stay, just uncategorised.')">
-          {% csrf_token %}<button class="btn small danger" type="submit">Delete</button>
-        </form>
+
+  <div class="ct-kpis">
+    <div class="ct-kpi"><b id="kCats">0</b><span>Categories</span></div>
+    <div class="ct-kpi"><b id="kItems">0</b><span>Items grouped</span></div>
+    <div class="ct-kpi"><b id="kEmpty">0</b><span>Empty categories</span></div>
+  </div>
+
+  <div class="ct-grid">
+    <div class="ct-card ct-add">
+      <h2>Add category</h2>
+      <form method="post" id="ctForm">
+        {% csrf_token %}
+        <div class="row">
+          <input type="text" name="name" id="ctName" placeholder="e.g. Vegetables, Spices, Dairy" required maxlength="80" autocomplete="off" aria-label="Category name">
+          <button class="ct-btn primary" type="submit" id="ctAdd">Add</button>
+        </div>
+        <div class="ct-hint" id="ctHint"></div>
+        {% if form.name.errors %}<div class="ct-err">{{ form.name.errors|striptags }}</div>{% endif %}
+      </form>
+      <div id="ctSugBox">
+        <div class="ct-sug-t">Quick add</div>
+        <div class="ct-chips" id="ctSug"></div>
       </div>
-    {% empty %}<p class="muted">No categories yet.</p>{% endfor %}
+    </div>
+
+    <div class="ct-card">
+      <h2>All categories</h2>
+      <div class="ct-find">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" id="ctFind" placeholder="Search categories" aria-label="Search categories" autocomplete="off">
+      </div>
+      <div class="ct-list" id="ctList">
+        {% for c in categories %}
+        <div class="ct-item" data-name="{{ c.name|lower }}" data-count="{{ c.items.count }}">
+          <div class="ct-top">
+            <span class="ct-ic plain" data-n="{{ c.name|lower }}">{{ c.name|slice:":1"|upper }}</span>
+            <div class="ct-nm"><b>{{ c.name }}</b><small>{{ c.items.count }} item{{ c.items.count|pluralize }}</small></div>
+          </div>
+          <div class="ct-bar"><i></i></div>
+          <div class="ct-act">
+            <a class="ct-btn sm" href="{% url 'store:item_list' %}?category={{ c.pk }}">View items</a>
+            <form method="post" action="{% url 'store:category_delete' c.pk %}" onsubmit="return confirm('Delete {{ c.name|escapejs }}? Items stay, just uncategorised.')">
+              {% csrf_token %}<button class="ct-btn sm danger" type="submit">Delete</button>
+            </form>
+          </div>
+        </div>
+        {% empty %}
+        <div class="ct-empty"><b>No categories yet</b>Add your first one, or tap a quick add suggestion.</div>
+        {% endfor %}
+        <div class="ct-empty" id="ctNone"><b>Nothing matches</b>Try a different word.</div>
+      </div>
+    </div>
   </div>
 </div>
+
+<script>
+(function () {
+  var ICONS = [
+    ['meat','🥩'],['seafood','🐟'],['fish','🐟'],['chicken','🍗'],['egg','🥚'],
+    ['vegetable','🥬'],['herb','🌿'],['spice','🌶️'],['masala','🌶️'],
+    ['rice','🍚'],['flour','🌾'],['grain','🌾'],['pulse','🫘'],['dal','🫘'],
+    ['drink','🍹'],['beverage','🍹'],['juice','🧃'],['fruit','🍎'],['dairy','🥛'],['milk','🥛'],
+    ['oil','🛢️'],['sauce','🥫'],['bakery','🍞'],['bread','🍞'],['sweet','🍬'],['dessert','🍰'],['snack','🍿'],
+    ['frozen','🧊'],['packag','📦'],['container','📦'],['clean','🧴'],['gas','🔥'],['fuel','🔥'],['disposable','🛍️']
+  ];
+  function iconFor(n) {
+    for (var k = 0; k < ICONS.length; k++) if (n.indexOf(ICONS[k][0]) !== -1) return ICONS[k][1];
+    return '';
+  }
+
+  var items = Array.prototype.slice.call(document.querySelectorAll('#ctList .ct-item'));
+  var existing = items.map(function (i) { return i.dataset.name; });
+  var maxCount = 0, total = 0, empty = 0;
+
+  items.forEach(function (it) {
+    var n = parseInt(it.dataset.count, 10) || 0;
+    total += n;
+    if (n === 0) empty++;
+    if (n > maxCount) maxCount = n;
+    var ic = it.querySelector('.ct-ic');
+    var e = iconFor(ic.dataset.n || '');
+    if (e) { ic.textContent = e; ic.classList.remove('plain'); }
+  });
+  items.forEach(function (it) {
+    var n = parseInt(it.dataset.count, 10) || 0;
+    it.querySelector('.ct-bar i').style.width = (maxCount ? Math.max(n ? 6 : 0, (n / maxCount) * 100) : 0) + '%';
+  });
+  document.getElementById('kCats').textContent = items.length;
+  document.getElementById('kItems').textContent = total;
+  document.getElementById('kEmpty').textContent = empty;
+
+  // search
+  var find = document.getElementById('ctFind');
+  var none = document.getElementById('ctNone');
+  find.addEventListener('input', function () {
+    var t = find.value.toLowerCase().trim(), shown = 0;
+    items.forEach(function (it) {
+      var ok = !t || it.dataset.name.indexOf(t) !== -1;
+      it.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    none.style.display = (items.length && !shown) ? 'block' : 'none';
+  });
+
+  // add form: duplicate check + suggestions
+  var name = document.getElementById('ctName');
+  var hint = document.getElementById('ctHint');
+  var add = document.getElementById('ctAdd');
+  function check() {
+    var v = name.value.toLowerCase().trim();
+    var dup = v && existing.indexOf(v) !== -1;
+    hint.className = 'ct-hint' + (dup ? ' bad' : '');
+    hint.textContent = dup ? 'This category already exists.' : '';
+    add.disabled = !!dup;
+  }
+  name.addEventListener('input', check);
+
+  var SUG = ['Vegetables & Herbs','Spices','Dairy','Meat & Seafood','Rice & Flour','Pulses & Dals','Oils & Sauces','Drinks & Fruits','Bakery','Packaging','Cleaning','Gas & Fuel'];
+  var box = document.getElementById('ctSug');
+  var shownSug = SUG.filter(function (s) { return existing.indexOf(s.toLowerCase()) === -1; });
+  shownSug.forEach(function (s) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ct-chip';
+    b.textContent = (iconFor(s.toLowerCase()) + ' ' + s).trim();
+    b.addEventListener('click', function () { name.value = s; check(); name.focus(); });
+    box.appendChild(b);
+  });
+  if (!shownSug.length) document.getElementById('ctSugBox').style.display = 'none';
+})();
+</script>
 {% endblock %}

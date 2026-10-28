@@ -1,346 +1,210 @@
 {% extends base_tpl %}
 {% block admin_content %}
 <style>
-  :root {
-    --oos-red: #F63A3A; --oos-ink: #1a1a2e; --oos-muted: #6b7280;
-    --oos-green: #2bb673; --oos-amber: #f59e0b;
+  .os-page, .os-bulk, .os-modal-bg {
+    --os-ink: #0f172a; --os-text: #334155; --os-muted: #64748b; --os-line: #e2e8f0;
+    --os-bg: #ffffff; --os-soft: #f8fafc; --os-accent: #1e3a8a;
+    --os-ok: #15803d; --os-ok-bg: #dcfce7;
+    --os-low: #b45309; --os-low-bg: #fef3c7;
+    --os-rep: #1d4ed8; --os-rep-bg: #dbeafe;
+    --os-danger: #dc2626;
+    color: var(--os-text); font-size: 14px;
   }
+  .os-page *, .os-bulk *, .os-modal-bg * { box-sizing: border-box; }
 
-  /* ---------- hero ---------- */
-  .oos-hero {
-    background: linear-gradient(135deg, #1a1a2e 0%, #243b6b 55%, #F63A3A 140%);
-    color: #fff; border-radius: 20px; padding: 26px 28px; margin-bottom: 20px;
-    display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap;
-    box-shadow: 0 14px 34px rgba(26,26,46,.25); position: relative; overflow: hidden;
-  }
-  .oos-hero::after {
-    content: "🚫"; position: absolute; right: -10px; bottom: -34px; font-size: 150px; opacity: .08;
-  }
-  .oos-hero h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: .3px; }
-  .oos-hero p { margin: 0; color: #cbd5e1; font-size: 14px; max-width: 520px; line-height: 1.5; }
-  .oos-clock {
-    background: rgba(255,255,255,.12); backdrop-filter: blur(6px); border-radius: 14px;
-    padding: 10px 16px; text-align: right; z-index: 1;
-  }
-  .oos-clock b { display: block; font-size: 22px; letter-spacing: .5px; }
-  .oos-clock small { color: #cbd5e1; font-size: 12px; }
+  /* header */
+  .os-head { margin: 0 0 18px; }
+  .os-head h1 { margin: 0 0 4px; font-size: 24px; font-weight: 700; color: var(--os-ink); }
+  .os-head p { margin: 0; color: var(--os-muted); font-size: 14px; }
 
-  /* ---------- restock banner ---------- */
-  .oos-restock { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
-  .oos-restock .row {
-    display: flex; gap: 12px; align-items: center;
-    background: linear-gradient(90deg, #ecfdf5, #fff); border: 1px solid #a7f3d0;
-    border-left: 5px solid var(--oos-green); border-radius: 12px; padding: 11px 14px;
-    font-size: 13.5px; color: #065f46; animation: slideIn .4s ease;
-  }
-  .oos-restock .row .ico { font-size: 22px; }
-  .oos-restock .row small { display: block; color: #047857; opacity: .85; margin-top: 2px; }
-  .oos-restock .row time { margin-left: auto; font-size: 12px; color: #047857; white-space: nowrap; }
-  @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+  /* recently restocked */
+  .os-restock { background: var(--os-ok-bg); border: 1px solid #bbf7d0; border-radius: 10px; margin-bottom: 16px; }
+  .os-restock summary { cursor: pointer; padding: 11px 16px; font-weight: 600; color: var(--os-ok); list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  .os-restock summary::-webkit-details-marker { display: none; }
+  .os-restock summary::after { content: "Show"; font-weight: 500; font-size: 12px; }
+  .os-restock[open] summary::after { content: "Hide"; }
+  .os-restock ul { list-style: none; margin: 0; padding: 0 16px 8px; }
+  .os-restock li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid #bbf7d0; font-size: 13px; color: #14532d; }
+  .os-restock li span { color: #166534; opacity: .8; white-space: nowrap; }
 
-  /* ---------- stat cards ---------- */
-  .oos-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .oos-stat {
-    background: #fff; border-radius: 16px; padding: 16px 18px; display: flex; align-items: center; gap: 14px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.06); cursor: pointer; border: 2px solid transparent;
-    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
-  }
-  .oos-stat:hover { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0,0,0,.1); }
-  .oos-stat.active { border-color: var(--oos-ink); }
-  .oos-stat .badge {
-    width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px;
-  }
-  .oos-stat.all .badge { background: #e0e7ff; }
-  .oos-stat.ok .badge { background: #d1fae5; }
-  .oos-stat.low .badge { background: #fef3c7; }
-  .oos-stat.pending .badge { background: #fee2e2; }
-  .oos-stat b { display: block; font-size: 26px; color: var(--oos-ink); line-height: 1; }
-  .oos-stat span { font-size: 12.5px; color: var(--oos-muted); }
+  /* toolbar */
+  .os-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+  .os-search { position: relative; flex: 1 1 260px; max-width: 420px; }
+  .os-search input { width: 100%; height: 40px; padding: 0 40px 0 14px; border: 1px solid var(--os-line); border-radius: 8px; background: var(--os-bg); font-size: 14px; color: var(--os-ink); outline: none; }
+  .os-search input:focus { border-color: var(--os-accent); box-shadow: 0 0 0 3px rgba(30,58,138,.12); }
+  .os-search kbd { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--os-muted); border: 1px solid var(--os-line); border-radius: 4px; padding: 1px 6px; background: var(--os-soft); }
+  .os-tabs { display: inline-flex; background: #eef2f7; border-radius: 9px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+  .os-tab { border: 0; background: transparent; padding: 7px 14px; border-radius: 7px; font-size: 13px; font-weight: 600; color: var(--os-muted); cursor: pointer; }
+  .os-tab em { font-style: normal; font-weight: 500; margin-left: 4px; opacity: .8; }
+  .os-tab.on { background: var(--os-bg); color: var(--os-ink); box-shadow: 0 1px 2px rgba(15,23,42,.12); }
+  .os-select { height: 40px; border: 1px solid var(--os-line); border-radius: 8px; padding: 0 10px; background: var(--os-bg); color: var(--os-text); font-size: 13px; margin-left: auto; }
 
-  /* ---------- toolbar ---------- */
-  .oos-toolbar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-  .oos-search-wrap { position: relative; flex: 1; min-width: 240px; }
-  .oos-search-wrap input {
-    width: 100%; box-sizing: border-box; padding: 13px 44px 13px 42px; border: 1px solid #e5e7eb; border-radius: 12px;
-    font-size: 14px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.04); outline: none;
-    transition: border-color .15s, box-shadow .15s;
-  }
-  .oos-search-wrap input:focus { border-color: var(--oos-red); box-shadow: 0 0 0 4px rgba(246,58,58,.12); }
-  .oos-search-wrap .s-ico { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 15px; }
-  .oos-search-wrap kbd {
-    position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: #f3f4f6; border: 1px solid #e5e7eb;
-    border-radius: 6px; padding: 1px 7px; font-size: 12px; color: var(--oos-muted);
-  }
-  .oos-select {
-    padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; font-size: 13.5px; cursor: pointer;
-  }
-  .oos-view { display: inline-flex; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
-  .oos-view button { border: 0; background: transparent; padding: 11px 14px; cursor: pointer; font-size: 15px; }
-  .oos-view button.on { background: var(--oos-ink); color: #fff; }
+  /* table */
+  .os-table { background: var(--os-bg); border: 1px solid var(--os-line); border-radius: 12px; overflow: hidden; }
+  .os-row, .os-thead { display: grid; grid-template-columns: 44px minmax(160px, 1.3fr) minmax(200px, 1.6fr) 140px 190px; align-items: center; gap: 12px; padding: 12px 16px; }
+  .os-thead { background: var(--os-soft); border-bottom: 1px solid var(--os-line); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--os-muted); padding-top: 10px; padding-bottom: 10px; }
+  .os-row { border-bottom: 1px solid var(--os-line); }
+  .os-row:last-child { border-bottom: 0; }
+  .os-row:hover { background: var(--os-soft); }
+  .os-row.selected { background: #eff6ff; }
+  .os-name { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .os-name b { color: var(--os-ink); font-weight: 600; font-size: 15px; }
+  .os-ava { flex: 0 0 46px; width: 46px; height: 46px; border-radius: 10px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 25px; line-height: 1; overflow: hidden; border: 1px solid var(--os-line); }
+  .os-ava img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .os-qty { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; }
+  .os-qty b { font-size: 16px; color: var(--os-ink); }
+  .os-qty span { color: var(--os-muted); font-size: 12px; margin-left: auto; }
+  .os-bar { height: 6px; border-radius: 99px; background: #e5e7eb; overflow: hidden; }
+  .os-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--os-ok); transition: width .5s ease; }
+  .os-row.low .os-bar i { background: #f59e0b; }
+  .os-row.pending .os-bar i { background: #3b82f6; }
+  .os-badge { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+  .os-badge.ok { background: var(--os-ok-bg); color: var(--os-ok); }
+  .os-badge.low { background: var(--os-low-bg); color: var(--os-low); }
+  .os-badge.pending { background: var(--os-rep-bg); color: var(--os-rep); }
+  .os-check { width: 18px; height: 18px; cursor: pointer; accent-color: var(--os-accent); }
+  .os-btn { height: 38px; padding: 0 14px; border-radius: 8px; border: 1px solid #fca5a5; background: #fff; color: var(--os-danger); font-weight: 600; font-size: 13px; cursor: pointer; width: 100%; transition: .15s; }
+  .os-btn:hover:not(:disabled) { background: var(--os-danger); border-color: var(--os-danger); color: #fff; }
+  .os-btn:disabled { border-color: var(--os-line); background: var(--os-soft); color: var(--os-muted); cursor: default; }
+  .os-btn.solid { background: var(--os-danger); border-color: var(--os-danger); color: #fff; width: auto; }
+  .os-btn.solid:hover:not(:disabled) { background: #b91c1c; }
+  .os-btn.plain { border-color: var(--os-line); color: var(--os-text); }
+  .os-btn.plain:hover:not(:disabled) { background: var(--os-soft); color: var(--os-ink); border-color: var(--os-line); }
+  .os-empty { display: none; text-align: center; padding: 48px 16px; color: var(--os-muted); }
 
-  .oos-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
-  .oos-tab {
-    border: 1px solid #e5e7eb; background: #fff; border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600;
-    color: #374151; cursor: pointer; transition: all .15s ease;
-  }
-  .oos-tab:hover { border-color: var(--oos-ink); }
-  .oos-tab.on { background: var(--oos-ink); color: #fff; border-color: var(--oos-ink); }
-  .oos-tab em { font-style: normal; opacity: .7; margin-left: 4px; }
+  /* bulk bar */
+  .os-bulk { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 120px); background: var(--os-ink); color: #fff; padding: 10px 14px; border-radius: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 12px 30px rgba(15,23,42,.3); transition: transform .25s; z-index: 50; max-width: calc(100% - 24px); flex-wrap: wrap; }
+  .os-bulk.show { transform: translate(-50%, 0); }
+  .os-bulk input { height: 36px; border-radius: 8px; border: 0; padding: 0 12px; min-width: 200px; font-size: 13px; }
+  .os-bulk .os-btn { height: 36px; }
+  .os-bulk .link { background: none; border: 0; color: #cbd5e1; cursor: pointer; font-size: 13px; }
 
-  /* ---------- cards ---------- */
-  .oos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
-  .oos-grid.list { grid-template-columns: 1fr; }
-  .oos-card {
-    background: #fff; border-radius: 18px; padding: 18px; position: relative;
-    box-shadow: 0 4px 16px rgba(0,0,0,.06); border: 2px solid transparent;
-    display: flex; flex-direction: column; gap: 12px;
-    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-    animation: cardIn .35s ease both;
-  }
-  .oos-card:hover { transform: translateY(-4px); box-shadow: 0 14px 28px rgba(0,0,0,.12); }
-  .oos-card::before {
-    content: ""; position: absolute; left: 0; top: 18px; bottom: 18px; width: 5px; border-radius: 0 6px 6px 0; background: var(--oos-green);
-  }
-  .oos-card.low::before { background: var(--oos-amber); }
-  .oos-card.pending::before { background: var(--oos-red); }
-  .oos-card.pending { background: linear-gradient(180deg, #fff7f7, #fff); border-color: #fecaca; }
-  .oos-card.selected { border-color: var(--oos-ink); }
-  @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  /* modal */
+  .os-modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  .os-modal-bg.open { display: flex; }
+  .os-modal { background: #fff; border-radius: 14px; width: 100%; max-width: 440px; padding: 22px; box-shadow: 0 24px 60px rgba(15,23,42,.35); }
+  .os-modal h2 { margin: 0 0 4px; font-size: 18px; color: var(--os-ink); }
+  .os-modal p { margin: 0 0 14px; color: var(--os-muted); font-size: 13px; }
+  .os-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .os-chip { border: 1px solid var(--os-line); background: #fff; border-radius: 99px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: var(--os-text); }
+  .os-chip.on { background: var(--os-accent); border-color: var(--os-accent); color: #fff; }
+  .os-modal textarea { width: 100%; min-height: 72px; border: 1px solid var(--os-line); border-radius: 8px; padding: 10px; font: inherit; resize: vertical; outline: none; }
+  .os-modal textarea:focus { border-color: var(--os-accent); }
+  .os-count { text-align: right; font-size: 12px; color: var(--os-muted); margin: 4px 0 14px; }
+  .os-actions { display: flex; justify-content: flex-end; gap: 10px; }
+  .os-actions .os-btn { width: auto; }
 
-  .oos-top { display: flex; align-items: center; gap: 12px; }
-  .oos-avatar {
-    width: 48px; height: 48px; border-radius: 14px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;
-  }
-  .oos-card.low .oos-avatar { background: #fef3c7; }
-  .oos-card.pending .oos-avatar { background: #fee2e2; }
-  .oos-title { flex: 1; min-width: 0; }
-  .oos-title h3 { margin: 0; font-size: 16.5px; color: var(--oos-ink); text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .oos-title small { color: var(--oos-muted); font-size: 12.5px; }
-
-  .oos-check { width: 20px; height: 20px; accent-color: var(--oos-red); cursor: pointer; }
-  .oos-check:disabled { cursor: not-allowed; opacity: .35; }
-
-  .tag { font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 999px; white-space: nowrap; letter-spacing: .3px; }
-  .tag.ok { background: #d1fae5; color: #065f46; }
-  .tag.low { background: #fef3c7; color: #92400e; }
-  .tag.pending { background: #fee2e2; color: #991b1b; display: inline-flex; align-items: center; gap: 6px; }
-  .tag.pending::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--oos-red); animation: pulse 1.3s infinite; }
-  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(246,58,58,.6); } 100% { box-shadow: 0 0 0 9px rgba(246,58,58,0); } }
-
-  .oos-qtyrow { display: flex; align-items: baseline; justify-content: space-between; }
-  .oos-qty { font-size: 26px; font-weight: 800; color: var(--oos-ink); }
-  .oos-qty small { font-size: 13px; font-weight: 600; color: var(--oos-muted); margin-left: 4px; }
-  .oos-limit { font-size: 12px; color: var(--oos-muted); }
-
-  .oos-bar { height: 9px; background: #eef0f4; border-radius: 99px; overflow: hidden; }
-  .oos-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #34d399, var(--oos-green)); transition: width .8s cubic-bezier(.2,.8,.2,1); }
-  .oos-card.low .oos-bar i { background: linear-gradient(90deg, #fbbf24, var(--oos-amber)); }
-  .oos-card.pending .oos-bar i { background: linear-gradient(90deg, #fb7185, var(--oos-red)); }
-
-  .oos-btn {
-    padding: 12px 14px; border: 0; border-radius: 12px; color: #fff; font-weight: 700; font-size: 14px; cursor: pointer;
-    background: linear-gradient(135deg, #ff5a5a, var(--oos-red)); box-shadow: 0 6px 14px rgba(246,58,58,.3);
-    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
-  }
-  .oos-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(246,58,58,.38); }
-  .oos-btn:active:not(:disabled) { transform: scale(.98); }
-  .oos-btn:disabled { background: #e5e7eb; color: #6b7280; box-shadow: none; cursor: not-allowed; }
-
-  /* list view */
-  .oos-grid.list .oos-card { flex-direction: row; align-items: center; gap: 18px; }
-  .oos-grid.list .oos-top { flex: 1.3; }
-  .oos-grid.list .oos-meta { flex: 1.4; display: flex; flex-direction: column; gap: 8px; }
-  .oos-grid.list .oos-btn { min-width: 170px; }
-  .oos-meta { display: flex; flex-direction: column; gap: 12px; }
-
-  .oos-empty { display: none; text-align: center; background: #fff; border-radius: 18px; padding: 50px 20px; color: var(--oos-muted); box-shadow: 0 4px 16px rgba(0,0,0,.06); }
-  .oos-empty b { display: block; font-size: 40px; margin-bottom: 8px; }
-
-  /* ---------- bulk bar ---------- */
-  .oos-bulk {
-    position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 140%); z-index: 9000;
-    background: var(--oos-ink); color: #fff; border-radius: 16px; padding: 12px 14px 12px 20px; display: flex; gap: 12px; align-items: center;
-    box-shadow: 0 18px 40px rgba(0,0,0,.35); transition: transform .3s cubic-bezier(.2,.8,.2,1); max-width: 94vw;
-  }
-  .oos-bulk.show { transform: translate(-50%, 0); }
-  .oos-bulk input { padding: 9px 12px; border-radius: 10px; border: 0; width: 210px; font-size: 13px; }
-  .oos-bulk .ghost { background: transparent; border: 1px solid rgba(255,255,255,.35); color: #fff; border-radius: 10px; padding: 9px 14px; cursor: pointer; }
-
-  /* ---------- modal ---------- */
-  .oos-modal-bg {
-    position: fixed; inset: 0; background: rgba(15,23,42,.55); backdrop-filter: blur(4px); z-index: 9500;
-    display: none; align-items: center; justify-content: center; padding: 18px;
-  }
-  .oos-modal-bg.open { display: flex; animation: fade .2s ease; }
-  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
-  .oos-modal { background: #fff; border-radius: 22px; width: 100%; max-width: 440px; padding: 24px; box-shadow: 0 30px 70px rgba(0,0,0,.4); animation: pop .25s cubic-bezier(.2,.8,.2,1); }
-  @keyframes pop { from { transform: scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
-  .oos-modal .m-ico { font-size: 40px; }
-  .oos-modal h2 { margin: 6px 0 4px; color: var(--oos-ink); font-size: 21px; }
-  .oos-modal p { margin: 0 0 14px; color: var(--oos-muted); font-size: 13.5px; }
-  .oos-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-  .oos-chip {
-    border: 1px solid #e5e7eb; background: #f9fafb; border-radius: 999px; padding: 7px 13px; font-size: 12.5px; cursor: pointer; font-weight: 600; color: #374151;
-    transition: all .15s ease;
-  }
-  .oos-chip:hover, .oos-chip.on { background: var(--oos-ink); color: #fff; border-color: var(--oos-ink); }
-  .oos-modal textarea {
-    width: 100%; box-sizing: border-box; border: 1px solid #e5e7eb; border-radius: 12px; padding: 11px 12px; font-size: 14px; resize: none; height: 74px; font-family: inherit; outline: none;
-  }
-  .oos-modal textarea:focus { border-color: var(--oos-red); box-shadow: 0 0 0 4px rgba(246,58,58,.12); }
-  .oos-count { text-align: right; font-size: 11.5px; color: var(--oos-muted); margin: 3px 0 14px; }
-  .oos-actions { display: flex; gap: 10px; }
-  .oos-actions .oos-btn { flex: 1; }
-  .oos-actions .cancel { flex: .6; background: #f3f4f6; color: #374151; box-shadow: none; }
-  .oos-actions .cancel:hover { background: #e5e7eb; box-shadow: none; transform: none; }
-
-  @media (max-width: 760px) {
-    .oos-grid.list .oos-card { flex-direction: column; align-items: stretch; }
-    .oos-hero h1 { font-size: 23px; }
-    .oos-bulk { flex-wrap: wrap; justify-content: center; }
+  /* mobile: each row becomes a card */
+  @media (max-width: 800px) {
+    .os-thead { display: none; }
+    .os-row { grid-template-columns: 28px 1fr auto; grid-template-areas: "sel name state" "stock stock stock" "act act act"; gap: 10px 12px; padding: 14px; }
+    .os-sel { grid-area: sel; } .os-name { grid-area: name; } .os-state { grid-area: state; }
+    .os-stock { grid-area: stock; } .os-act { grid-area: act; }
+    .os-select { margin-left: 0; }
   }
 </style>
 
-<!-- HERO -->
-<div class="oos-hero">
-  <div>
-    <h1>🚫 Out of Stock</h1>
-    <p>Oru item theernthuchuna report pannunga. Store-ku udane alert pogum. Restock aanaa inga message varum.</p>
+<div class="os-page">
+  <div class="os-head">
+    <h1>Out of Stock</h1>
+    <p>Report an item that has run out. The store team is alerted instantly.</p>
   </div>
-  <div class="oos-clock">
-    <b id="oosClock">--:--:--</b>
-    <small id="oosDate"></small>
-  </div>
-</div>
 
-<!-- RECENT RESTOCKS -->
-{% if recent_restocks %}
-<div class="oos-restock">
-  {% for r in recent_restocks %}
-    <div class="row">
-      <span class="ico">📦</span>
-      <div>
-        <b>{{ r.item.name }}</b> restocked
-        <small>{{ r.restocked_message }}</small>
-      </div>
-      {% if r.restocked_at %}<time>{{ r.restocked_at|timesince }} ago</time>{% endif %}
+  {% if recent_restocks %}
+  <details class="os-restock">
+    <summary>Recently restocked ({{ recent_restocks|length }})</summary>
+    <ul>
+      {% for r in recent_restocks %}
+        <li>
+          <div><b>{{ r.item.name }}</b>{% if r.restocked_message %} &middot; {{ r.restocked_message }}{% endif %}</div>
+          {% if r.restocked_at %}<span>{{ r.restocked_at|timesince }} ago</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+
+  <div class="os-toolbar">
+    <div class="os-search">
+      <input type="text" id="oosSearch" placeholder="Search item" autocomplete="off" aria-label="Search item">
+      <kbd>/</kbd>
     </div>
-  {% endfor %}
-</div>
-{% endif %}
-
-<!-- STATS -->
-<div class="oos-stats">
-  <div class="oos-stat all active" data-filter="all"><div class="badge">🛒</div><div><b id="stAll">0</b><span>Total items</span></div></div>
-  <div class="oos-stat ok" data-filter="ok"><div class="badge">✅</div><div><b id="stOk">0</b><span>In stock</span></div></div>
-  <div class="oos-stat low" data-filter="low"><div class="badge">⚠️</div><div><b id="stLow">0</b><span>Running low</span></div></div>
-  <div class="oos-stat pending" data-filter="pending"><div class="badge">🚫</div><div><b id="stPending">0</b><span>Reported to store</span></div></div>
-</div>
-
-<!-- TOOLBAR -->
-<div class="oos-toolbar">
-  <div class="oos-search-wrap">
-    <span class="s-ico">🔍</span>
-    <input type="text" id="oosSearch" placeholder="Search item..." autocomplete="off">
-    <kbd>/</kbd>
-  </div>
-  <select id="oosSort" class="oos-select">
-    <option value="attention">Sort: Needs attention first</option>
-    <option value="az">Sort: A to Z</option>
-    <option value="lowest">Sort: Lowest stock first</option>
-  </select>
-  <div class="oos-view">
-    <button type="button" id="vGrid" class="on" title="Grid view">▦</button>
-    <button type="button" id="vList" title="List view">☰</button>
-  </div>
-</div>
-
-<div class="oos-tabs" id="oosTabs">
-  <button type="button" class="oos-tab on" data-filter="all">All <em id="tAll">0</em></button>
-  <button type="button" class="oos-tab" data-filter="ok">In stock <em id="tOk">0</em></button>
-  <button type="button" class="oos-tab" data-filter="low">Low <em id="tLow">0</em></button>
-  <button type="button" class="oos-tab" data-filter="pending">Reported <em id="tPending">0</em></button>
-</div>
-
-<!-- GRID -->
-<div class="oos-grid" id="oosGrid">
-  {% for g in grocery_items %}
-    <div class="oos-card {% if g.id in pending_ids %}pending{% elif g.is_low %}low{% endif %}"
-         id="oos-{{ g.id }}"
-         data-id="{{ g.id }}"
-         data-name="{{ g.name|lower }}"
-         data-label="{{ g.name }}"
-         data-qty="{{ g.quantity|stringformat:'s' }}"
-         data-limit="{{ g.low_stock_limit|stringformat:'s' }}"
-         data-url="{% url 'dashboard:kitchen_request_stock' g.pk %}"
-         data-status="{% if g.id in pending_ids %}pending{% elif g.is_low %}low{% else %}ok{% endif %}"
-         style="animation-delay: {{ forloop.counter0|add:0 }}0ms">
-      <div class="oos-top">
-        <div class="oos-avatar" data-emoji>🛒</div>
-        <div class="oos-title">
-          <h3>{{ g.name }}</h3>
-          <small>Item #{{ g.id }}</small>
-        </div>
-        <span class="tag {% if g.id in pending_ids %}pending{% elif g.is_low %}low{% else %}ok{% endif %}" data-tag>
-          {% if g.id in pending_ids %}Reported{% elif g.is_low %}LOW{% else %}In stock{% endif %}
-        </span>
-        <input type="checkbox" class="oos-check" title="Select for bulk report" {% if g.id in pending_ids %}disabled{% endif %}>
-      </div>
-
-      <div class="oos-meta">
-        <div>
-          <div class="oos-qtyrow">
-            <div class="oos-qty">{{ g.quantity|floatformat:"-2" }}<small>{{ g.unit }} left</small></div>
-            <div class="oos-limit">Low at {{ g.low_stock_limit|floatformat:"-2" }} {{ g.unit }}</div>
-          </div>
-          <div class="oos-bar"><i data-bar></i></div>
-        </div>
-        <button type="button" class="oos-btn" data-report {% if g.id in pending_ids %}disabled{% endif %}>
-          {% if g.id in pending_ids %}⏳ Waiting for store...{% else %}🚫 Out of Stock{% endif %}
-        </button>
-      </div>
+    <div class="os-tabs" id="oosTabs">
+      <button type="button" class="os-tab on" data-filter="all">All<em id="tAll">0</em></button>
+      <button type="button" class="os-tab" data-filter="low">Low stock<em id="tLow">0</em></button>
+      <button type="button" class="os-tab" data-filter="pending">Reported<em id="tPending">0</em></button>
+      <button type="button" class="os-tab" data-filter="ok">In stock<em id="tOk">0</em></button>
     </div>
-  {% endfor %}
-</div>
-
-<div class="oos-empty" id="oosEmpty">
-  <b>🔎</b>
-  Intha filter-ku item edhuvum illa.
-</div>
-
-{% if not grocery_items %}
-  <div class="oos-empty" style="display:block">
-    <b>🛒</b>
-    Grocery items illa. Store Manager "Manage Grocery"-la add pannanum.
+    <select id="oosSort" class="os-select" aria-label="Sort">
+      <option value="attention">Needs attention first</option>
+      <option value="az">Name A to Z</option>
+      <option value="lowest">Lowest stock first</option>
+    </select>
   </div>
-{% endif %}
 
-<!-- BULK BAR -->
-<div class="oos-bulk" id="oosBulk">
+  <div class="os-table">
+    <div class="os-thead">
+      <label class="os-sel"><input type="checkbox" class="os-check" id="oosAll" title="Select all visible"></label>
+      <div>Item</div><div>Stock level</div><div>Status</div><div></div>
+    </div>
+    <div id="oosGrid">
+      {% for g in grocery_items %}
+      <div class="os-row {% if g.id in pending_ids %}pending{% elif g.is_low %}low{% endif %} oos-card"
+           id="oos-{{ g.id }}"
+           data-name="{{ g.name|lower }}"
+           data-label="{{ g.name }}"
+           data-qty="{{ g.quantity|stringformat:'s' }}"
+           data-limit="{{ g.low_stock_limit|stringformat:'s' }}"
+           data-url="{% url 'dashboard:kitchen_request_stock' g.pk %}"
+           data-status="{% if g.id in pending_ids %}pending{% elif g.is_low %}low{% else %}ok{% endif %}">
+        <label class="os-sel"><input type="checkbox" class="os-check oos-check" aria-label="Select {{ g.name }}" {% if g.id in pending_ids %}disabled{% endif %}></label>
+        <div class="os-name"><span class="os-ava" data-ava></span><b>{{ g.name }}</b></div>
+        <div class="os-stock">
+          <div class="os-qty"><b>{{ g.quantity|floatformat:"-2" }}</b> {{ g.unit }}<span>Low at {{ g.low_stock_limit|floatformat:"-2" }} {{ g.unit }}</span></div>
+          <div class="os-bar"><i data-bar></i></div>
+        </div>
+        <div class="os-state">
+          <span class="os-badge {% if g.id in pending_ids %}pending{% elif g.is_low %}low{% else %}ok{% endif %}" data-tag>{% if g.id in pending_ids %}Reported{% elif g.is_low %}Low stock{% else %}In stock{% endif %}</span>
+        </div>
+        <div class="os-act">
+          <button type="button" class="os-btn" data-report {% if g.id in pending_ids %}disabled{% endif %}>{% if g.id in pending_ids %}Waiting for store{% else %}Report out of stock{% endif %}</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="os-empty" id="oosEmpty">No items match your search or filter.</div>
+    {% if not grocery_items %}
+      <div class="os-empty" style="display:block">No grocery items yet. The Store Manager needs to add them under Manage Grocery.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- bulk bar -->
+<div class="os-bulk" id="oosBulk">
   <span><b id="bulkCount">0</b> selected</span>
-  <input type="text" id="bulkNote" maxlength="120" placeholder="Common note (optional)">
-  <button type="button" class="oos-btn" id="bulkGo" style="padding:10px 16px">Report all</button>
-  <button type="button" class="ghost" id="bulkClear">Clear</button>
+  <input type="text" id="bulkNote" maxlength="120" placeholder="Note for all (optional)">
+  <button type="button" class="os-btn solid" id="bulkGo">Report all</button>
+  <button type="button" class="link" id="bulkClear">Clear</button>
 </div>
 
-<!-- CONFIRM MODAL -->
-<div class="oos-modal-bg" id="oosModalBg">
-  <div class="oos-modal" role="dialog" aria-modal="true">
-    <div class="m-ico" id="mEmoji">🚫</div>
+<!-- confirm modal -->
+<div class="os-modal-bg" id="oosModalBg">
+  <div class="os-modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
     <h2 id="mTitle">Report out of stock?</h2>
-    <p id="mSub">Store-ku udane alert pogum.</p>
-    <div class="oos-chips" id="mChips">
-      <button type="button" class="oos-chip">Finished</button>
-      <button type="button" class="oos-chip">Expired</button>
-      <button type="button" class="oos-chip">Spoiled</button>
-      <button type="button" class="oos-chip">Urgent needed</button>
-      <button type="button" class="oos-chip">Quality issue</button>
+    <p>The store team gets an alert right away.</p>
+    <div class="os-chips" id="mChips">
+      <button type="button" class="os-chip" data-reason="finished">Finished</button>
+      <button type="button" class="os-chip" data-reason="expired">Expired</button>
+      <button type="button" class="os-chip" data-reason="spoiled">Spoiled</button>
+      <button type="button" class="os-chip" data-reason="urgent">Urgent</button>
+      <button type="button" class="os-chip" data-reason="quality">Quality issue</button>
     </div>
-    <textarea id="mNote" maxlength="120" placeholder="Note (optional)"></textarea>
-    <div class="oos-count"><span id="mCount">0</span>/120</div>
-    <div class="oos-actions">
-      <button type="button" class="oos-btn cancel" id="mCancel">Cancel</button>
-      <button type="button" class="oos-btn" id="mConfirm">Send to Store</button>
+    <textarea id="mNote" maxlength="120" placeholder="Add a note (optional)"></textarea>
+    <div class="os-count"><span id="mCount">0</span>/120</div>
+    <div class="os-actions">
+      <button type="button" class="os-btn plain" id="mCancel">Cancel</button>
+      <button type="button" class="os-btn solid" id="mConfirm">Send to Store</button>
     </div>
   </div>
 </div>
@@ -352,56 +216,83 @@
   const searchEl = document.getElementById('oosSearch');
   const sortEl = document.getElementById('oosSort');
   const emptyEl = document.getElementById('oosEmpty');
+  const allBox = document.getElementById('oosAll');
   let filter = 'all';
 
-  // ---------- helpers ----------
+  // reason -> text shown/spoken in the toast (so each option gives its own message)
+  const REASON_TEXT = {
+    out_of_stock: 'is out of stock',
+    finished:     'is finished',
+    expired:      'is expired',
+    spoiled:      'is spoiled',
+    urgent:       'is needed urgently',
+    quality:      'has a quality issue'
+  };
+
   function csrf() {
     const m = document.cookie.match('(?:^|; )csrftoken=([^;]*)');
     return m ? decodeURIComponent(m[1]) : '{{ csrf_token }}';
   }
   function toast(t, s, k) { if (window.showToast) window.showToast(t, s, k); }
 
-  const EMOJI = [
-    [/rice|basmathi|biryani/, '🍚'], [/oil/, '🛢️'], [/juice|mojito|drink/, '🧃'], [/apple/, '🍎'],
-    [/onion/, '🧅'], [/tomato/, '🍅'], [/potato/, '🥔'], [/chicken/, '🍗'], [/mutton|lamb/, '🥩'],
-    [/fish|prawn|meen|crab/, '🐟'], [/egg/, '🥚'], [/milk|curd|paneer|butter|cheese|cream/, '🥛'],
-    [/sugar|salt|masala|spice|chilli|pepper|turmeric/, '🧂'], [/flour|maida|wheat|atta|rava/, '🌾'],
-    [/dal|lentil|bean|gram/, '🫘'], [/carrot/, '🥕'], [/lemon|lime/, '🍋'], [/banana/, '🍌'],
-    [/water|soda/, '💧'], [/tea|coffee/, '☕'], [/garlic|ginger/, '🧄']
+  // item pictures: an icon that matches each item name
+  const ICONS = [
+    [/blueberr/, '\u{1FAD0}', '#e0e7ff'], [/strawberr/, '\u{1F353}', '#ffe4e6'],
+    [/watermelon/, '\u{1F349}', '#ffe4e6'], [/apple/, '\u{1F34E}', '#fee2e2'],
+    [/mango/, '\u{1F96D}', '#fef3c7'], [/orange/, '\u{1F34A}', '#ffedd5'],
+    [/lemon/, '\u{1F34B}', '#fef9c3'], [/coconut/, '\u{1F965}', '#f5f5f4'],
+    [/juice/, '\u{1F9C3}', '#ffedd5'], [/crush|syrup|pulp/, '\u{1F379}', '#ffe4e6'],
+    [/masala|powder|pepper|cardamom|cinnamon|cloves|cumin|fennel|mustard|anise|turmeric|seeds/, '\u{1FAD9}', '#ffedd5'],
+    [/fish|anchovy|nethili|pomfret|meen|prawn/, '\u{1F41F}', '#dbeafe'],
+    [/chicken/, '\u{1F357}', '#ffedd5'],
+    [/mutton|goat/, '\u{1F969}', '#fee2e2'],
+    [/egg/, '\u{1F95A}', '#fef9c3'],
+    [/rice flour|corn flour|flour/, '\u{1F33E}', '#fef3c7'],
+    [/rice/, '\u{1F35A}', '#f1f5f9'],
+    [/ghee|butter/, '\u{1F9C8}', '#fef9c3'], [/oil/, '\u{1F6E2}\uFE0F', '#fef3c7'],
+    [/curd|milk|cream|paneer/, '\u{1F95B}', '#f1f5f9'],
+    [/spring onion/, '\u{1F331}', '#dcfce7'], [/onion/, '\u{1F9C5}', '#fae8ff'],
+    [/garlic/, '\u{1F9C4}', '#f5f5f4'], [/ginger/, '\u{1F33F}', '#fef3c7'],
+    [/tomato/, '\u{1F345}', '#fee2e2'],
+    [/capsicum/, '\u{1FAD1}', '#dcfce7'],
+    [/chilli|chili/, '\u{1F336}\uFE0F', '#fee2e2'],
+    [/leaves|leaf/, '\u{1F33F}', '#dcfce7'],
+    [/mushroom/, '\u{1F344}', '#f5f5f4'], [/vegetable/, '\u{1F966}', '#dcfce7'],
+    [/tamarind/, '\u{1F330}', '#ffedd5'],
+    [/sugar/, '\u{1F36C}', '#fae8ff'], [/salt/, '\u{1F9C2}', '#f1f5f9'],
+    [/ice/, '\u{1F9CA}', '#e0f2fe'], [/soda|water/, '\u{1F964}', '#e0f2fe'],
+    [/soy|vinegar|sauce/, '\u{1F376}', '#fef3c7']
   ];
-  function emojiFor(name) {
-    for (const [re, e] of EMOJI) if (re.test(name)) return e;
-    return '🛒';
-  }
-
-  // ---------- init cards ----------
   cards.forEach(function (c) {
-    c.querySelector('[data-emoji]').textContent = emojiFor(c.dataset.name);
+    const ava = c.querySelector('[data-ava]');
+    let icon = '\u{1F6D2}', bg = '#f1f5f9';
+    for (const [re, e, b] of ICONS) { if (re.test(c.dataset.name)) { icon = e; bg = b; break; } }
+    ava.textContent = icon; ava.style.background = bg;
+  });
+
+  // stock bars
+  cards.forEach(function (c) {
     const qty = parseFloat(c.dataset.qty) || 0;
     const limit = parseFloat(c.dataset.limit) || 0;
     const max = Math.max(limit * 4, qty, 1);
     const pct = Math.max(3, Math.min(100, (qty / max) * 100));
     requestAnimationFrame(function () {
-      setTimeout(function () { c.querySelector('[data-bar]').style.width = pct + '%'; }, 80);
+      setTimeout(function () { c.querySelector('[data-bar]').style.width = pct + '%'; }, 60);
     });
   });
 
-  // ---------- stats ----------
-  function stats() {
+  // counts
+  function counts() {
     const n = { all: cards.length, ok: 0, low: 0, pending: 0 };
     cards.forEach(function (c) { n[c.dataset.status]++; });
-    document.getElementById('stAll').textContent = n.all;
-    document.getElementById('stOk').textContent = n.ok;
-    document.getElementById('stLow').textContent = n.low;
-    document.getElementById('stPending').textContent = n.pending;
     document.getElementById('tAll').textContent = n.all;
     document.getElementById('tOk').textContent = n.ok;
     document.getElementById('tLow').textContent = n.low;
     document.getElementById('tPending').textContent = n.pending;
   }
 
-  // ---------- filter + search + sort ----------
-  const RANK = { pending: 0, low: 1, ok: 2 };
+  // sort / filter / search
+  const RANK = { low: 0, ok: 1, pending: 2 };
   function sortCards() {
     const mode = sortEl.value;
     const sorted = cards.slice().sort(function (a, b) {
@@ -417,95 +308,85 @@
     const q = searchEl.value.trim().toLowerCase();
     let shown = 0;
     cards.forEach(function (c) {
-      const okF = filter === 'all' || c.dataset.status === filter;
-      const okQ = !q || c.dataset.name.indexOf(q) !== -1;
-      const show = okF && okQ;
+      const show = (filter === 'all' || c.dataset.status === filter) && (!q || c.dataset.name.indexOf(q) !== -1);
       c.style.display = show ? '' : 'none';
       if (show) shown++;
     });
     emptyEl.style.display = (shown === 0 && cards.length) ? 'block' : 'none';
-    document.querySelectorAll('[data-filter]').forEach(function (el) {
-      el.classList.toggle('active', el.classList.contains('oos-stat') && el.dataset.filter === filter);
-      el.classList.toggle('on', el.classList.contains('oos-tab') && el.dataset.filter === filter);
-    });
+    document.querySelectorAll('.os-tab').forEach(function (t) { t.classList.toggle('on', t.dataset.filter === filter); });
   }
-  document.querySelectorAll('[data-filter]').forEach(function (el) {
-    el.addEventListener('click', function () { filter = el.dataset.filter; apply(); });
+  document.querySelectorAll('.os-tab').forEach(function (t) {
+    t.addEventListener('click', function () { filter = t.dataset.filter; apply(); });
   });
   searchEl.addEventListener('input', apply);
-  sortEl.addEventListener('change', function () { sortCards(); try { localStorage.setItem('oosSort', sortEl.value); } catch (e) {} });
+  sortEl.addEventListener('change', function () { sortCards(); });
 
-  // ---------- view toggle ----------
-  function setView(v) {
-    grid.classList.toggle('list', v === 'list');
-    document.getElementById('vGrid').classList.toggle('on', v !== 'list');
-    document.getElementById('vList').classList.toggle('on', v === 'list');
-    try { localStorage.setItem('oosView', v); } catch (e) {}
-  }
-  document.getElementById('vGrid').onclick = function () { setView('grid'); };
-  document.getElementById('vList').onclick = function () { setView('list'); };
-  try {
-    setView(localStorage.getItem('oosView') || 'grid');
-    const s = localStorage.getItem('oosSort');
-    if (s) sortEl.value = s;
-  } catch (e) {}
-
-  // ---------- mark reported ----------
+  // mark reported
   function markPending(c) {
     c.dataset.status = 'pending';
     c.classList.remove('low', 'selected');
     c.classList.add('pending');
     const tag = c.querySelector('[data-tag]');
-    tag.className = 'tag pending';
+    tag.className = 'os-badge pending';
     tag.textContent = 'Reported';
     const btn = c.querySelector('[data-report]');
     btn.disabled = true;
-    btn.textContent = '⏳ Waiting for store...';
+    btn.textContent = 'Waiting for store';
     const cb = c.querySelector('.oos-check');
     cb.checked = false; cb.disabled = true;
-    stats(); sortCards(); apply(); updateBulk();
+    counts(); sortCards(); apply(); updateBulk();
   }
 
-  // ---------- send request ----------
-  async function send(card, note) {
+  // send request (now also sends the selected reason)
+  async function send(card, note, reason) {
+    reason = reason || 'out_of_stock';
     try {
       const body = new FormData();
       body.append('note', note || '');
+      body.append('reason', reason);
       const res = await fetch(card.dataset.url, {
         method: 'POST', headers: { 'X-CSRFToken': csrf() }, body: body, credentials: 'same-origin'
       });
       const d = await res.json();
-      if (d.ok) { markPending(card); return { ok: true, name: d.name }; }
+      if (d.ok) { markPending(card); return { ok: true, name: d.name, reason: reason }; }
       if (d.error && d.error.indexOf('Already') === 0) { markPending(card); }
-      return { ok: false, error: d.error || 'Error' };
+      return { ok: false, error: d.error || 'Something went wrong' };
     } catch (e) {
-      return { ok: false, error: 'Network error. Thirumba try pannunga.' };
+      return { ok: false, error: 'Network error. Please try again.' };
     }
   }
 
-  // ---------- modal (single report) ----------
+  // modal
   const bg = document.getElementById('oosModalBg');
   const mNote = document.getElementById('mNote');
   const mCount = document.getElementById('mCount');
   let current = null;
+  let currentReason = 'out_of_stock';
 
   function openModal(card) {
     current = card;
-    document.getElementById('mEmoji').textContent = emojiFor(card.dataset.name);
-    document.getElementById('mTitle').textContent = card.dataset.label + ' theernthucha?';
-    document.getElementById('mSub').textContent = 'Store-ku udane alert + notification pogum.';
+    currentReason = 'out_of_stock';
+    document.getElementById('mTitle').textContent = 'Report ' + card.dataset.label + ' as out of stock?';
     mNote.value = ''; mCount.textContent = '0';
-    document.querySelectorAll('#mChips .oos-chip').forEach(function (c) { c.classList.remove('on'); });
+    document.querySelectorAll('#mChips .os-chip').forEach(function (c) { c.classList.remove('on'); });
     bg.classList.add('open');
     setTimeout(function () { mNote.focus(); }, 60);
   }
-  function closeModal() { bg.classList.remove('open'); current = null; }
+  function closeModal() { bg.classList.remove('open'); current = null; currentReason = 'out_of_stock'; }
 
-  document.querySelectorAll('#mChips .oos-chip').forEach(function (chip) {
+  document.querySelectorAll('#mChips .os-chip').forEach(function (chip) {
     chip.addEventListener('click', function () {
-      document.querySelectorAll('#mChips .oos-chip').forEach(function (c) { c.classList.remove('on'); });
-      chip.classList.add('on');
-      mNote.value = chip.textContent;
+      const wasOn = chip.classList.contains('on');
+      document.querySelectorAll('#mChips .os-chip').forEach(function (c) { c.classList.remove('on'); });
+      if (wasOn) {
+        // click again to un-select
+        currentReason = 'out_of_stock';
+        mNote.value = '';
+      } else {
+        chip.classList.add('on');
+        currentReason = chip.dataset.reason || 'out_of_stock';
+        mNote.value = chip.textContent.trim();
+      }
       mCount.textContent = mNote.value.length;
     });
   });
@@ -515,13 +396,18 @@
 
   document.getElementById('mConfirm').onclick = async function () {
     if (!current) return;
-    const btn = this, card = current;
+    const btn = this, card = current, reason = currentReason;
     btn.disabled = true; btn.textContent = 'Sending...';
-    const r = await send(card, mNote.value.trim());
+    const r = await send(card, mNote.value.trim(), reason);
     btn.disabled = false; btn.textContent = 'Send to Store';
     closeModal();
-    if (r.ok) toast('✅ Store-ku alert poiduchu', r.name + ' out of stock', 'good');
-    else toast('⚠️ ' + r.error, '', 'alert');
+    if (r.ok) {
+      // message depends on the option clicked: expired / spoiled / urgent ...
+      const what = REASON_TEXT[r.reason] || REASON_TEXT.out_of_stock;
+      toast('Reported to store', r.name + ' ' + what, 'good');
+      // hook for any sound script: document.addEventListener('stock:reported', ...)
+      document.dispatchEvent(new CustomEvent('stock:reported', { detail: { name: r.name, reason: r.reason, text: r.name + ' ' + what } }));
+    } else toast(r.error, '', 'alert');
   };
 
   cards.forEach(function (c) {
@@ -534,14 +420,24 @@
     });
   });
 
-  // ---------- bulk ----------
+  // bulk
   const bulk = document.getElementById('oosBulk');
   function selected() { return cards.filter(function (c) { return c.querySelector('.oos-check').checked; }); }
   function updateBulk() {
     const n = selected().length;
     document.getElementById('bulkCount').textContent = n;
     bulk.classList.toggle('show', n > 0);
+    if (!n) allBox.checked = false;
   }
+  allBox.addEventListener('change', function () {
+    cards.forEach(function (c) {
+      const cb = c.querySelector('.oos-check');
+      if (c.style.display === 'none' || cb.disabled) return;
+      cb.checked = allBox.checked;
+      c.classList.toggle('selected', cb.checked);
+    });
+    updateBulk();
+  });
   document.getElementById('bulkClear').onclick = function () {
     cards.forEach(function (c) { c.querySelector('.oos-check').checked = false; c.classList.remove('selected'); });
     updateBulk();
@@ -552,17 +448,14 @@
     const btn = this, note = document.getElementById('bulkNote').value.trim();
     btn.disabled = true; btn.textContent = 'Sending...';
     let ok = 0, fail = 0;
-    for (const c of list) {
-      const r = await send(c, note);
-      r.ok ? ok++ : fail++;
-    }
+    for (const c of list) { const r = await send(c, note, 'out_of_stock'); r.ok ? ok++ : fail++; }
     btn.disabled = false; btn.textContent = 'Report all';
     document.getElementById('bulkNote').value = '';
-    if (ok) toast('✅ ' + ok + ' item(s) store-ku report aayiduchu', fail ? fail + ' failed / already reported' : '', 'good');
-    else toast('⚠️ Edhuvum send aagala', '', 'alert');
+    if (ok) toast(ok + ' item(s) reported to store', fail ? fail + ' failed or already reported' : '', 'good');
+    else toast('Nothing was sent', '', 'alert');
   };
 
-  // ---------- keyboard ----------
+  // keyboard
   document.addEventListener('keydown', function (e) {
     const typing = /INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '');
     if (e.key === '/' && !typing) { e.preventDefault(); searchEl.focus(); }
@@ -572,16 +465,7 @@
     }
   });
 
-  // ---------- clock ----------
-  function tick() {
-    const d = new Date();
-    document.getElementById('oosClock').textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    document.getElementById('oosDate').textContent = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
-  }
-  tick(); setInterval(tick, 1000);
-
-  // ---------- go ----------
-  stats(); sortCards(); apply(); updateBulk();
+  counts(); sortCards(); apply(); updateBulk();
 })();
 </script>
 {% endblock %}

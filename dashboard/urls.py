@@ -1,3 +1,4 @@
+from django.views.generic import RedirectView
 from django.urls import path
 from . import views
 
@@ -28,7 +29,7 @@ urlpatterns = [
     path('orders/<int:pk>/approve/', views.approve_order, name='approve_order'),
     path('orders/<int:pk>/reject/', views.reject_order, name='reject_order'),
     path('orders/<int:pk>/stock-check/', views.order_stock_check, name='order_stock_check'),
-    path('grocery/', views.manage_grocery, name='manage_grocery'),
+    path('grocery/', RedirectView.as_view(pattern_name='store:item_list'), name='manage_grocery'),
     path('grocery/<int:pk>/update/', views.update_grocery, name='update_grocery'),
     path('grocery/<int:pk>/delete/', views.delete_grocery, name='delete_grocery'),
     path('reports/', views.sales_reports, name='sales_reports'),
@@ -39,8 +40,7 @@ urlpatterns = [
     path('server/poll/', views.server_poll, name='server_poll'),
     path('server/take-order/', views.server_take_order, name='server_take_order'),
     path('server/free-table/<int:pk>/', views.server_free_table, name='server_free_table'),
-    path('delivery/', views.delivery_dashboard, name='delivery_dashboard'),
-    path('delivery/poll/', views.delivery_poll, name='delivery_poll'),
+    path('server/mark-cash-received/<int:pk>/', views.server_mark_cash_received, name='server_mark_cash_received'),
     path('notifications/poll/', views.notifications_poll, name='notifications_poll'),
     path('notifications/read/', views.notifications_mark_read, name='notifications_mark_read'),
     path('table-qr-codes/', views.table_qr_codes, name='table_qr_codes'),
@@ -51,4 +51,6 @@ urlpatterns = [
     path('menu/<int:pk>/toggle/', views.toggle_menu_availability, name='toggle_menu_availability'),
     path('server/send-to-kitchen/<int:pk>/', views.server_send_to_kitchen, name='server_send_to_kitchen'),
     path('server/reject/<int:pk>/', views.server_reject_order, name='server_reject_order'),
+    path('server/bill/<int:pk>/', views.server_table_bill, name='server_table_bill'),
+    path('server/bill/<int:pk>/cash-received/', views.server_table_cash_received, name='server_table_cash_received'),
 ]

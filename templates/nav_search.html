@@ -1,0 +1,187 @@
+{# Navbar search: icon button + full-screen search panel. #}
+<button type="button" id="navSearchBtn" class="ns-btn" aria-label="Search menu">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+</button>
+
+<div id="navSearchPanel" class="ns-overlay" hidden>
+  <div class="ns-box" role="dialog" aria-label="Search the menu">
+    <div class="ns-top">
+      <div class="ns-field">
+        <input type="text" id="navSearchInput" placeholder="Search dishes or menu..." autocomplete="off">
+        <button type="button" id="navSearchClear" class="ns-clear" aria-label="Clear" hidden>&times;</button>
+      </div>
+      <button type="button" id="navSearchClose" class="ns-close">Close</button>
+    </div>
+    <div class="ns-filters">
+      <button type="button" id="nsVeg" class="ns-tg" aria-pressed="false" aria-label="Veg only" title="Veg only">
+        <span class="ns-ic ns-ic-veg"></span><span class="ns-sw"></span>
+      </button>
+      <button type="button" id="nsNon" class="ns-tg" aria-pressed="false" aria-label="Non-veg only" title="Non-veg only">
+        <span class="ns-ic ns-ic-non"></span><span class="ns-sw"></span>
+      </button>
+    </div>
+    <div class="ns-body">
+      <div id="navSearchCats" class="ns-cats"></div>
+      <div id="navSearchItems" class="ns-items"></div>
+      <p id="navSearchMsg" class="ns-msg"></p>
+    </div>
+  </div>
+</div>
+
+<style>
+.ns-btn{width:40px;height:40px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#ffb703;cursor:pointer;padding:0}
+.ns-btn:hover{background:rgba(255,183,3,.18)}
+.ns-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:3000;background:rgba(11,20,40,.55);display:none}
+.ns-overlay.open{display:block}
+.ns-box{background:#fff;max-width:680px;margin:0 auto;border-radius:0 0 18px 18px;box-shadow:0 18px 50px rgba(0,0,0,.28);max-height:88vh;display:flex;flex-direction:column}
+.ns-top{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #eef0f3}
+.ns-field{flex:1;display:flex;align-items:center;background:#f3f5f8;border-radius:999px;padding:0 16px;height:46px}
+.ns-field input{flex:1;border:0;outline:0;background:transparent;font-size:16px;color:#111827;min-width:0}
+.ns-clear{border:0;background:transparent;font-size:24px;line-height:1;color:#9ca3af;cursor:pointer}
+.ns-close{border:0;background:transparent;color:#ff6b6b;font-weight:700;cursor:pointer;font-size:15px}
+.ns-body{overflow-y:auto;padding:14px 16px 18px}
+.ns-cats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.ns-chip{border:1px solid #e5e7eb;background:#fff;color:#1f2937;border-radius:999px;padding:7px 14px;font-size:14px;font-weight:600;cursor:pointer}
+.ns-chip:hover{border-color:#ff6b6b;color:#ff6b6b}
+.ns-label{width:100%;font-size:12px;text-transform:uppercase;color:#9ca3af;font-weight:700;margin:2px 0 0}
+.ns-items{display:flex;flex-direction:column;gap:8px}
+.ns-item{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;padding:8px;border-radius:12px;border:1px solid #eef0f3;background:#fff}
+.ns-item:hover{background:#fff7f5}
+.ns-thumb{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#e5e7eb;flex:none}
+.ns-info{flex:1;min-width:0}
+.ns-name{font-weight:700;color:#111827;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ns-sub{font-size:13px;color:#6b7280;margin-top:2px}
+.ns-price{font-weight:800;color:#e11d48;font-size:15px;flex:none}
+.ns-dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+.ns-dot.veg{background:#16a34a}
+.ns-dot.non{background:#b91c1c}
+.ns-msg{color:#6b7280;text-align:center;margin:18px 0 6px;font-size:14px}
+.ns-filters{display:flex;gap:12px;padding:10px 16px 0}
+.ns-tg{display:inline-flex;align-items:center;gap:8px;padding:5px 12px 5px 6px;border-radius:999px;border:2px solid #7a3b2e;background:#fff;cursor:pointer}
+.ns-ic{width:20px;height:20px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.ns-ic-veg{border:2px solid #16a34a}
+.ns-ic-veg::after{content:"";width:9px;height:9px;border-radius:50%;background:#16a34a}
+.ns-ic-non{border:2px solid #b91c1c}
+.ns-ic-non::after{content:"";border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:9px solid #b91c1c}
+.ns-sw{width:44px;height:14px;border-radius:999px;background:#d9d9d9;position:relative;transition:background .2s}
+.ns-sw::after{content:"";position:absolute;top:-2px;left:0;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid #9ca3af;box-sizing:border-box;transition:left .2s,border-color .2s}
+.ns-tg.on#nsVeg .ns-sw{background:#bbf7d0}
+.ns-tg.on#nsVeg .ns-sw::after{left:26px;border-color:#16a34a}
+.ns-tg.on#nsNon .ns-sw{background:#fecaca}
+.ns-tg.on#nsNon .ns-sw::after{left:26px;border-color:#b91c1c}
+body.ns-lock{overflow:hidden}
+@media (max-width:600px){.ns-box{border-radius:0;max-height:100vh;height:100vh}}
+</style>
+
+<script>
+(function () {
+  var SUGGEST = "{% url 'search_suggest' %}";
+  var g = function (id) { return document.getElementById(id); };
+  var btn = g("navSearchBtn"), panel = g("navSearchPanel"), input = g("navSearchInput");
+  var clr = g("navSearchClear"), closeBtn = g("navSearchClose");
+  var cats = g("navSearchCats"), items = g("navSearchItems"), msg = g("navSearchMsg");
+  var timer = null, last = null, lastData = null, lastQ = "", mode = "";
+
+  function openPanel() {
+    panel.hidden = false;
+    panel.classList.add("open");
+    document.body.classList.add("ns-lock");
+    input.focus();
+    if (last === null) { run(""); }
+  }
+  function closePanel() {
+    panel.classList.remove("open");
+    panel.hidden = true;
+    document.body.classList.remove("ns-lock");
+  }
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) { n.className = cls; }
+    if (text !== undefined) { n.textContent = text; }
+    return n;
+  }
+  function render(data, q) {
+    lastData = data;
+    lastQ = q;
+    var list = data.items.filter(function (it) {
+      return mode === "" || (mode === "veg") === !!it.is_veg;
+    });
+    cats.innerHTML = "";
+    items.innerHTML = "";
+    msg.textContent = "";
+    if (data.categories.length) {
+      cats.appendChild(el("p", "ns-label", q ? "Menu categories" : "Browse menu"));
+      data.categories.forEach(function (c) {
+        var chip = el("button", "ns-chip", c.name);
+        chip.type = "button";
+        chip.addEventListener("click", function () {
+          input.value = c.name;
+          clr.hidden = false;
+          run(c.name);
+        });
+        cats.appendChild(chip);
+      });
+    }
+    list.forEach(function (it) {
+      var a = el("a", "ns-item");
+      a.href = it.url;
+      var img = el("img", "ns-thumb");
+      img.alt = it.name;
+      if (it.image) { img.src = it.image; }
+      var info = el("div", "ns-info");
+      info.appendChild(el("div", "ns-name", it.name));
+      var sub = el("div", "ns-sub");
+      sub.appendChild(el("span", "ns-dot " + (it.is_veg ? "veg" : "non")));
+      sub.appendChild(document.createTextNode(it.category));
+      info.appendChild(sub);
+      a.appendChild(img);
+      a.appendChild(info);
+      a.appendChild(el("div", "ns-price", "\u20B9" + it.price));
+      items.appendChild(a);
+    });
+    if ((q || mode) && !list.length && (mode || !data.categories.length)) {
+      msg.textContent = "No " + (mode === "veg" ? "veg " : mode === "non" ? "non-veg " : "") + "dishes found" + (q ? " for \"" + q + "\"" : "") + ".";
+    } else if (!q) {
+      msg.textContent = "Type a dish name or pick a category.";
+    }
+  }
+  function run(q) {
+    last = q;
+    fetch(SUGGEST + "?q=" + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (q === last) { render(d, q); } })
+      .catch(function () { msg.textContent = "Search is not available right now."; });
+  }
+
+  function setMode(m) {
+    mode = (mode === m) ? "" : m;
+    var v = g("nsVeg"), n = g("nsNon");
+    v.classList.toggle("on", mode === "veg");
+    n.classList.toggle("on", mode === "non");
+    v.setAttribute("aria-pressed", mode === "veg" ? "true" : "false");
+    n.setAttribute("aria-pressed", mode === "non" ? "true" : "false");
+    if (lastData) { render(lastData, lastQ); }
+  }
+  g("nsVeg").addEventListener("click", function () { setMode("veg"); });
+  g("nsNon").addEventListener("click", function () { setMode("non"); });
+
+  btn.addEventListener("click", openPanel);
+  closeBtn.addEventListener("click", closePanel);
+  panel.addEventListener("click", function (e) { if (e.target === panel) { closePanel(); } });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && panel.classList.contains("open")) { closePanel(); }
+  });
+  clr.addEventListener("click", function () {
+    input.value = "";
+    clr.hidden = true;
+    input.focus();
+    run("");
+  });
+  input.addEventListener("input", function () {
+    var q = input.value.trim();
+    clr.hidden = !input.value;
+    clearTimeout(timer);
+    timer = setTimeout(function () { run(q); }, 200);
+  });
+})();
+</script>

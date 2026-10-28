@@ -1,95 +1,258 @@
 {% extends base_tpl %}
 {% block admin_content %}
 <style>
-  .kv-hero { background:linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#3a1c4a 100%); color:#fff; border-radius:18px; padding:22px 26px; margin-bottom:18px; box-shadow:0 10px 28px rgba(26,26,46,.25); }
-  .kv-hero h1 { margin:0; font-size:26px; font-weight:800; }
-  .kv-hero p { margin:4px 0 0; color:#b8b8d4; font-size:13.5px; }
-  .kv-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:18px; }
-  .kv-stat { background:#fff; border-radius:14px; padding:14px 18px; box-shadow:0 2px 10px rgba(0,0,0,.05); cursor:pointer; border:2px solid transparent; }
-  .kv-stat.active { border-color:#1a1a2e; }
-  .kv-stat .n { font-size:1.7rem; font-weight:800; }
-  .kv-stat .l { font-size:.8rem; color:#6b7280; font-weight:600; }
-  .kv-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:16px; }
-  .kv-bar input { flex:1; min-width:220px; padding:10px 14px; border:1px solid #e5e7eb; border-radius:10px; font-size:.95rem; }
-  .kv-count { color:#6b7280; font-size:.85rem; }
-  .kv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
-  .kv-card { background:#fff; border-radius:14px; padding:16px 18px; box-shadow:0 2px 10px rgba(0,0,0,.05); border-top:4px solid #22c55e; }
-  .kv-card.low { border-top-color:#f59e0b; }
-  .kv-card.out { border-top-color:#dc2626; }
-  .kv-name { font-weight:700; font-size:1rem; }
-  .kv-qty { font-size:1.6rem; font-weight:800; margin:8px 0 2px; }
-  .kv-qty small { font-size:.9rem; font-weight:600; color:#6b7280; }
-  .kv-meta { font-size:.78rem; color:#9ca3af; }
-  .kv-tag { float:right; font-size:.7rem; font-weight:700; padding:3px 9px; border-radius:999px; background:#dcfce7; color:#16a34a; }
-  .kv-card.low .kv-tag { background:#fef3c7; color:#d97706; }
-  .kv-card.out .kv-tag { background:#fee2e2; color:#dc2626; }
-  .kv-empty { display:none; text-align:center; color:#9ca3af; padding:30px; }
+  .kr-head { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; gap:12px; margin-bottom:16px; }
+  .kr-head h1 { margin:0; font-size:28px; font-weight:800; color:#111827; }
+  .kr-head p { margin:4px 0 0; color:#6b7280; font-size:14px; }
+  .kr-copy { border:1px solid #d1d5db; background:#fff; color:#374151; border-radius:10px; padding:9px 14px;
+    font-size:13.5px; font-weight:600; cursor:pointer; font-family:inherit; transition:.2s; }
+  .kr-copy:hover { background:#f3f4f6; }
+
+  .kr-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:14px; }
+  .kr-search { position:relative; flex:0 1 460px; min-width:220px; }
+  .kr-search input { width:100%; box-sizing:border-box; padding:12px 40px 12px 16px; border:1px solid #e5e7eb; border-radius:12px;
+    font-size:14.5px; background:#fff; font-family:inherit; }
+  .kr-search input:focus { outline:2px solid #1a1a2e22; border-color:#1a1a2e; }
+  .kr-search kbd { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12px; color:#6b7280;
+    border:1px solid #e5e7eb; border-radius:6px; padding:1px 7px; background:#f9fafb; font-family:inherit; }
+
+  .kr-chips { display:flex; background:#eef0f4; border-radius:12px; padding:4px; gap:2px; }
+  .kr-chip { border:0; background:transparent; padding:8px 14px; border-radius:9px; font-size:13.5px; font-weight:600;
+    color:#6b7280; cursor:pointer; font-family:inherit; white-space:nowrap; }
+  .kr-chip span { font-weight:500; margin-left:3px; }
+  .kr-chip.on { background:#fff; color:#111827; box-shadow:0 1px 3px rgba(0,0,0,.12); }
+
+  .kr-sort { margin-left:auto; padding:11px 14px; border:1px solid #e5e7eb; border-radius:12px; background:#fff;
+    font-size:14px; font-family:inherit; color:#374151; }
+
+  .kr-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+  .kr-row, .kr-th { display:grid; grid-template-columns:minmax(210px,1.1fr) 2.2fr 110px 160px; gap:20px; align-items:center; padding:13px 22px; }
+  .kr-th { background:#fff; font-size:11.5px; font-weight:700; letter-spacing:.08em; color:#6b7280; text-transform:uppercase;
+    border-bottom:1px solid #eef0f4; padding-top:16px; padding-bottom:14px; }
+  .kr-row { border-bottom:1px solid #eef0f4; transition:background .15s; }
+  .kr-row:last-child { border-bottom:0; }
+  .kr-row:hover { background:#f9fafb; }
+
+  .kr-item { display:flex; align-items:center; gap:14px; min-width:0; }
+  .kr-ico { flex:0 0 auto; width:50px; height:50px; border-radius:14px; background:#f3f4f6; display:flex;
+    align-items:center; justify-content:center; font-size:26px; line-height:1; }
+  .kr-ico.letter { color:#3730a3; font-size:20px; font-weight:800; text-transform:uppercase; }
+  .kr-name { font-size:16px; font-weight:700; color:#111827; line-height:1.25; }
+
+  .kr-lvtop { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .kr-lvtop b { font-size:19px; color:#111827; }
+  .kr-unit { font-size:14px; color:#6b7280; }
+  .kr-low { font-size:12.5px; color:#6b7280; }
+  .kr-bar { height:7px; background:#e5e7eb; border-radius:6px; margin-top:7px; overflow:hidden; }
+  .kr-bar .fill { display:block; height:100%; border-radius:6px; background:#15803d; transition:width .5s ease; }
+  .st-low .kr-bar .fill { background:#f59e0b; }
+  .st-out .kr-bar .fill { background:#ef4444; }
+
+  .kr-pill { display:inline-block; font-size:12px; font-weight:700; padding:4px 11px; border-radius:20px; background:#dcfce7; color:#166534; white-space:nowrap; }
+  .st-low .kr-pill { background:#fef3c7; color:#92400e; }
+  .st-out .kr-pill { background:#fee2e2; color:#b91c1c; }
+  .st-out { background:#fffafa; }
+
+  .kr-upd { font-size:13px; color:#9ca3af; text-align:right; }
+  .kr-empty { display:none; text-align:center; color:#6b7280; padding:50px 0; font-size:15px; }
+  .kr-count { font-size:13px; color:#6b7280; margin:10px 4px 0; }
+
+  @media (max-width:900px) {
+    .kr-th { display:none; }
+    .kr-row { grid-template-columns:1fr auto; gap:10px 14px; padding:14px 16px; }
+    .kr-level { grid-column:1 / -1; order:3; }
+    .kr-upd { grid-column:1 / -1; order:4; text-align:left; }
+    .kr-sort { margin-left:0; }
+  }
 </style>
 
-<div class="kv-hero">
-  <h1>📦 Kitchen Stock</h1>
-  <p>View only. Stock is updated by the store.</p>
-</div>
-
-<div class="kv-stats">
-  <div class="kv-stat active" data-f="all"><div class="n" id="kvAll">0</div><div class="l">Total items</div></div>
-  <div class="kv-stat" data-f="ok"><div class="n" id="kvOk">0</div><div class="l">In stock</div></div>
-  <div class="kv-stat" data-f="low"><div class="n" id="kvLow">0</div><div class="l">Low stock</div></div>
-  <div class="kv-stat" data-f="out"><div class="n" id="kvOut">0</div><div class="l">Out of stock</div></div>
-</div>
-
-<div class="kv-bar">
-  <input type="text" id="kvSearch" placeholder="Search item...">
-  <span class="kv-count" id="kvCount"></span>
-</div>
-
-<div class="kv-grid" id="kvGrid">
-  {% for item in grocery_items %}
-  <div class="kv-card {% if item.quantity <= 0 %}out{% elif item.is_low %}low{% else %}ok{% endif %}"
-       data-name="{{ item.name|lower }}"
-       data-state="{% if item.quantity <= 0 %}out{% elif item.is_low %}low{% else %}ok{% endif %}">
-    <span class="kv-tag">{% if item.quantity <= 0 %}Out{% elif item.is_low %}Low{% else %}In stock{% endif %}</span>
-    <div class="kv-name">{{ item.name }}</div>
-    <div class="kv-qty">{{ item.quantity|floatformat:"-2" }} <small>{{ item.unit }}</small></div>
-    <div class="kv-meta">Low limit: {{ item.low_stock_limit|floatformat:"-2" }} {{ item.unit }}</div>
-    <div class="kv-meta">Updated {{ item.updated_at|timesince }} ago</div>
+<div class="kr-head">
+  <div>
+    <h1>Kitchen Stock</h1>
+    <p>View only. Stock is updated by the store.</p>
   </div>
-  {% endfor %}
+  <button type="button" class="kr-copy" id="krCopy">📋 Copy low-stock list</button>
 </div>
-<div class="kv-empty" id="kvEmpty">No items found.</div>
+
+<div class="kr-toolbar">
+  <div class="kr-search">
+    <input type="text" id="krSearch" placeholder="Search item" autocomplete="off">
+    <kbd>/</kbd>
+  </div>
+  <div class="kr-chips" id="krChips">
+    <button type="button" class="kr-chip on" data-f="all">All <span id="nAll">0</span></button>
+    <button type="button" class="kr-chip" data-f="low">Low stock <span id="nLow">0</span></button>
+    <button type="button" class="kr-chip" data-f="out">Out of stock <span id="nOut">0</span></button>
+    <button type="button" class="kr-chip" data-f="ok">In stock <span id="nOk">0</span></button>
+  </div>
+  <select class="kr-sort" id="krSort">
+    <option value="attention">Needs attention first</option>
+    <option value="name">Name (A-Z)</option>
+    <option value="qtyAsc">Lowest stock</option>
+    <option value="qtyDesc">Highest stock</option>
+    <option value="updated">Recently updated</option>
+  </select>
+</div>
+
+<div class="kr-card">
+  <div class="kr-th">
+    <div>Item</div><div>Stock level</div><div>Status</div><div style="text-align:right">Last update</div>
+  </div>
+  <div id="krList">
+    {% for item in grocery_items %}
+    <div class="kr-row"
+         data-name="{{ item.name|lower }}"
+         data-qty="{{ item.quantity }}"
+         data-limit="{{ item.low_stock_limit }}"
+         data-unit="{{ item.unit }}"
+         data-updated="{% if item.updated_at %}{{ item.updated_at|date:'U' }}{% else %}0{% endif %}">
+      <div class="kr-item">
+        <span class="kr-ico js-ico"></span>
+        <span class="kr-name">{{ item.name }}</span>
+      </div>
+      <div class="kr-level">
+        <div class="kr-lvtop">
+          <span><b class="js-qty">{{ item.quantity }}</b> <span class="kr-unit">{{ item.unit }}</span></span>
+          <span class="kr-low">Low at <span class="js-low">{{ item.low_stock_limit }}</span> {{ item.unit }}</span>
+        </div>
+        <div class="kr-bar"><span class="fill js-bar"></span></div>
+      </div>
+      <div><span class="kr-pill">In stock</span></div>
+      <div class="kr-upd">{% if item.updated_at %}Updated {{ item.updated_at|timesince }} ago{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="kr-empty" id="krEmpty">😕 Edhuvum kedaikala.</div>
+</div>
+<div class="kr-count" id="krCount"></div>
 
 <script>
 (function () {
-  var cards = Array.prototype.slice.call(document.querySelectorAll('#kvGrid .kv-card'));
-  var stats = Array.prototype.slice.call(document.querySelectorAll('.kv-stat'));
-  var search = document.getElementById('kvSearch');
-  var filter = 'all';
-  function count(state) { return cards.filter(function (c) { return c.dataset.state === state; }).length; }
-  document.getElementById('kvAll').textContent = cards.length;
-  document.getElementById('kvOk').textContent = count('ok');
-  document.getElementById('kvLow').textContent = count('low');
-  document.getElementById('kvOut').textContent = count('out');
-  function apply() {
-    var q = search.value.trim().toLowerCase();
+  var list = document.getElementById('krList');
+  var rows = Array.prototype.slice.call(list.querySelectorAll('.kr-row'));
+  var view = { filter: 'all', sort: 'attention', q: '' };
+
+  function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+  function fmt(n) {
+    var s = (Math.round(n * 100) / 100).toFixed(2);
+    return s.replace(/0+$/, '').replace(/\.$/, '');
+  }
+  function statusOf(q, limit) { return q <= 0 ? 'out' : (q <= limit ? 'low' : 'ok'); }
+  function nameOf(r) { return r.querySelector('.kr-name').textContent.trim(); }
+
+  /* [words, emoji, tile background] */
+  var ICONS = [
+    ['eggplant|brinjal', '🍆', '#f3e8ff'], ['egg', '🥚', '#fef3c7'],
+    ['chicken|hen|broiler', '🍗', '#ffedd5'], ['mutton|lamb|goat|beef|meat|intestine', '🥩', '#fee2e2'],
+    ['fish|anchovy|nethili|pomfret|prawn|shrimp|crab|seafood|squid', '🐟', '#dbeafe'],
+    ['onion', '🧅', '#fce7f3'], ['tomato', '🍅', '#fee2e2'], ['potato', '🥔', '#fef3c7'], ['carrot', '🥕', '#ffedd5'],
+    ['garlic', '🧄', '#f3f4f6'], ['ginger', '🫚', '#fef3c7'], ['capsicum|bell pepper', '🫑', '#dcfce7'],
+    ['cucumber', '🥒', '#dcfce7'], ['corn flour', '🌾', '#fef9c3'], ['corn', '🌽', '#fef9c3'], ['mushroom', '🍄', '#f3f4f6'],
+    ['bay leaf|curry leaf|coriander leaves|mint|leaf|leaves|herb|basil|cilantro', '🌿', '#dcfce7'],
+    ['cardamom|cinnamon|cloves|cumin|seeds|turmeric|fennel|mustard|fry masala|coriander powder', '🫙', '#ffedd5'],
+    ['chilli|chili|pepper|masala|spice|powder', '🌶️', '#fee2e2'],
+    ['lemon|lime', '🍋', '#fef9c3'], ['blueberr', '🫐', '#e0e7ff'], ['strawberr', '🍓', '#fee2e2'], ['mango', '🥭', '#fef3c7'],
+    ['banana', '🍌', '#fef9c3'], ['apple', '🍎', '#fee2e2'], ['orange', '🍊', '#ffedd5'], ['grape', '🍇', '#f3e8ff'],
+    ['pineapple', '🍍', '#fef9c3'], ['watermelon', '🍉', '#fee2e2'], ['coconut', '🥥', '#f3f4f6'],
+    ['milk', '🥛', '#e0f2fe'], ['butter|ghee', '🧈', '#fef9c3'], ['cheese|paneer', '🧀', '#fef3c7'], ['curd|yogurt|yoghurt', '🥣', '#f3f4f6'],
+    ['ice', '🧊', '#e0f2fe'],
+    ['rice|biryani', '🍚', '#f3f4f6'], ['noodle|pasta|maggi', '🍜', '#ffedd5'],
+    ['wheat|flour|atta|maida|rava|sooji', '🌾', '#fef9c3'], ['bread|bun', '🍞', '#ffedd5'],
+    ['oil', '🫒', '#ecfccb'], ['salt', '🧂', '#f3f4f6'], ['sugar|jaggery', '🍬', '#fce7f3'], ['honey', '🍯', '#fef3c7'],
+    ['tea|coffee', '☕', '#ffedd5'], ['water', '💧', '#e0f2fe'],
+    ['sauce|ketchup|vinegar', '🍅', '#fee2e2'], ['crush|soda|cola|juice|syrup|drink', '🥤', '#e0f2fe'],
+    ['nut|cashew|almond|peanut|pista', '🥜', '#ffedd5'], ['dal|lentil|gram|beans|peas', '🫘', '#fef3c7']
+  ].map(function (p) { return [new RegExp('\\b(' + p[0] + ')', 'i'), p[1], p[2]]; });
+
+  function setIcon(r) {
+    var el = r.querySelector('.js-ico'), nm = nameOf(r);
+    for (var i = 0; i < ICONS.length; i++) {
+      if (ICONS[i][0].test(nm)) { el.textContent = ICONS[i][1]; el.style.background = ICONS[i][2]; el.classList.remove('letter'); return; }
+    }
+    el.textContent = nm.charAt(0) || '?'; el.style.background = '#e0e7ff'; el.classList.add('letter');
+  }
+
+  function paint(r) {
+    var q = num(r.dataset.qty), limit = num(r.dataset.limit);
+    var st = statusOf(q, limit);
+    r.dataset.st = st;
+    r.classList.remove('st-ok', 'st-low', 'st-out');
+    r.classList.add('st-' + st);
+    r.querySelector('.kr-pill').textContent = st === 'out' ? 'Out of stock' : (st === 'low' ? 'Low stock' : 'In stock');
+    var max = Math.max(limit * 3, q, 1);
+    r.querySelector('.js-bar').style.width = Math.min(100, (q / max) * 100) + '%';
+    r.querySelector('.js-qty').textContent = fmt(q);
+    r.querySelector('.js-low').textContent = fmt(limit);
+  }
+
+  function stats() {
+    var c = { ok: 0, low: 0, out: 0 };
+    rows.forEach(function (r) { c[r.dataset.st]++; });
+    document.getElementById('nAll').textContent = rows.length;
+    document.getElementById('nOk').textContent = c.ok;
+    document.getElementById('nLow').textContent = c.low;
+    document.getElementById('nOut').textContent = c.out;
+  }
+
+  var order = { out: 0, low: 1, ok: 2 };
+  function applyView(resort) {
+    var q = view.q.toLowerCase();
+    if (resort) {
+      rows.slice().sort(function (a, b) {
+        var qa = num(a.dataset.qty), qb = num(b.dataset.qty);
+        if (view.sort === 'name') return a.dataset.name.localeCompare(b.dataset.name);
+        if (view.sort === 'qtyAsc') return qa - qb;
+        if (view.sort === 'qtyDesc') return qb - qa;
+        if (view.sort === 'updated') return num(b.dataset.updated) - num(a.dataset.updated);
+        var d = order[a.dataset.st] - order[b.dataset.st];
+        return d !== 0 ? d : a.dataset.name.localeCompare(b.dataset.name);
+      }).forEach(function (r) { list.appendChild(r); });
+    }
     var shown = 0;
-    cards.forEach(function (c) {
-      var ok = (filter === 'all' || c.dataset.state === filter) && (!q || c.dataset.name.indexOf(q) !== -1);
-      c.style.display = ok ? '' : 'none';
+    rows.forEach(function (r) {
+      var ok = r.dataset.name.indexOf(q) !== -1 && (view.filter === 'all' || r.dataset.st === view.filter);
+      r.style.display = ok ? '' : 'none';
       if (ok) shown++;
     });
-    document.getElementById('kvCount').textContent = shown + ' / ' + cards.length + ' items';
-    document.getElementById('kvEmpty').style.display = shown ? 'none' : 'block';
+    document.getElementById('krEmpty').style.display = shown ? 'none' : 'block';
+    document.getElementById('krCount').textContent = shown + ' / ' + rows.length + ' items';
   }
-  stats.forEach(function (s) {
-    s.addEventListener('click', function () {
-      stats.forEach(function (x) { x.classList.remove('active'); });
-      s.classList.add('active');
-      filter = s.dataset.f;
-      apply();
+
+  document.querySelectorAll('.kr-chip').forEach(function (b) {
+    b.addEventListener('click', function () {
+      view.filter = b.dataset.f;
+      document.querySelectorAll('.kr-chip').forEach(function (x) { x.classList.toggle('on', x === b); });
+      applyView(false);
     });
   });
-  search.addEventListener('input', apply);
-  apply();
+  document.getElementById('krSearch').addEventListener('input', function (e) { view.q = e.target.value.trim(); applyView(false); });
+  document.getElementById('krSort').addEventListener('change', function (e) { view.sort = e.target.value; applyView(true); });
+  document.addEventListener('keydown', function (e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (e.key === '/' && tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+      e.preventDefault();
+      document.getElementById('krSearch').focus();
+    }
+  });
+
+  document.getElementById('krCopy').addEventListener('click', function () {
+    var lines = rows.filter(function (r) { return r.dataset.st !== 'ok'; }).map(function (r) {
+      return '- ' + nameOf(r) + ': ' + fmt(num(r.dataset.qty)) + ' ' + r.dataset.unit +
+             ' (limit ' + fmt(num(r.dataset.limit)) + ')' + (r.dataset.st === 'out' ? ' OUT' : '');
+    });
+    var text = lines.length ? 'Low / out of stock list:\n' + lines.join('\n') : 'Ella items-um stock-la irukku.';
+    function done() { if (window.showToast) window.showToast('📋 Copied', lines.length + ' items copy aachu', 'good'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done);
+    } else {
+      var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); ta.remove(); done();
+    }
+  });
+
+  rows.forEach(function (r) { setIcon(r); paint(r); });
+  stats();
+  applyView(true);
 })();
 </script>
 {% endblock %}

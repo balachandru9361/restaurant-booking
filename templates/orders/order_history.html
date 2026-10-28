@@ -186,6 +186,18 @@
         color: #dc2626;
     }
 
+    /* money paid back for a rejected online order */
+    .payment-badge.refunded {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    /* rejected online order, refund not finished yet */
+    .payment-badge.refund_pending {
+        background: #fff4e0;
+        color: #b06a00;
+    }
+
     .order-date {
         color: #999;
         font-size: 0.83rem;
@@ -539,6 +551,576 @@
     }
 </style>
 
+<style id="tkUpgrade">
+    /* ===== ANIMATED ORDER TRACKER ===== */
+    .tracker { --d: 40px; margin: 8px 0 12px; }
+    .t-step:nth-child(1) { --n: 0; }
+    .t-step:nth-child(2) { --n: 1; }
+    .t-step:nth-child(3) { --n: 2; }
+    .t-step:nth-child(4) { --n: 3; }
+    .t-step:nth-child(5) { --n: 4; }
+
+    .t-step {
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #9aa3b2;
+    }
+
+    /* grey track */
+    .t-step::before {
+        top: calc(var(--d) / 2 - 2px);
+        height: 4px;
+        border-radius: 4px;
+        background: #e5e7eb;
+    }
+    .t-step.done::before,
+    .t-step.current::before { background: #e5e7eb; }
+
+    /* animated fill */
+    .t-step::after {
+        content: "";
+        display: none;
+        position: absolute;
+        top: calc(var(--d) / 2 - 2px);
+        left: -50%;
+        width: 100%;
+        height: 4px;
+        border-radius: 4px;
+        background: #16a34a;
+        transform: scaleX(0);
+        transform-origin: left;
+    }
+    .t-step.done::after,
+    .t-step.current::after {
+        display: block;
+        animation: tFill 0.7s ease forwards;
+        animation-delay: calc(var(--n) * 0.35s);
+    }
+    .t-step.current::after {
+        background-image:
+            repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.4) 0 6px, transparent 6px 12px),
+            linear-gradient(90deg, #16a34a, #f59e0b);
+        background-size: 24px 24px, 100% 100%;
+        animation: tFill 0.7s ease forwards, tStripe 1s linear infinite;
+        animation-delay: calc(var(--n) * 0.35s), 0s;
+    }
+    .t-step:first-child::after { display: none; }
+
+    /* dots with icons */
+    .t-dot {
+        width: var(--d);
+        height: var(--d);
+        margin: 0 auto 8px;
+        font-size: 0;
+        background: #eef0f4;
+        border: 2px solid #e1e5ec;
+        filter: grayscale(1);
+        opacity: 0.8;
+    }
+    .t-dot::after { font-size: 1.15rem; line-height: 1; }
+    .t-step:nth-child(1) .t-dot::after { content: "\1F9FE"; }
+    .t-step:nth-child(2) .t-dot::after { content: "\2705"; }
+    .t-step:nth-child(3) .t-dot::after { content: "\1F468\200D\1F373"; }
+    .t-step:nth-child(4) .t-dot::after { content: "\1F6CE\FE0F"; }
+    .t-step:nth-child(5) .t-dot::after { content: "\1F37D\FE0F"; }
+
+    .t-step.done { color: #15803d; }
+    .t-step.done .t-dot {
+        background: linear-gradient(135deg, #22c55e, #15803d);
+        border-color: #bbf7d0;
+        filter: none;
+        opacity: 1;
+        animation: tPop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+        animation-delay: calc(var(--n) * 0.35s);
+    }
+    .t-step.done .t-dot::before {
+        content: "\2713";
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #fff;
+        color: #15803d;
+        font-size: 0.7rem;
+        font-weight: 900;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    .t-step.current { color: #d97706; }
+    .t-step.current .t-dot {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        border-color: #fde68a;
+        filter: none;
+        opacity: 1;
+        box-shadow: none;
+        animation:
+            tPop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both,
+            tFloat 1.8s ease-in-out infinite;
+        animation-delay: calc(var(--n) * 0.35s), calc(var(--n) * 0.35s + 0.5s);
+    }
+    .t-step.current .t-dot::before {
+        content: "";
+        position: absolute;
+        top: -4px; left: -4px; right: -4px; bottom: -4px;
+        border-radius: 50%;
+        border: 2px solid rgba(245, 158, 11, 0.75);
+        animation: tRing 1.8s ease-out infinite;
+    }
+    .t-step.current .t-dot::after { animation: tWob 1.2s ease-in-out infinite; }
+
+    /* delivered: golden finish */
+    .order-card[data-status="delivered"] .t-step:last-child .t-dot {
+        background: linear-gradient(135deg, #fde68a, #f59e0b);
+        border-color: #fff3c4;
+        animation: tPop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both, tGlow 2s ease-in-out infinite;
+        animation-delay: calc(var(--n) * 0.35s), calc(var(--n) * 0.35s + 0.6s);
+    }
+
+    /* status message strip */
+    .t-msg {
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0 0 16px;
+        padding: 11px 14px;
+        border-radius: 14px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #7c4a03;
+        background: #fff7e0;
+        border: 1px solid #fde7b0;
+    }
+    .t-msg::after {
+        content: "";
+        position: absolute;
+        top: 0; bottom: 0; left: 0;
+        width: 30%;
+        background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+        animation: tSweep 2.8s ease-in-out infinite;
+        pointer-events: none;
+    }
+    .t-msg.t-confirmed { color: #166534; background: #ecfdf3; border-color: #bbf7d0; }
+    .t-msg.t-preparing { color: #9a3412; background: #fff1e6; border-color: #fed7aa; }
+    .t-msg.t-ready { color: #1d4ed8; background: #eaf2ff; border-color: #bfdbfe; }
+    .t-msg.t-delivered { color: #0f5132; background: #e8f9ee; border-color: #bbf7d0; }
+    .t-ic { font-size: 1.35rem; line-height: 1; animation: tBounce 1.4s ease-in-out infinite; }
+    .t-dots i {
+        display: inline-block;
+        width: 5px; height: 5px;
+        margin-left: 3px;
+        border-radius: 50%;
+        background: currentColor;
+        animation: tDot 1.2s infinite;
+    }
+    .t-dots i:nth-child(2) { animation-delay: 0.2s; }
+    .t-dots i:nth-child(3) { animation-delay: 0.4s; }
+
+    /* coloured top edge per status */
+    .order-card[data-status="pending"] { border-top: 4px solid #f59e0b; }
+    .order-card[data-status="confirmed"] { border-top: 4px solid #22c55e; }
+    .order-card[data-status="preparing"] { border-top: 4px solid #f97316; }
+    .order-card[data-status="ready"] { border-top: 4px solid #3b82f6; }
+    .order-card[data-status="delivered"] { border-top: 4px solid #0369a1; }
+
+    @keyframes tFill { to { transform: scaleX(1); } }
+    @keyframes tStripe { to { background-position: 24px 0, 0 0; } }
+    @keyframes tPop {
+        0% { transform: scale(0.3); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes tFloat {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-5px) scale(1.08); }
+    }
+    @keyframes tRing {
+        0% { transform: scale(0.9); opacity: 0.9; }
+        100% { transform: scale(1.7); opacity: 0; }
+    }
+    @keyframes tWob {
+        0%, 100% { transform: rotate(0); }
+        25% { transform: rotate(-14deg); }
+        75% { transform: rotate(14deg); }
+    }
+    @keyframes tBounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-4px); }
+    }
+    @keyframes tDot {
+        0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+        40% { opacity: 1; transform: scale(1.2); }
+    }
+    @keyframes tSweep {
+        from { transform: translateX(-120%); }
+        to { transform: translateX(380%); }
+    }
+    @keyframes tGlow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6); }
+        50% { box-shadow: 0 0 0 10px rgba(251, 191, 36, 0); }
+    }
+
+    @media (max-width: 480px) {
+        .tracker { --d: 34px; }
+        .t-step { font-size: 0.64rem; }
+        .t-dot::after { font-size: 1rem; }
+        .t-msg { font-size: 0.82rem; padding: 10px 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .t-step::after,
+        .t-dot,
+        .t-dot::before,
+        .t-dot::after,
+        .t-msg::after,
+        .t-ic,
+        .t-dots i { animation: none !important; }
+        .t-step.done::after,
+        .t-step.current::after { transform: scaleX(1); }
+    }
+</style>
+
+<style id="srvUpgrade">
+    /* ===== SERVED CELEBRATION CARD ===== */
+    .t-msg.t-delivered {
+        display: block;
+        padding: 0;
+        background: none;
+        border: 0;
+        overflow: visible;
+        color: inherit;
+    }
+    .t-msg.t-delivered::after { display: none; }
+    .order-card[data-status="delivered"] {
+        box-shadow: 0 10px 30px rgba(217, 164, 65, 0.22);
+    }
+
+    .srv {
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 18px;
+        border-radius: 18px;
+        color: #fff;
+        text-align: left;
+        background:
+            radial-gradient(260px circle at 10% 30%, rgba(243, 207, 122, 0.30), transparent 65%),
+            linear-gradient(135deg, #0b1426, #1b2f63);
+        border: 1px solid rgba(243, 207, 122, 0.55);
+        box-shadow: 0 12px 30px rgba(11, 20, 38, 0.25);
+        animation: srvIn 0.6s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+    }
+    .srv::before {
+        content: "";
+        position: absolute;
+        top: 0; bottom: 0; left: 0;
+        width: 28%;
+        background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+        animation: srvSweep 3.6s ease-in-out infinite;
+        pointer-events: none;
+    }
+    .srv-art {
+        position: relative;
+        flex: 0 0 104px;
+        width: 104px;
+        height: 88px;
+        cursor: pointer;
+    }
+    .srv-art svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .srv-dome {
+        transform-box: fill-box;
+        transform-origin: 0 100%;
+        animation: srvLift 4.2s ease-in-out infinite;
+    }
+    .srv-steam path {
+        fill: none;
+        stroke: rgba(255, 255, 255, 0.85);
+        stroke-width: 3;
+        stroke-linecap: round;
+        opacity: 0;
+        animation: srvSteam 4.2s ease-in-out infinite;
+    }
+    .srv-steam path:nth-child(2) { animation-delay: 0.15s; }
+    .srv-steam path:nth-child(3) { animation-delay: 0.3s; }
+    .srv-sp {
+        position: absolute;
+        font-style: normal;
+        color: #f3cf7a;
+        text-shadow: 0 0 10px rgba(243, 207, 122, 0.9);
+        animation: srvTwinkle 2.2s ease-in-out infinite;
+        opacity: 0;
+    }
+    .srv-sp.s1 { top: -2px; left: 4px; font-size: 14px; }
+    .srv-sp.s2 { top: 8px; right: -4px; font-size: 18px; animation-delay: 0.7s; }
+    .srv-sp.s3 { bottom: 14px; left: -6px; font-size: 12px; animation-delay: 1.3s; }
+
+    .srv-body { position: relative; min-width: 0; flex: 1; }
+    .srv-title {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-weight: 800;
+        font-size: 1.2rem;
+        line-height: 1.2;
+        background: linear-gradient(110deg, #d9a441 15%, #fff6cf 45%, #d9a441 75%);
+        background-size: 250% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        animation: hpShimmer 3.6s linear infinite;
+    }
+    .srv-sub {
+        margin-top: 4px;
+        font-size: 0.82rem;
+        font-weight: 500;
+        color: #c9d2e8;
+        line-height: 1.4;
+    }
+    .srv-rate {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        margin-top: 10px;
+    }
+    .srv-note { font-size: 0.78rem; font-weight: 700; color: #f3cf7a; }
+    .srv-stars { display: inline-flex; gap: 2px; }
+    .srv-stars button {
+        border: 0;
+        background: transparent;
+        padding: 0 2px;
+        font-size: 1.5rem;
+        line-height: 1;
+        color: rgba(255, 255, 255, 0.3);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: color 0.15s ease, transform 0.15s ease;
+    }
+    .srv-stars button:hover { transform: scale(1.18); }
+    .srv-stars button.on {
+        color: #f3cf7a;
+        text-shadow: 0 0 12px rgba(243, 207, 122, 0.8);
+    }
+    .srv-stars button.pop { animation: srvStar 0.45s cubic-bezier(0.2, 1.6, 0.4, 1); }
+    .srv-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .srv-again,
+    .srv-party {
+        display: inline-flex;
+        align-items: center;
+        height: 38px;
+        padding: 0 18px;
+        border-radius: 999px;
+        font-size: 0.84rem;
+        font-weight: 800;
+        text-decoration: none;
+        cursor: pointer;
+        font-family: inherit;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform 0.15s ease, box-shadow 0.2s ease;
+    }
+    .srv-again {
+        border: 0;
+        background: linear-gradient(135deg, #f3cf7a, #d9a441);
+        color: #0b1426;
+        animation: hpCta 2.4s ease-out infinite;
+    }
+    .srv-again:hover { color: #0b1426; text-decoration: none; transform: translateY(-2px); }
+    .srv-party {
+        background: transparent;
+        color: #f3cf7a;
+        border: 1.5px solid rgba(243, 207, 122, 0.6);
+    }
+    .srv-party:hover { background: rgba(243, 207, 122, 0.12); }
+
+    @keyframes srvIn {
+        0% { opacity: 0; transform: translateY(14px) scale(0.96); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes srvSweep {
+        from { transform: translateX(-130%); }
+        to { transform: translateX(480%); }
+    }
+    @keyframes srvLift {
+        0%, 16% { transform: translate(0, 0) rotate(0); }
+        36%, 68% { transform: translate(8px, -24px) rotate(-12deg); }
+        88%, 100% { transform: translate(0, 0) rotate(0); }
+    }
+    @keyframes srvSteam {
+        0%, 28% { opacity: 0; transform: translateY(6px); }
+        44% { opacity: 0.9; }
+        70% { opacity: 0.9; transform: translateY(-6px); }
+        86%, 100% { opacity: 0; transform: translateY(-14px); }
+    }
+    @keyframes srvTwinkle {
+        0%, 100% { opacity: 0; transform: scale(0.4) rotate(0); }
+        50% { opacity: 1; transform: scale(1.2) rotate(45deg); }
+    }
+    @keyframes srvStar {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.5) rotate(12deg); }
+        100% { transform: scale(1); }
+    }
+
+    @media (max-width: 480px) {
+        .srv { flex-direction: column; text-align: center; padding: 18px 14px; gap: 10px; }
+        .srv-rate, .srv-actions { justify-content: center; }
+        .srv-title { font-size: 1.1rem; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .srv, .srv::before, .srv-dome, .srv-steam path, .srv-sp,
+        .srv-title, .srv-again, .srv-stars button.pop { animation: none !important; }
+        .srv-sp { opacity: 1; }
+    }
+</style>
+
+<style id="srvPlus">
+    /* keyframes that were missing on this page */
+    @keyframes hpShimmer { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+    @keyframes hpCta {
+        0% { box-shadow: 0 0 0 0 rgba(243, 207, 122, 0.55); }
+        70%, 100% { box-shadow: 0 0 0 16px rgba(243, 207, 122, 0); }
+    }
+
+    /* ===== SERVED CARD: PLUS ===== */
+    @property --srvAng {
+        syntax: '<angle>';
+        initial-value: 0deg;
+        inherits: false;
+    }
+    .srv {
+        border: 2px solid transparent;
+        background:
+            radial-gradient(260px circle at 10% 30%, rgba(243, 207, 122, 0.30), transparent 65%) padding-box,
+            linear-gradient(135deg, #0b1426, #1b2f63) padding-box,
+            conic-gradient(from var(--srvAng), #d9a441, #fff6cf, #1b2f63 35%, #d9a441 60%, #fff6cf 80%, #d9a441) border-box;
+        animation: srvIn 0.6s cubic-bezier(0.2, 1.2, 0.4, 1) both, srvBorder 5s linear infinite;
+    }
+    @keyframes srvBorder { to { --srvAng: 360deg; } }
+
+    .srv-art {
+        flex: 0 0 120px;
+        width: 120px;
+        height: 100px;
+        z-index: 1;
+    }
+    .srv-rays {
+        position: absolute;
+        left: 50%; top: 50%;
+        width: 200px; height: 200px;
+        margin: -100px 0 0 -100px;
+        border-radius: 50%;
+        background: repeating-conic-gradient(from 0deg, rgba(243, 207, 122, 0.30) 0 6deg, transparent 6deg 18deg);
+        -webkit-mask: radial-gradient(circle, #000 0, transparent 68%);
+        mask: radial-gradient(circle, #000 0, transparent 68%);
+        animation: srvSpin 16s linear infinite;
+        pointer-events: none;
+    }
+    .srv-art svg { position: relative; }
+    @keyframes srvSpin { to { transform: rotate(360deg); } }
+
+    .srv-float {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        pointer-events: none;
+        z-index: 0;
+    }
+    .srv-float i {
+        position: absolute;
+        bottom: -26px;
+        font-style: normal;
+        font-size: 1.25rem;
+        opacity: 0;
+        animation: srvRise 7s linear infinite;
+    }
+    .srv-float i:nth-child(1) { left: 8%; }
+    .srv-float i:nth-child(2) { left: 30%; animation-delay: 1.4s; }
+    .srv-float i:nth-child(3) { left: 54%; animation-delay: 2.8s; }
+    .srv-float i:nth-child(4) { left: 74%; animation-delay: 4.2s; }
+    .srv-float i:nth-child(5) { left: 91%; animation-delay: 5.6s; }
+    @keyframes srvRise {
+        0% { transform: translateY(0) rotate(0); opacity: 0; }
+        12% { opacity: 0.55; }
+        100% { transform: translateY(-210px) rotate(40deg); opacity: 0; }
+    }
+
+    .srv-stamp {
+        display: inline-block;
+        margin-bottom: 8px;
+        padding: 3px 12px;
+        border: 2px solid #f3cf7a;
+        border-radius: 6px;
+        color: #f3cf7a;
+        font-size: 0.7rem;
+        font-weight: 900;
+        letter-spacing: 0.22em;
+        transform: rotate(-6deg);
+        box-shadow: 0 0 14px rgba(243, 207, 122, 0.35);
+        animation: srvStamp 0.6s cubic-bezier(0.2, 1.5, 0.4, 1) 0.5s both;
+    }
+    @keyframes srvStamp {
+        0% { opacity: 0; transform: rotate(-6deg) scale(3); }
+        60% { opacity: 1; transform: rotate(-6deg) scale(0.9); }
+        100% { opacity: 1; transform: rotate(-6deg) scale(1); }
+    }
+
+    .srv-title {
+        animation: hpShimmer 3.6s linear infinite, srvTitle 0.9s ease 0.3s both;
+    }
+    @keyframes srvTitle {
+        from { opacity: 0; letter-spacing: 0.22em; filter: blur(8px); }
+        to { opacity: 1; letter-spacing: 0; filter: blur(0); }
+    }
+
+    .srv-sb {
+        position: fixed;
+        width: 7px; height: 7px;
+        margin: -3px 0 0 -3px;
+        border-radius: 50%;
+        background: #f3cf7a;
+        box-shadow: 0 0 10px 2px rgba(243, 207, 122, 0.85);
+        pointer-events: none;
+        z-index: 99998;
+        animation: srvSb 0.7s ease-out forwards;
+    }
+    @keyframes srvSb { to { transform: translate(var(--bx), var(--by)) scale(0.2); opacity: 0; } }
+
+    @media (max-width: 480px) {
+        .srv-art { flex: 0 0 auto; width: 120px; }
+        .srv-rays { width: 160px; height: 160px; margin: -80px 0 0 -80px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .srv, .srv-rays, .srv-float i, .srv-stamp, .srv-title { animation: none !important; }
+        .srv-float { display: none; }
+    }
+</style>
+
+<style id="etaStyle">
+    /* ===== READY-IN ESTIMATE (shown while Preparing) ===== */
+    .eta-box {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: -4px 0 16px;
+        padding: 11px 14px;
+        border-radius: 14px;
+        font-size: 0.9rem;
+        font-weight: 800;
+        color: #8a5a00;
+        background: #fff7e0;
+        border: 1px dashed #f3cf7a;
+    }
+    .eta-box .eta-ic { font-size: 1.25rem; line-height: 1; }
+    .eta-box.eta-late {
+        color: #9a3412;
+        background: #fff1e6;
+        border-color: #fed7aa;
+    }
+</style>
+
 <div class="orders-hero">
     <div class="icon">🧾</div>
     <h1>My Orders</h1>
@@ -573,14 +1155,24 @@
                     <div class="badge-group">
                         <span class="order-status-badge {{ order.status }}">{% if order.status == 'cancelled' %}rejected{% else %}{{ order.status }}{% endif %}</span>
                         {% if order.payment_method == 'cash' %}
-                            {% if order.payment_status == 'paid' %}
+                            {% if order.status == 'cancelled' %}
+                                <span class="payment-badge pending">Cancelled</span>
+                            {% elif order.payment_status == 'paid' %}
                                 <span class="payment-badge paid">Cash Paid</span>
                             {% else %}
                                 <span class="payment-badge cash_pending">Cash Pending</span>
                             {% endif %}
                         {% else %}
                             {% if order.payment_status == 'paid' %}
-                                <span class="payment-badge paid">Paid Online</span>
+                                {% if order.status == 'cancelled' %}
+                                    {% if order.refunded %}
+                                        <span class="payment-badge refunded">Refunded</span>
+                                    {% else %}
+                                        <span class="payment-badge refund_pending">Refund Pending</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="payment-badge paid">Paid Online</span>
+                                {% endif %}
                             {% else %}
                                 <span class="payment-badge pending">Payment Pending</span>
                             {% endif %}
@@ -607,6 +1199,78 @@
                             <div class="t-dot">{% if order.status == 'delivered' %}&#10003;{% endif %}</div>Served
                         </div>
                     </div>
+                    <div class="t-msg t-{{ order.status }}">
+                        {% if order.status == 'pending' %}
+                            <span class="t-ic">&#9203;</span><span>Waiting for the restaurant to accept your order<span class="t-dots"><i></i><i></i><i></i></span></span>
+                        {% elif order.status == 'confirmed' %}
+                            <span class="t-ic">&#9989;</span><span>Order accepted! The kitchen is getting ready</span>
+                        {% elif order.status == 'preparing' %}
+                            <span class="t-ic">&#128104;&#8205;&#127859;</span><span>Our chef is cooking your food<span class="t-dots"><i></i><i></i><i></i></span></span>
+                        {% elif order.status == 'ready' %}
+                            <span class="t-ic">&#128718;&#65039;</span><span>Your order is ready!</span>
+                        {% elif order.status == 'delivered' %}
+                            <div class="srv" data-id="{{ order.id }}">
+                                <div class="srv-float" aria-hidden="true"><i>&#127835;</i><i>&#127831;</i><i>&#129368;</i><i>&#127819;</i><i>&#11088;</i></div>
+                                <div class="srv-art" aria-hidden="true">
+                                    <div class="srv-rays"></div>
+                                    <i class="srv-sp s1">&#10022;</i><i class="srv-sp s2">&#10022;</i><i class="srv-sp s3">&#10022;</i>
+                                    <svg viewBox="0 0 120 100">
+                                        <defs>
+                                            <linearGradient id="srvGold{{ order.id }}" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="0" stop-color="#fbe7a2"/>
+                                                <stop offset="0.55" stop-color="#e3b04a"/>
+                                                <stop offset="1" stop-color="#b4781c"/>
+                                            </linearGradient>
+                                        </defs>
+                                        <ellipse cx="60" cy="91" rx="44" ry="5" fill="rgba(0,0,0,0.35)"/>
+                                        <ellipse cx="60" cy="80" rx="50" ry="10" fill="#ffffff"/>
+                                        <ellipse cx="60" cy="79" rx="38" ry="6.5" fill="none" stroke="#d9a441" stroke-width="1.5"/>
+                                        <path d="M30 78 C34 58 86 58 90 78 Z" fill="#f3cf7a"/>
+                                        <circle cx="50" cy="69" r="2.4" fill="#e8742a"/>
+                                        <circle cx="68" cy="65" r="2.4" fill="#e8742a"/>
+                                        <circle cx="79" cy="73" r="2.4" fill="#2f9e5b"/>
+                                        <g class="srv-steam">
+                                            <path d="M46 56 C40 48 52 44 46 34"/>
+                                            <path d="M60 54 C54 46 66 42 60 32"/>
+                                            <path d="M74 56 C68 48 80 44 74 34"/>
+                                        </g>
+                                        <g class="srv-dome">
+                                            <path d="M16 76 C16 30 104 30 104 76 Z" fill="url(#srvGold{{ order.id }})"/>
+                                            <path d="M26 66 C30 47 48 41 61 41" fill="none" stroke="#ffffff" stroke-opacity="0.65" stroke-width="3" stroke-linecap="round"/>
+                                            <circle cx="60" cy="29" r="5" fill="url(#srvGold{{ order.id }})"/>
+                                            <rect x="14" y="74" width="92" height="5" rx="2.5" fill="#b4781c"/>
+                                        </g>
+                                    </svg>
+                                </div>
+                                <div class="srv-body">
+                                    <div class="srv-stamp">&#10003; SERVED</div>
+                                    <div class="srv-title">Served hot. Enjoy your meal!</div>
+                                    <div class="srv-sub">Thank you for choosing Chandru Restaurant. We hope to see you again soon.</div>
+                                    <div class="srv-rate" data-id="{{ order.id }}">
+                                        <span class="srv-note">Rate your meal</span>
+                                        <span class="srv-stars">
+                                            <button type="button" data-v="1" aria-label="1 star">&#9733;</button>
+                                            <button type="button" data-v="2" aria-label="2 stars">&#9733;</button>
+                                            <button type="button" data-v="3" aria-label="3 stars">&#9733;</button>
+                                            <button type="button" data-v="4" aria-label="4 stars">&#9733;</button>
+                                            <button type="button" data-v="5" aria-label="5 stars">&#9733;</button>
+                                        </span>
+                                    </div>
+                                    <div class="srv-actions">
+                                        <a class="srv-again" href="{% url 'menu_list' %}">Order again</a>
+                                        <button type="button" class="srv-party">&#127881; Celebrate</button>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {% if order.status == 'preparing' and order.ready_by %}
+                        <div class="eta-box" data-ready-by="{{ order.ready_by|date:'c' }}">
+                            <span class="eta-ic">&#9201;&#65039;</span>
+                            <span class="eta-text">...</span>
+                        </div>
+                    {% endif %}
                 {% endif %}
 
                 {% if order.status == 'cancelled' %}
@@ -657,7 +1321,7 @@
                                 {% else %}
                                     <span class="item-thumb item-thumb-empty">🍽️</span>
                                 {% endif %}
-                                <span class="item-name">{{ item.food_item.name }} <span class="item-qty">x {{ item.quantity }}</span></span>
+                                <span class="item-name">{{ item.food_item.name }} <span class="item-qty">x {{ item.quantity }}</span>{% if item.options_text %}<small style="display:block;font-size:.8em;font-weight:600;color:#d97706;margin-top:2px">{{ item.options_text }}</small>{% endif %}</span>
                             </span>
                             <span class="item-price">₹{{ item.subtotal|inr }}</span>
                         </li>
@@ -706,8 +1370,10 @@
             setTimeout(() => el.remove(), 6000);
         }
 
+        let reloading = false;
+
         async function poll() {
-            if (document.hidden) return;
+            if (document.hidden || reloading) return;
             try {
                 const res = await fetch(POLL_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
                 if (!res.ok) return;
@@ -722,16 +1388,50 @@
                         rejected = rejected || isReject;
                         let msg = 'Order #' + o.id + ' ' + (LABELS[o.status] || 'was updated');
                         if (isReject && o.reason) msg += '. Reason: ' + o.reason;
+                        if (o.status === 'delivered') { try { sessionStorage.setItem('tkServed', String(o.id)); } catch (e) {} }
                         showToast(msg, isReject);
                     }
                 });
-                if (changed) setTimeout(() => window.location.reload(), rejected ? 4000 : 2500);
+                if (changed) {
+                    reloading = true;
+                    setTimeout(() => window.location.reload(), rejected ? 4000 : 2500);
+                }
             } catch (e) {
                 /* ignore network errors, try again on the next tick */
             }
         }
 
+        // Fallback: check every 8 seconds (works even when WebSocket is unavailable)
         setInterval(poll, 8000);
+
+        // When the tab comes back into view, check immediately
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) poll();
+        });
+
+        // Instant updates: the server pushes a message when one of MY orders changes
+        let ws = null;
+        let retry = 0;
+        function connectWS() {
+            const scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
+            try {
+                ws = new WebSocket(scheme + location.host + '/ws/my-orders/');
+            } catch (e) {
+                return;
+            }
+            ws.onopen = function () { retry = 0; };
+            ws.onmessage = function (e) {
+                try {
+                    const d = JSON.parse(e.data);
+                    if (d.type === 'orders_changed') poll();
+                } catch (err) {}
+            };
+            ws.onclose = function () {
+                retry += 1;
+                setTimeout(connectWS, Math.min(1000 * retry, 10000));
+            };
+        }
+        connectWS();
     })();
 
     function filterOrders(btn, status) {
@@ -747,6 +1447,281 @@
             }
         });
     }
+</script>
+
+<script>
+    // ===== "Estimated ready in X minutes" countdown =====
+    (function () {
+        function updateEta() {
+            document.querySelectorAll('.eta-box').forEach(function (box) {
+                var readyBy = new Date(box.getAttribute('data-ready-by'));
+                var text = box.querySelector('.eta-text');
+                if (isNaN(readyBy.getTime())) { box.style.display = 'none'; return; }
+                var mins = Math.ceil((readyBy - new Date()) / 60000);
+                if (mins > 0) {
+                    text.textContent = 'Estimated: ready in ' + mins + ' min';
+                    box.classList.remove('eta-late');
+                } else {
+                    text.textContent = 'Almost ready, your order will be ready shortly';
+                    box.classList.add('eta-late');
+                }
+            });
+        }
+        updateEta();
+        setInterval(updateEta, 15000);
+    })();
+</script>
+
+<script>
+    (function () {
+        var reduce = false;
+        try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+        function confetti() {
+            if (reduce) { return; }
+            var c = document.createElement('canvas');
+            c.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:99999';
+            var w = c.width = window.innerWidth;
+            var h = c.height = window.innerHeight;
+            document.body.appendChild(c);
+            var ctx = c.getContext('2d');
+            var cols = ['#f3cf7a', '#d9a441', '#ffffff', '#e11d48', '#22c55e', '#3b82f6'];
+            var ps = [];
+            for (var i = 0; i < 150; i++) {
+                var left = i % 2 === 0;
+                ps.push({
+                    x: left ? 0 : w,
+                    y: h * 0.85,
+                    vx: (left ? 1 : -1) * (3 + Math.random() * 7),
+                    vy: -(9 + Math.random() * 12),
+                    s: 5 + Math.random() * 6,
+                    r: Math.random() * 6,
+                    vr: (Math.random() - 0.5) * 0.35,
+                    c: cols[i % cols.length]
+                });
+            }
+            var t0 = performance.now();
+            function frame(now) {
+                var age = now - t0;
+                ctx.clearRect(0, 0, w, h);
+                var alive = 0;
+                ps.forEach(function (p) {
+                    p.vy += 0.28;
+                    p.vx *= 0.992;
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.r += p.vr;
+                    if (p.y < h + 20) { alive++; }
+                    ctx.save();
+                    ctx.globalAlpha = age > 3200 ? Math.max(0, 1 - (age - 3200) / 800) : 1;
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.r);
+                    ctx.fillStyle = p.c;
+                    ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+                    ctx.restore();
+                });
+                if (alive > 0 && age < 4000) {
+                    requestAnimationFrame(frame);
+                } else if (c.parentNode) {
+                    c.parentNode.removeChild(c);
+                }
+            }
+            requestAnimationFrame(frame);
+        }
+
+        // stars
+        document.querySelectorAll('.srv-rate').forEach(function (box) {
+            var id = box.getAttribute('data-id');
+            var btns = box.querySelectorAll('button');
+            var note = box.querySelector('.srv-note');
+            function paint(v) {
+                btns.forEach(function (b) { b.classList.toggle('on', Number(b.getAttribute('data-v')) <= v); });
+                note.textContent = v ? 'Thanks! You rated ' + v + ' of 5' : 'Rate your meal';
+            }
+            var saved = 0;
+            try { saved = Number(localStorage.getItem('tkRate' + id)) || 0; } catch (e) {}
+            paint(saved);
+            btns.forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var v = Number(b.getAttribute('data-v'));
+                    paint(v);
+                    try { localStorage.setItem('tkRate' + id, String(v)); } catch (e) {}
+                    b.classList.remove('pop');
+                    void b.offsetWidth;
+                    b.classList.add('pop');
+                    if (v >= 4) { confetti(); }
+                });
+            });
+        });
+
+        // celebrate button + tapping the cloche
+        document.querySelectorAll('.srv-party, .srv-art').forEach(function (el) {
+            el.addEventListener('click', confetti);
+        });
+
+        // automatic celebration: just-served order, or the newest served order (once)
+        var cards = document.querySelectorAll('.order-card[data-status="delivered"]');
+        var justId = null;
+        try { justId = sessionStorage.getItem('tkServed'); } catch (e) {}
+        var target = null;
+        if (justId) {
+            cards.forEach(function (cd) { if (cd.getAttribute('data-id') === justId) { target = cd; } });
+        }
+        if (!target && cards.length) {
+            var seen = false;
+            try { seen = localStorage.getItem('tkSeen' + cards[0].getAttribute('data-id')) === '1'; } catch (e) {}
+            if (!seen) { target = cards[0]; }
+        }
+        if (target) {
+            var tid = target.getAttribute('data-id');
+            var fired = false;
+            var fire = function () {
+                if (fired) { return; }
+                fired = true;
+                try {
+                    localStorage.setItem('tkSeen' + tid, '1');
+                    sessionStorage.removeItem('tkServed');
+                } catch (e) {}
+                confetti();
+            };
+            if (justId) {
+                setTimeout(function () { target.scrollIntoView({behavior: 'smooth', block: 'center'}); }, 300);
+            }
+            if ('IntersectionObserver' in window) {
+                var io = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (en) {
+                        if (en.isIntersecting) { io.disconnect(); setTimeout(fire, 500); }
+                    });
+                }, {threshold: 0.6});
+                io.observe(target);
+            } else {
+                fire();
+            }
+        }
+    })();
+</script>
+
+<script>
+    (function () {
+        var reduce = false;
+        try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+        function fireworks() {
+            if (reduce) { return; }
+            var c = document.createElement('canvas');
+            c.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:99998';
+            var w = c.width = window.innerWidth;
+            var h = c.height = window.innerHeight;
+            document.body.appendChild(c);
+            var ctx = c.getContext('2d');
+            var cols = ['#f3cf7a', '#fff6cf', '#ff6b81', '#7bed9f', '#70a1ff', '#ffa502'];
+            var ps = [];
+            var t0 = performance.now();
+
+            function launch() {
+                var x = w * (0.15 + Math.random() * 0.7);
+                var y = h * (0.15 + Math.random() * 0.4);
+                var col = cols[Math.floor(Math.random() * cols.length)];
+                for (var i = 0; i < 48; i++) {
+                    var a = (Math.PI * 2 * i) / 48;
+                    var sp = 1.8 + Math.random() * 4.2;
+                    ps.push({x: x, y: y, px: x, py: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, c: col});
+                }
+            }
+            for (var k = 0; k < 5; k++) { setTimeout(launch, k * 380); }
+
+            function frame(now) {
+                var age = now - t0;
+                ctx.clearRect(0, 0, w, h);
+                ctx.lineCap = 'round';
+                ps.forEach(function (p) {
+                    p.px = p.x; p.py = p.y;
+                    p.vy += 0.045;
+                    p.vx *= 0.985;
+                    p.vy *= 0.985;
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life -= 0.011;
+                    if (p.life > 0) {
+                        ctx.globalAlpha = p.life;
+                        ctx.strokeStyle = p.c;
+                        ctx.lineWidth = 2.2;
+                        ctx.beginPath();
+                        ctx.moveTo(p.px, p.py);
+                        ctx.lineTo(p.x, p.y);
+                        ctx.stroke();
+                    }
+                });
+                ps = ps.filter(function (p) { return p.life > 0; });
+                if (age < 2200 || ps.length) {
+                    requestAnimationFrame(frame);
+                } else if (c.parentNode) {
+                    c.parentNode.removeChild(c);
+                }
+            }
+            requestAnimationFrame(frame);
+        }
+
+        function starBurst(btn) {
+            var r = btn.getBoundingClientRect();
+            var cx = r.left + r.width / 2;
+            var cy = r.top + r.height / 2;
+            for (var i = 0; i < 9; i++) {
+                var a = (Math.PI * 2 * i) / 9;
+                var d = 26 + Math.random() * 18;
+                var b = document.createElement('i');
+                b.className = 'srv-sb';
+                b.style.left = cx + 'px';
+                b.style.top = cy + 'px';
+                b.style.setProperty('--bx', Math.round(Math.cos(a) * d) + 'px');
+                b.style.setProperty('--by', Math.round(Math.sin(a) * d) + 'px');
+                document.body.appendChild(b);
+                setTimeout(function (el) { if (el.parentNode) { el.parentNode.removeChild(el); } }, 750, b);
+            }
+        }
+
+        var LABELS = ['Rate your meal', "Sorry! We'll do better", 'Okay, we can improve', 'Good, thank you!', 'Loved it! Thank you', 'Outstanding! You made our day'];
+
+        document.querySelectorAll('.srv-rate').forEach(function (box) {
+            var id = box.getAttribute('data-id');
+            var note = box.querySelector('.srv-note');
+            var saved = 0;
+            try { saved = Number(localStorage.getItem('tkRate' + id)) || 0; } catch (e) {}
+            if (saved) { note.textContent = LABELS[saved]; }
+            box.querySelectorAll('button').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    var v = Number(b.getAttribute('data-v'));
+                    note.textContent = LABELS[v];
+                    starBurst(b);
+                    if (v === 5) { fireworks(); }
+                });
+            });
+        });
+
+        document.querySelectorAll('.srv-party, .srv-art').forEach(function (el) {
+            el.addEventListener('click', fireworks);
+        });
+
+        // fireworks once when the newest served card scrolls into view
+        var first = document.querySelector('.order-card[data-status="delivered"]');
+        if (first) {
+            var key = 'tkFw' + first.getAttribute('data-id');
+            var done = false;
+            try { done = localStorage.getItem(key) === '1'; } catch (e) {}
+            if (!done && 'IntersectionObserver' in window) {
+                var io = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (en) {
+                        if (en.isIntersecting) {
+                            io.disconnect();
+                            try { localStorage.setItem(key, '1'); } catch (e) {}
+                            setTimeout(fireworks, 700);
+                        }
+                    });
+                }, {threshold: 0.6});
+                io.observe(first);
+            }
+        }
+    })();
 </script>
 
 {% endblock %}

@@ -1,0 +1,144 @@
+{% extends 'store/store_base.html' %}
+{% block title %}Recipes{% endblock %}
+{% block content %}
+<style>
+.rc{--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;--bg:#f7f8fb;--ok:#16a34a;--ok-bg:#e8f7ee;--low:#d97706;--low-bg:#fff4db;--out:#dc2626;--brand:#ff6b6b;--adj:#2563eb;color:var(--ink)}
+.rc *{box-sizing:border-box}
+.rc-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.rc-head h1{margin:0;font-size:26px;line-height:1.1}
+.rc-head p{margin:4px 0 0;color:var(--mut);font-size:13px}
+.rc-btn{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:9px 14px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.rc-btn:hover{border-color:#cfd3de}
+.rc-btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
+.rc-btn.go{background:var(--ink);border-color:var(--ink);color:#fff}
+.rc-btn:focus-visible,.rc-chip:focus-visible,.rc input:focus-visible,.rc select:focus-visible{outline:2px solid var(--adj);outline-offset:2px}
+
+.rc-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.rc-kpi{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:14px 16px;border-left-width:4px}
+.rc-kpi b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.rc-kpi span{font-size:12.5px;color:var(--mut)}
+.rc-kpi.k-all{border-left-color:var(--ink)}
+.rc-kpi.k-ok{border-left-color:var(--ok)}
+.rc-kpi.k-no{border-left-color:var(--low)}
+
+.rc-tools{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:14px}
+.rc-form{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.rc-search{flex:1 1 240px;position:relative}
+.rc-search input{width:100%;padding:10px 12px 10px 34px;border:1px solid var(--bd);border-radius:10px;font-size:14px;background:var(--bg);font-family:inherit}
+.rc-search svg{position:absolute;left:11px;top:50%;translate:0 -50%;width:16px;height:16px;color:var(--mut)}
+.rc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.rc-chip{border:1px solid var(--bd);background:#fff;color:var(--mut);padding:6px 12px;border-radius:99px;font-size:13px;font-weight:600;text-decoration:none}
+.rc-chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+
+.rc-card{background:#fff;border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+.rc-scroll{overflow-x:auto}
+.rc table{width:100%;border-collapse:collapse;font-size:14px}
+.rc thead th{background:var(--bg);text-align:left;font-size:12.5px;color:var(--mut);font-weight:600;padding:11px 14px;border-bottom:1px solid var(--bd);white-space:nowrap}
+.rc th.num,.rc td.num{text-align:right}
+.rc td{padding:12px 14px;border-bottom:1px solid var(--bd);vertical-align:middle}
+.rc tbody tr.row:hover td{background:#fbfbfd}
+.rc tr.row.has td:first-child{box-shadow:inset 4px 0 0 var(--ok)}
+.rc tr.row.none td:first-child{box-shadow:inset 4px 0 0 var(--low)}
+.rc .who{display:flex;align-items:center;gap:12px}
+.rc .th{width:52px;height:52px;border-radius:12px;overflow:hidden;background:var(--bg);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:var(--mut);flex:none}
+.rc .th img{width:100%;height:100%;object-fit:cover;display:block}
+.rc .nm b{display:block;font-size:15px}
+.rc .cat{display:inline-block;background:var(--bg);border:1px solid var(--bd);border-radius:99px;padding:2px 10px;font-size:12.5px;color:var(--mut)}
+.rc .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:700}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.no{background:var(--low-bg);color:var(--low)}
+.rc .mut{color:var(--mut)}
+.rc .acts{display:flex;justify-content:flex-end}
+.rc-empty{padding:34px 16px;text-align:center;color:var(--mut)}
+.rc-empty b{display:block;color:var(--ink);margin-bottom:6px;font-size:15px}
+.rc-foot{padding:10px 14px;color:var(--mut);font-size:12.5px;border-top:1px solid var(--bd);background:var(--bg)}
+
+@media (max-width:760px){
+  .rc-kpis{grid-template-columns:1fr}
+  .rc thead{display:none}
+  .rc table,.rc tbody{display:block}
+  .rc tr.row{display:grid;grid-template-columns:1fr auto;gap:6px 10px;padding:14px;border-bottom:1px solid var(--bd)}
+  .rc tr.row td{display:block;padding:0;border:0}
+  .rc tr.row td:first-child{box-shadow:none!important}
+  .rc tr.row.has{border-left:4px solid var(--ok)}
+  .rc tr.row.none{border-left:4px solid var(--low)}
+  .rc td.nm{grid-column:1;grid-row:1}
+  .rc td.st{grid-column:2;grid-row:1;text-align:right}
+  .rc td.catc{grid-column:1;grid-row:2}
+  .rc td.cnt{grid-column:2;grid-row:2;text-align:right;font-size:12.5px;color:var(--mut)}
+  .rc td.ac{grid-column:1 / -1;grid-row:3;margin-top:6px}
+  .rc .acts{justify-content:flex-start}
+}
+</style>
+
+<div class="rc">
+  <div class="rc-head">
+    <div>
+      <h1>Recipes</h1>
+      <p>Set which grocery items each dish uses. A dish is hidden when one of its ingredients runs out of stock. Customer orders do not reduce the store stock automatically.</p>
+    </div>
+  </div>
+
+  <div class="rc-kpis">
+    <div class="rc-kpi k-all"><b>{{ total }}</b><span>Total dishes</span></div>
+    <div class="rc-kpi k-ok"><b>{{ with_recipe }}</b><span>With recipe</span></div>
+    <div class="rc-kpi k-no"><b>{{ without_recipe }}</b><span>No recipe yet</span></div>
+  </div>
+
+  <div class="rc-tools">
+    <form method="get" class="rc-form">
+      <div class="rc-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" name="q" value="{{ q }}" placeholder="Search dish or category" aria-label="Search dish or category" autocomplete="off">
+      </div>
+      <input type="hidden" name="filter" value="{{ flt }}">
+      <button class="rc-btn go" type="submit">Search</button>
+      {% if q or flt %}<a class="rc-btn" href="{% url 'store:recipes' %}">Reset</a>{% endif %}
+    </form>
+    <div class="rc-chips" role="group" aria-label="Filter dishes">
+      <a class="rc-chip {% if not flt %}on{% endif %}" href="?q={{ q|urlencode }}">All dishes</a>
+      <a class="rc-chip {% if flt == 'none' %}on{% endif %}" href="?q={{ q|urlencode }}&filter=none">No recipe</a>
+      <a class="rc-chip {% if flt == 'done' %}on{% endif %}" href="?q={{ q|urlencode }}&filter=done">Has recipe</a>
+    </div>
+  </div>
+
+  <div class="rc-card">
+    <div class="rc-scroll">
+      <table>
+        <thead>
+          <tr><th>Dish</th><th>Category</th><th class="num">Ingredients</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for f in foods %}
+          <tr class="row {% if f.line_count %}has{% else %}none{% endif %}">
+            <td class="nm">
+              <div class="who">
+                <span class="th">{% if f.image %}<img src="{{ f.image.url }}" alt="{{ f.name }}" loading="lazy">{% else %}{{ f.name|slice:":1"|upper }}{% endif %}</span>
+                <div><b>{{ f.name }}</b></div>
+              </div>
+            </td>
+            <td class="catc">{% if f.category %}<span class="cat">{{ f.category.name }}</span>{% else %}<span class="mut">-</span>{% endif %}</td>
+            <td class="num cnt">{{ f.line_count }}</td>
+            <td class="st">{% if f.line_count %}<span class="pill ok">Recipe set</span>{% else %}<span class="pill no">No recipe</span>{% endif %}</td>
+            <td class="ac">
+              <div class="acts">
+                <a class="rc-btn sm go" href="{% url 'store:recipe_edit' f.pk %}">{% if f.line_count %}Edit recipe{% else %}Add recipe{% endif %}</a>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if not foods %}
+    <div class="rc-empty">
+      <b>{% if q or flt %}No dishes match these filters{% else %}No dishes yet{% endif %}</b>
+      {% if q or flt %}<a href="{% url 'store:recipes' %}">Clear filters</a>{% endif %}
+    </div>
+    {% else %}
+    <div class="rc-foot">Showing {{ foods|length }} dish{{ foods|length|pluralize:"es" }}</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

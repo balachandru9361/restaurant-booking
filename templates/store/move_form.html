@@ -1,26 +1,244 @@
 {% extends 'store/store_base.html' %}
 {% block title %}Add {{ cfg.title }}{% endblock %}
 {% block content %}
-<h1>Add {{ cfg.title }}</h1>
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
 <style>
-  .move-card select, .move-card input { width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:.95rem; }
-  .move-card label { display:block; font-weight:600; font-size:.85rem; margin-bottom:4px; }
-  .move-card .fld { margin-bottom:14px; }
-  .move-card .ferr { color:#dc2626; font-size:.82rem; margin-top:4px; }
+.mf{--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;--bg:#f7f8fb;--out:#dc2626;--out-bg:#fde8e8;--adj:#2563eb;--ac:#16a34a;--ac-bg:#e8f7ee;color:var(--ink);max-width:680px}
+.mf.t-out{--ac:#e8590c;--ac-bg:#fff0e6}
+.mf.t-damage{--ac:#d97706;--ac-bg:#fff4db}
+.mf *{box-sizing:border-box}
+.mf-back{display:inline-block;margin-bottom:10px;color:var(--mut);text-decoration:none;font-size:13px;font-weight:600}
+.mf-back:hover{color:var(--ink)}
+.mf-top{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+.mf-ic{width:54px;height:54px;border-radius:16px;background:var(--ac-bg);display:flex;align-items:center;justify-content:center;font-size:28px;flex:none}
+.mf-top h1{margin:0;font-size:26px;line-height:1.1}
+.mf-top p{margin:4px 0 0;color:var(--mut);font-size:13px}
+
+.mf-card{background:#fff;border:1px solid var(--bd);border-top:4px solid var(--ac);border-radius:16px;padding:20px}
+.mf-sec{margin-bottom:22px}
+.mf-sec > label,.mf-sec > .lbl{display:block;font-weight:700;margin-bottom:8px}
+.mf-err{color:var(--out);font-size:13px;margin-top:6px}
+.mf-pick{display:flex;align-items:center;gap:12px}
+.mf-th{width:52px;height:52px;border-radius:14px;background:var(--bg);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:var(--mut);flex:none}
+.mf-th.emo{font-size:30px;background:#fff7ed;border-color:#fde3c8}
+.mf-pick select{flex:1;width:100%;padding:13px 12px;border:1px solid var(--bd);border-radius:12px;font-size:16px;background:#fff;font-family:inherit;min-width:0}
+
+/* searchable item dropdown (Tom Select) */
+.mf-pick .ts-wrapper{flex:1;min-width:0}
+.mf-pick .ts-control{padding:13px 12px;border:1px solid var(--bd);border-radius:12px;font-size:16px;font-family:inherit;box-shadow:none;background:#fff}
+.mf-pick .ts-wrapper.focus .ts-control{border-color:var(--adj);box-shadow:none}
+.mf-pick .ts-control input{font-size:16px;font-family:inherit}
+.mf-pick .ts-dropdown{border:1px solid var(--bd);border-radius:12px;margin-top:4px;font-size:15px;box-shadow:0 8px 24px rgba(15,23,42,.12);overflow:hidden}
+.mf-pick .ts-dropdown .option{padding:10px 14px}
+.mf-pick .ts-dropdown .active{background:var(--ac-bg);color:var(--ink)}
+
+.mf-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.mf-opt{position:relative;display:block;cursor:pointer;margin:0}
+.mf-opt input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.mf-opt .box{display:flex;align-items:center;gap:10px;padding:14px;border:2px solid var(--bd);border-radius:14px;background:#fff;font-weight:700;transition:border-color .15s,background .15s}
+.mf-opt .box em{font-style:normal;font-size:24px;line-height:1}
+.mf-opt:hover .box{border-color:#cfd3de}
+.mf-opt input:checked + .box{border-color:var(--ac);background:var(--ac-bg)}
+.mf-opt input:focus-visible + .box{outline:2px solid var(--adj);outline-offset:2px}
+
+.mf-qty{display:flex;gap:8px;align-items:stretch}
+.mf-qty button{width:52px;border:1px solid var(--bd);background:#fff;border-radius:12px;font-size:22px;font-weight:700;cursor:pointer;color:var(--ink);font-family:inherit}
+.mf-qty button:hover{border-color:#cfd3de;background:var(--bg)}
+.mf-qty input{flex:1;width:100%;min-width:0;padding:14px;border:1px solid var(--bd);border-radius:12px;font-size:22px;font-weight:700;font-family:inherit;font-variant-numeric:tabular-nums;text-align:center}
+.mf-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.mf-chip{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:6px 12px;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.mf-chip:hover{border-color:#cfd3de;background:var(--bg)}
+.mf-note input{width:100%;padding:12px 14px;border:1px solid var(--bd);border-radius:12px;font-size:14px;font-family:inherit}
+.mf-help{color:var(--mut);font-size:13px;margin-top:6px}
+.mf input:focus-visible,.mf select:focus-visible,.mf button:focus-visible,.mf a:focus-visible{outline:2px solid var(--adj);outline-offset:2px}
+
+.mf-act{display:flex;gap:10px;flex-wrap:wrap}
+.mf-btn{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:12px 22px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-family:inherit;width:auto}
+.mf-btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+@media (max-width:520px){.mf-act .mf-btn{flex:1}}
+@media (prefers-reduced-motion:reduce){.mf *{transition:none!important}}
 </style>
-<div class="card move-card" style="max-width:520px">
-  <form method="post">
-    {% csrf_token %}
-    {% if form.non_field_errors %}<div class="ferr">{{ form.non_field_errors|striptags }}</div>{% endif %}
-    {% for f in form %}
-    <div class="fld">
-      <label for="{{ f.id_for_label }}">{{ f.label }}</label>
-      {{ f }}
-      {% if f.errors %}<div class="ferr">{{ f.errors|striptags }}</div>{% endif %}
+
+<div class="mf {% if cfg.reasons %}t-damage{% elif cfg.sign == 1 %}t-in{% else %}t-out{% endif %}">
+  <a class="mf-back" href="{% url cfg.list_url %}">Back to {{ cfg.title }}</a>
+
+  <div class="mf-top">
+    <span class="mf-ic">{% if cfg.reasons %}🗑️{% elif cfg.sign == 1 %}📥{% else %}📤{% endif %}</span>
+    <div>
+      <h1>Add {{ cfg.title }}</h1>
+      <p>{{ cfg.hint }}</p>
     </div>
-    {% endfor %}
-    <button class="btn" type="submit">Save</button>
-    <a class="btn light" href="{% url cfg.list_url %}">Cancel</a>
-  </form>
+  </div>
+
+  <div class="mf-card">
+    <form method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="mf-err" style="margin-bottom:14px">{{ form.non_field_errors|striptags }}</div>{% endif %}
+
+      <div class="mf-sec">
+        <label for="{{ form.item.id_for_label }}">Item</label>
+        <div class="mf-pick">
+          <span class="mf-th" id="mfTile">?</span>
+          {{ form.item }}
+        </div>
+        {% if form.item.errors %}<div class="mf-err">{{ form.item.errors|striptags }}</div>{% endif %}
+      </div>
+
+      {% if cfg.reasons %}
+      <div class="mf-sec">
+        <span class="lbl">What happened?</span>
+        <div class="mf-opts" role="radiogroup" aria-label="What happened?">
+          {% for value, text in form.reason.field.choices %}{% if value %}
+          <label class="mf-opt">
+            <input type="radio" name="reason" value="{{ value }}" {% if form.reason.value|stringformat:'s' == value|stringformat:'s' or not form.reason.value and forloop.first %}checked{% endif %}>
+            <span class="box"><em>{% if value|lower == 'expiry' %}⏰{% else %}💔{% endif %}</em><span>{{ text }}</span></span>
+          </label>
+          {% endif %}{% endfor %}
+        </div>
+        {% if form.reason.errors %}<div class="mf-err">{{ form.reason.errors|striptags }}</div>{% endif %}
+      </div>
+      {% endif %}
+
+      <div class="mf-sec">
+        <label for="id_quantity">Quantity</label>
+        <div class="mf-qty">
+          <button type="button" id="mfMinus" aria-label="Decrease quantity">&minus;</button>
+          <input type="number" step="0.001" min="0" name="quantity" id="id_quantity" inputmode="decimal" value="{{ form.quantity.value|default_if_none:'' }}" placeholder="0" required>
+          <button type="button" id="mfPlus" aria-label="Increase quantity">+</button>
+        </div>
+        <div class="mf-chips" id="mfChips">
+          <button type="button" class="mf-chip" data-add="1">+1</button>
+          <button type="button" class="mf-chip" data-add="5">+5</button>
+          <button type="button" class="mf-chip" data-add="10">+10</button>
+          <button type="button" class="mf-chip" data-add="25">+25</button>
+          <button type="button" class="mf-chip" data-add="50">+50</button>
+          <button type="button" class="mf-chip" data-clear="1">Clear</button>
+        </div>
+        {% if form.quantity.errors %}<div class="mf-err">{{ form.quantity.errors|striptags }}</div>{% endif %}
+      </div>
+
+      <div class="mf-sec mf-note">
+        <label for="id_note">Note <span style="font-weight:500;color:var(--mut)">(optional)</span></label>
+        <input type="text" name="note" id="id_note" maxlength="200" value="{{ form.note.value|default_if_none:'' }}" placeholder="{% if cfg.sign == 1 %}e.g. Bought from Ravi Traders{% elif cfg.reasons %}e.g. Box was wet{% else %}e.g. Used for dinner service{% endif %}">
+        <div class="mf-chips" id="mfNotes">
+          {% if cfg.reasons %}
+          <button type="button" class="mf-chip">Packet torn</button>
+          <button type="button" class="mf-chip">Past expiry date</button>
+          <button type="button" class="mf-chip">Spoiled</button>
+          <button type="button" class="mf-chip">Dropped</button>
+          {% elif cfg.sign == 1 %}
+          <button type="button" class="mf-chip">Bought from supplier</button>
+          <button type="button" class="mf-chip">Returned item</button>
+          <button type="button" class="mf-chip">Opening stock</button>
+          {% else %}
+          <button type="button" class="mf-chip">Used in kitchen</button>
+          <button type="button" class="mf-chip">Dinner service</button>
+          <button type="button" class="mf-chip">Lunch service</button>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="mf-act">
+        <button class="mf-btn primary" type="submit">Save</button>
+        <a class="mf-btn" href="{% url cfg.list_url %}">Cancel</a>
+      </div>
+    </form>
+  </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+(function () {
+  var BY_NAME = [
+    ['banana leaf','🍃'],['curry leaf','🌿'],['coriander','🌿'],['mint','🌿'],['bay leaf','🍃'],
+    ['chicken','🍗'],['mutton','🥩'],['lamb','🥩'],['beef','🥩'],['egg','🥚'],
+    ['prawn','🦐'],['shrimp','🦐'],['crab','🦀'],['squid','🦑'],['anchovy','🐟'],['fish','🐟'],['seer','🐟'],['tuna','🐟'],['sardine','🐟'],
+    ['basmati','🍚'],['rice','🍚'],['atta','🌾'],['maida','🌾'],['flour','🌾'],['rava','🌾'],['semolina','🌾'],
+    ['oil','🛢️'],['ghee','🧈'],['butter','🧈'],['curd','🥛'],['milk','🥛'],['paneer','🧀'],['cheese','🧀'],['cream','🥛'],
+    ['salt','🧂'],['sugar','🍬'],['jaggery','🍯'],['honey','🍯'],
+    ['onion','🧅'],['garlic','🧄'],['ginger','🫚'],['tomato','🍅'],['potato','🥔'],['carrot','🥕'],['brinjal','🍆'],['capsicum','🫑'],['beans','🫘'],['peas','🫛'],['cabbage','🥬'],['cauliflower','🥦'],['mushroom','🍄'],['corn','🌽'],['cucumber','🥒'],
+    ['chilli','🌶️'],['chili','🌶️'],['pepper','🌶️'],['masala','🌶️'],['turmeric','🧡'],['cumin','🌿'],['cardamom','🌿'],['clove','🌿'],['cinnamon','🪵'],['star anise','⭐'],
+    ['apple','🍎'],['banana','🍌'],['lemon','🍋'],['lime','🍋'],['orange','🍊'],['mango','🥭'],['grape','🍇'],['pineapple','🍍'],['watermelon','🍉'],['strawberry','🍓'],['blueberry','🫐'],['coconut','🥥'],
+    ['dal','🫘'],['lentil','🫘'],['chickpea','🫘'],['gram','🫘'],
+    ['tea','🍵'],['coffee','☕'],['juice','🧃'],['soda','🥤'],['water','💧'],['mojito','🍹'],
+    ['bread','🍞'],['bun','🍞'],['noodle','🍜'],['pasta','🍝'],['sauce','🥫'],['vinegar','🍶'],
+    ['lpg','🔥'],['cylinder','🔥'],['container','📦'],['box','📦'],['tissue','🧻'],['glove','🧤'],['cover','🛍️'],['bag','🛍️']
+  ];
+  function fmt(n) { return (Math.round(n * 1000) / 1000).toString(); }
+
+  // searchable item dropdown (type to search); falls back to the plain select if the library is blocked
+  var sel = document.getElementById('id_item');
+  var tile = document.getElementById('mfTile');
+  var prefillText = "{{ prefill_q|default:''|escapejs }}";
+  {% url 'store:item_add' as add_item_url %}
+  var ADD_ITEM_URL = "{{ add_item_url|escapejs }}";
+  var ts = null;
+  if (sel && window.TomSelect) {
+    ts = new TomSelect(sel, {
+      maxOptions: null,
+      placeholder: 'Search item...',
+      searchField: ['text'],
+      openOnFocus: true,
+      render: {
+        no_results: function (data, escape) {
+          var html = '<div class="no-results">No item found.';
+          if (ADD_ITEM_URL && data.input) {
+            html += ' <a href="' + ADD_ITEM_URL + '?then=stock_in&name=' + encodeURIComponent(data.input) +
+                    '" style="font-weight:700">Add &quot;' + escape(data.input) + '&quot; as a new item</a>';
+          }
+          return html + '</div>';
+        }
+      }
+    });
+    // item had no exact match: open the search with the kitchen item's name typed in
+    if (prefillText && !sel.value) {
+      ts.focus();
+      ts.setTextboxValue(prefillText);
+      ts.refreshOptions(true);
+    }
+  }
+
+  // item picture follows the selected option
+  function paintTile() {
+    if (!sel || !sel.options.length) return;
+    var opt = sel.options[sel.selectedIndex];
+    var name = (opt && opt.value ? opt.text : '').toLowerCase();
+    tile.className = 'mf-th';
+    tile.textContent = name ? name.charAt(0).toUpperCase() : '?';
+    for (var k = 0; k < BY_NAME.length; k++) {
+      if (name.indexOf(BY_NAME[k][0]) !== -1) { tile.textContent = BY_NAME[k][1]; tile.className = 'mf-th emo'; break; }
+    }
+  }
+  if (sel) { sel.addEventListener('change', paintTile); paintTile(); }
+
+  // quantity stepper and chips
+  var qty = document.getElementById('id_quantity');
+  function bump(n) {
+    var v = Math.max(0, (parseFloat(qty.value) || 0) + n);
+    qty.value = fmt(v);
+    qty.focus();
+  }
+  document.getElementById('mfPlus').addEventListener('click', function () { bump(1); });
+  document.getElementById('mfMinus').addEventListener('click', function () { bump(-1); });
+  document.getElementById('mfChips').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.clear) { qty.value = ''; qty.focus(); }
+    else bump(parseFloat(b.dataset.add));
+  });
+
+  // reason cards: make sure one is always selected
+  var reasons = document.querySelectorAll('input[name="reason"]');
+  if (reasons.length && !document.querySelector('input[name="reason"]:checked')) reasons[0].checked = true;
+
+  // note chips
+  var note = document.getElementById('id_note');
+  document.getElementById('mfNotes').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    note.value = b.textContent.trim();
+    note.focus();
+  });
+})();
+</script>
 {% endblock %}

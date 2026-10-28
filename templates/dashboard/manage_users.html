@@ -31,6 +31,7 @@
     align-items: center;
     gap: 6px;
     transition: all 0.2s ease;
+    text-decoration: none;
   }
   .btn-export:hover { border-color: #2ecc71; color: #2ecc71; }
 
@@ -52,8 +53,10 @@
     border-left: 4px solid #2ecc71;
     cursor: pointer;
     transition: transform 0.15s ease;
+    text-decoration: none;
+    color: inherit;
   }
-  .mini-stat:hover { transform: translateY(-2px); }
+  .mini-stat:hover { transform: translateY(-2px); color: inherit; text-decoration: none; }
   .mini-stat:nth-child(2) { border-left-color: #9b59b6; }
   .mini-stat:nth-child(3) { border-left-color: #F63A3A; }
   .mini-stat:nth-child(4) { border-left-color: #f39c12; }
@@ -65,11 +68,12 @@
   .toolbar {
     display: flex;
     gap: 12px;
-    margin-bottom: 18px;
+    margin-bottom: 14px;
     flex-wrap: wrap;
     align-items: center;
   }
-  .search-box { flex: 1; min-width: 220px; position: relative; }
+  .search-form { flex: 1; min-width: 220px; display: flex; gap: 8px; }
+  .search-box { flex: 1; position: relative; }
   .search-box input {
     width: 100%;
     padding: 11px 16px 11px 40px;
@@ -92,6 +96,14 @@
     font-size: 14px;
     opacity: 0.5;
   }
+  .search-btn, .clear-btn {
+    border: none; cursor: pointer; font-size: 13px; font-weight: 700; padding: 0 16px;
+    border-radius: 10px; text-decoration: none; display: flex; align-items: center;
+  }
+  .search-btn { background: #1a1a2e; color: #fff; }
+  .clear-btn  { background: #f0f0f3; color: #555; }
+
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
   .filter-chip {
     padding: 9px 16px;
     border-radius: 20px;
@@ -103,9 +115,12 @@
     border: 1.5px solid transparent;
     transition: all 0.15s ease;
     white-space: nowrap;
+    text-decoration: none;
+    display: inline-block;
   }
   .filter-chip.active { background: #1a1a2e; color: #fff; }
-  .filter-chip:hover:not(.active) { border-color: #ddd; }
+  .filter-chip:hover:not(.active) { border-color: #ddd; color: #666; text-decoration: none; }
+  .chip-label { font-size: 11.5px; color: #999; text-transform: uppercase; letter-spacing: 0.4px; margin: 4px 0 8px; font-weight: 700; }
 
   /* Bulk action bar */
   .bulk-bar {
@@ -149,11 +164,11 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    cursor: pointer;
     user-select: none;
   }
-  table.users-table thead th:hover { background: #24243e; }
-  table.users-table thead th .sort-arrow { opacity: 0.4; margin-left: 4px; font-size: 10px; }
+  table.users-table thead th .sort-link { color: #fff; text-decoration: none; display: inline-block; }
+  table.users-table thead th .sort-link:hover { opacity: 0.85; }
+  table.users-table thead th .sort-arrow { opacity: 0.5; margin-left: 4px; font-size: 10px; }
   table.users-table thead th input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
 
   table.users-table tbody tr {
@@ -221,9 +236,6 @@
   .status-inactive { background: #f5f5f8; color: #999; }
   .status-badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
-  .last-login { font-size: 12.5px; color: #999; }
-  .last-login.recent { color: #2ecc71; font-weight: 700; }
-
   /* Expandable detail row */
   .detail-row td {
     background: #fbfbfd;
@@ -247,6 +259,7 @@
 
   .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
   .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
+  .table-note { font-size: 12px; color: #9ca3af; margin: 10px 4px 0; }
 
   @media (max-width: 700px) {
     .users-table-wrap { overflow-x: auto; }
@@ -260,43 +273,61 @@
     <p>Everyone who has signed up on the platform</p>
   </div>
   <div>
-    <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+    <a class="btn-export" href="?{{ querystring }}export=csv">⬇ Export CSV</a>
     <a href="{% url 'dashboard:add_staff' %}" class="btn-add-staff">➕ Add Staff Login</a>
   </div>
 </div>
 
 <div class="stats-strip">
-  <div class="mini-stat" onclick="setFilter('all')">
+  <a class="mini-stat" href="?">
     <div class="emoji">👥</div>
-    <div><div class="num">{{ users|length }}</div><div class="lbl">Total Users</div></div>
-  </div>
-  <div class="mini-stat" onclick="setFilter('staff')">
+    <div><div class="num">{{ st.total }}</div><div class="lbl">Total Users</div></div>
+  </a>
+  <a class="mini-stat" href="?role=staff">
     <div class="emoji">👨‍🍳</div>
-    <div><div class="num" id="staffCount">0</div><div class="lbl">Kitchen</div></div>
-  </div>
-  <div class="mini-stat" onclick="setFilter('server')">
+    <div><div class="num">{{ st.staff }}</div><div class="lbl">Kitchen</div></div>
+  </a>
+  <a class="mini-stat" href="?role=server">
     <div class="emoji">🛎️</div>
-    <div><div class="num" id="serverCount">0</div><div class="lbl">Server</div></div>
-  </div>
-  <div class="mini-stat" onclick="setFilter('admin')">
+    <div><div class="num">{{ st.server }}</div><div class="lbl">Server</div></div>
+  </a>
+  <a class="mini-stat" href="?role=admin">
     <div class="emoji">👑</div>
-    <div><div class="num" id="adminCount">0</div><div class="lbl">Admins</div></div>
-  </div>
-  <div class="mini-stat" onclick="setFilter('active')">
+    <div><div class="num">{{ st.admin }}</div><div class="lbl">Admins</div></div>
+  </a>
+  <a class="mini-stat" href="?state=active">
     <div class="emoji">✅</div>
-    <div><div class="num" id="activeCount">0</div><div class="lbl">Active</div></div>
-  </div>
+    <div><div class="num">{{ st.active }}</div><div class="lbl">Active</div></div>
+  </a>
 </div>
 
 <div class="toolbar">
-  <div class="search-box">
-    <input type="text" id="userSearch" placeholder="Search by name, username or email...">
-  </div>
-  <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">All</div>
-  <div class="filter-chip" data-filter="admin" onclick="setFilter('admin')">Admins</div>
-  <div class="filter-chip" data-filter="staff" onclick="setFilter('staff')">Kitchen</div>
-  <div class="filter-chip" data-filter="server" onclick="setFilter('server')">Server</div>
-  <div class="filter-chip" data-filter="customer" onclick="setFilter('customer')">Customers</div>
+  <form method="get" class="search-form">
+    <input type="hidden" name="role" value="{{ f_role }}">
+    <input type="hidden" name="state" value="{{ f_state }}">
+    <input type="hidden" name="sort" value="{{ f_sort }}">
+    <div class="search-box">
+      <input type="text" name="q" value="{{ f_q }}" placeholder="Search by name, username or email...">
+    </div>
+    <button type="submit" class="search-btn">Search</button>
+    {% if f_q %}<a class="clear-btn" href="?role={{ f_role }}&amp;state={{ f_state }}&amp;sort={{ f_sort|urlencode }}">Clear</a>{% endif %}
+  </form>
+</div>
+
+<div class="chip-label">Role</div>
+<div class="chip-row">
+  <a class="filter-chip {% if f_role == 'all' %}active{% endif %}" href="?role=all&amp;state={{ f_state }}&amp;q={{ f_q|urlencode }}&amp;sort={{ f_sort|urlencode }}">All</a>
+  <a class="filter-chip {% if f_role == 'admin' %}active{% endif %}" href="?role=admin&amp;state={{ f_state }}&amp;q={{ f_q|urlencode }}&amp;sort={{ f_sort|urlencode }}">Admins</a>
+  <a class="filter-chip {% if f_role == 'staff' %}active{% endif %}" href="?role=staff&amp;state={{ f_state }}&amp;q={{ f_q|urlencode }}&amp;sort={{ f_sort|urlencode }}">Kitchen</a>
+  <a class="filter-chip {% if f_role == 'server' %}active{% endif %}" href="?role=server&amp;state={{ f_state }}&amp;q={{ f_q|urlencode }}&amp;sort={{ f_sort|urlencode }}">Server</a>
+  <a class="filter-chip {% if f_role == 'customer' %}active{% endif %}" href="?role=customer&amp;state={{ f_state }}&amp;q={{ f_q|urlencode }}&amp;sort={{ f_sort|urlencode }}">Customers</a>
+</div>
+
+<div class="chip-label">Status</div>
+<div class="chip-row">
+  <a class="filter-chip {% if not f_state %}active{% endif %}" href="?role={{ f_role }}&amp;q={{ f_q|urlencode }}&amp;sort={{ f_sort|urlencode }}">Any</a>
+  <a class="filter-chip {% if f_state == 'active' %}active{% endif %}" href="?role={{ f_role }}&amp;state=active&amp;q={{ f_q|urlencode }}&amp;sort={{ f_sort|urlencode }}">✅ Active</a>
+  <a class="filter-chip {% if f_state == 'inactive' %}active{% endif %}" href="?role={{ f_role }}&amp;state=inactive&amp;q={{ f_q|urlencode }}&amp;sort={{ f_sort|urlencode }}">⏸ Inactive</a>
 </div>
 
 {% csrf_token %}
@@ -313,23 +344,17 @@
   <table class="users-table">
     <thead>
       <tr>
-        <th style="width:36px;"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th>
-        <th onclick="sortTable(1)">User <span class="sort-arrow">⇅</span></th>
-        <th onclick="sortTable(2)">Email <span class="sort-arrow">⇅</span></th>
-        <th onclick="sortTable(3)">Role <span class="sort-arrow">⇅</span></th>
-        <th onclick="sortTable(4)">Status <span class="sort-arrow">⇅</span></th>
-        <th onclick="sortTable(5)">Joined <span class="sort-arrow">⇅</span></th>
+        <th style="width:36px;"><input type="checkbox" id="selectAll" title="Select all on this page" onclick="toggleAll(this)"></th>
+        <th><a class="sort-link" href="?role={{ f_role }}&amp;state={{ f_state }}&amp;q={{ f_q|urlencode }}&amp;sort={% if f_sort == 'user' %}-user{% else %}user{% endif %}">User <span class="sort-arrow">{% if f_sort == 'user' %}▲{% elif f_sort == '-user' %}▼{% else %}⇅{% endif %}</span></a></th>
+        <th><a class="sort-link" href="?role={{ f_role }}&amp;state={{ f_state }}&amp;q={{ f_q|urlencode }}&amp;sort={% if f_sort == 'email' %}-email{% else %}email{% endif %}">Email <span class="sort-arrow">{% if f_sort == 'email' %}▲{% elif f_sort == '-email' %}▼{% else %}⇅{% endif %}</span></a></th>
+        <th>Role</th>
+        <th><a class="sort-link" href="?role={{ f_role }}&amp;state={{ f_state }}&amp;q={{ f_q|urlencode }}&amp;sort={% if f_sort == 'status' %}-status{% else %}status{% endif %}">Status <span class="sort-arrow">{% if f_sort == 'status' %}▲{% elif f_sort == '-status' %}▼{% else %}⇅{% endif %}</span></a></th>
+        <th><a class="sort-link" href="?role={{ f_role }}&amp;state={{ f_state }}&amp;q={{ f_q|urlencode }}&amp;sort={% if f_sort == 'joined' %}-joined{% else %}joined{% endif %}">Joined <span class="sort-arrow">{% if f_sort == 'joined' %}▲{% elif f_sort == '-joined' %}▼{% else %}⇅{% endif %}</span></a></th>
       </tr>
     </thead>
     <tbody id="usersTableBody">
       {% for user in users %}
-      <tr class="user-row"
-          data-role="{% if user.is_superuser %}admin{% elif user.profile.role == 'server' %}server{% elif user.is_staff %}staff{% else %}customer{% endif %}"
-          data-active="{{ user.is_active|yesno:'active,inactive' }}"
-          data-name="{{ user.get_full_name|default:user.username|lower }}"
-          data-username="{{ user.username|lower }}"
-          data-email="{{ user.email|lower }}"
-          onclick="toggleDetail(event, {{ forloop.counter }})">
+      <tr class="user-row" onclick="toggleDetail(event, {{ forloop.counter }})">
         <td class="checkbox-cell" onclick="event.stopPropagation()">
           <input type="checkbox" class="row-check" value="{{ user.id }}" onchange="updateBulkBar()">
         </td>
@@ -382,8 +407,8 @@
       {% empty %}
       <tr><td colspan="6">
         <div class="empty-state">
-          <div class="big-emoji">👥</div>
-          <p>No registered users yet.</p>
+          <div class="big-emoji">{% if f_q or f_role != 'all' or f_state %}🔍{% else %}👥{% endif %}</div>
+          <p>{% if f_q or f_role != 'all' or f_state %}No users match these filters.{% else %}No registered users yet.{% endif %}</p>
         </div>
       </td></tr>
       {% endfor %}
@@ -391,49 +416,13 @@
   </table>
 </div>
 
+{% if page_obj.paginator.count %}
+  <p class="table-note">Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} users. Ticking boxes selects users on this page only.</p>
+{% endif %}
+
+{% include 'includes/_pagination.html' %}
+
 <script>
-  const searchInput = document.getElementById('userSearch');
-  const rows = document.querySelectorAll('#usersTableBody tr.user-row');
-  let currentFilter = 'all';
-  let sortDir = {};
-
-  function computeCounts() {
-    let staff = 0, server = 0, admin = 0, active = 0;
-    rows.forEach(r => {
-      if (r.dataset.role === 'staff') staff++;
-      if (r.dataset.role === 'server') server++;
-      if (r.dataset.role === 'admin') admin++;
-      if (r.dataset.active === 'active') active++;
-    });
-    document.getElementById('staffCount').textContent = staff;
-    document.getElementById('serverCount').textContent = server;
-    document.getElementById('adminCount').textContent = admin;
-    document.getElementById('activeCount').textContent = active;
-  }
-  computeCounts();
-
-  function applyFilters() {
-    const q = searchInput.value.toLowerCase();
-    rows.forEach(row => {
-      const textMatch = row.dataset.name.includes(q) || row.dataset.username.includes(q) || row.dataset.email.includes(q);
-      const filterMatch = currentFilter === 'all' || row.dataset.role === currentFilter || row.dataset.active === currentFilter;
-      const show = textMatch && filterMatch;
-      row.style.display = show ? '' : 'none';
-      const detail = row.nextElementSibling;
-      if (detail && detail.classList.contains('detail-row')) {
-        detail.style.display = show ? '' : 'none';
-      }
-    });
-  }
-
-  searchInput.addEventListener('input', applyFilters);
-
-  function setFilter(f) {
-    currentFilter = f;
-    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
-    applyFilters();
-  }
-
   function toggleDetail(e, idx) {
     if (e.target.type === 'checkbox') return;
     const panel = document.getElementById('panel-' + idx);
@@ -461,42 +450,6 @@
     document.querySelectorAll('.row-check').forEach(c => c.checked = false);
     document.getElementById('selectAll').checked = false;
     updateBulkBar();
-  }
-
-  function sortTable(colIndex) {
-    const tbody = document.getElementById('usersTableBody');
-    const rowPairs = [];
-    document.querySelectorAll('.user-row').forEach(r => {
-      const detail = r.nextElementSibling;
-      rowPairs.push([r, detail]);
-    });
-    sortDir[colIndex] = !sortDir[colIndex];
-    rowPairs.sort((a, b) => {
-      const t1 = a[0].children[colIndex].innerText.trim().toLowerCase();
-      const t2 = b[0].children[colIndex].innerText.trim().toLowerCase();
-      return sortDir[colIndex] ? t1.localeCompare(t2) : t2.localeCompare(t1);
-    });
-    rowPairs.forEach(([r, d]) => { tbody.appendChild(r); tbody.appendChild(d); });
-  }
-
-  function exportCSV() {
-    let csv = 'Name,Username,Email,Role,Status,Joined\n';
-    rows.forEach(r => {
-      if (r.style.display === 'none') return;
-      const cells = r.querySelectorAll('td');
-      const name = cells[1].querySelector('.user-name').innerText;
-      const username = r.dataset.username;
-      const email = cells[2].innerText;
-      const role = cells[3].innerText.trim();
-      const status = cells[4].innerText.trim();
-      const joined = cells[5].innerText.trim();
-      csv += `"${name}","${username}","${email}","${role}","${status}","${joined}"\n`;
-    });
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'users.csv';
-    link.click();
   }
 
   function bulkUserAction(action) {

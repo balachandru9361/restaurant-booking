@@ -154,20 +154,32 @@
     position: relative;
     z-index: 1;
   }
-  .table-actions a {
+  .table-actions a,
+  .table-actions .delete-btn {
     flex: 1;
     text-decoration: none;
+    text-align: center;
     font-size: 12px;
     font-weight: 700;
     padding: 7px 0;
     border-radius: 7px;
     transition: transform 0.15s ease;
   }
-  .table-actions a:hover { transform: translateY(-1px); }
+  .table-actions a:hover,
+  .table-actions .delete-btn:hover { transform: translateY(-1px); }
   .edit-link { color: #3498db; background: #e3f2fd; }
   .delete-link { color: #e74c3c; background: #ffe5e5; }
 
-  /* --- table hold status (2-hour auto hide) --- */
+  /* delete is a POST form now (button looks the same as the old link) */
+  .delete-form { flex: 1; margin: 0; padding: 0; display: flex; }
+  .table-actions .delete-btn {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    width: 100%;
+  }
+
+  /* --- table hold status (held until the admin clicks Open Table) --- */
   .table-card.is-held { border-top-color: #e74c3c !important; background: #fffafa; }
   .table-card.is-held .table-icon { background: linear-gradient(135deg, #ffe5e5, #ffd3d3); box-shadow: 0 6px 16px rgba(231,76,60,0.2); }
 
@@ -220,7 +232,7 @@
 <div class="page-header">
   <div>
     <h2>🪑 Manage Tables</h2>
-    <p>Set up dine-in tables. A booked table is hidden for 2 hours, then opens automatically — or open it yourself.</p>
+    <p>Set up dine-in tables. A booked table stays held until you click <strong>Open Table</strong>. There is no timer.</p>
   </div>
   <a href="{% url 'dashboard:add_table' %}" class="btn-add">+ Add New Table</a>
 </div>
@@ -262,8 +274,7 @@
       <span class="hold-pill held">🔒 Occupied</span>
       <div class="hold-info">
         {{ hold.label }}<br>
-        Opens automatically at <strong>{{ hold.end|time:"g:i A" }}</strong>
-        ({{ row.mins_left }} min left)
+        Stays held <strong>until you open it</strong>
       </div>
       <form method="post" action="{% url 'dashboard:open_table' table.pk %}" class="open-form">
         {% csrf_token %}
@@ -275,17 +286,20 @@
       <div class="hold-info">
         {{ upcoming.label }}<br>
         Arriving at <strong>{{ upcoming.start|time:"g:i A" }}</strong>
-        (in {{ row.upcoming_in_mins }} min) — free until then
+        (in {{ row.upcoming_in_mins }} min). Free until then
       </div>
     {% else %}
-      <span class="hold-pill free">✅ Free</span>http://127.0.0.1:8000/
-
+      <span class="hold-pill free">✅ Free</span>
       <div class="hold-info">Available for booking</div>
     {% endif %}
 
     <div class="table-actions">
       <a href="{% url 'dashboard:edit_table' table.pk %}" class="edit-link">Edit</a>
-      <a href="{% url 'dashboard:delete_table' table.pk %}" class="delete-link" onclick="return confirm('Delete Table {{ table.number }}?')">Delete</a>
+      <form method="post" action="{% url 'dashboard:delete_table' table.pk %}" class="delete-form"
+            onsubmit="return confirm('Delete Table {{ table.number }}?');">
+        {% csrf_token %}
+        <button type="submit" class="delete-btn delete-link">Delete</button>
+      </form>
     </div>
   </div>
   {% endwith %}

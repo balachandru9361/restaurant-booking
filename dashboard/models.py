@@ -14,7 +14,6 @@ class Notification(models.Model):
         ('served', 'Order served'),
         ('rejected', 'Order rejected'),            # message format: 'Order #444 rejected: <reason>'
         ('ready', 'Order ready'),                  # kitchen marked the order ready
-        ('out_for_delivery', 'Out for delivery'),  # delivery staff picked up the order
         ('stock', 'Kitchen stock update'),
         ('stock_in', 'Store stock update'),        # used by update_grocery in dashboard/views.py
         ('stock_out', 'Out of stock alert'),

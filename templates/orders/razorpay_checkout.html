@@ -70,13 +70,6 @@
 .upi-app.active { border-color:#3395ff; background:#eaf4ff; color:#3395ff; }
 .upi-app:hover:not(.active) { border-color:#b9c2d6; }
 .upi-app .uicon { font-size:1.35rem; display:block; margin-bottom:5px; }
-.bank-select-note { font-size:0.78rem; color:#8a90a3; margin-bottom:14px; }
-.wallet-list { display:flex; flex-direction:column; gap:8px; }
-.wallet-row { display:flex; align-items:center; justify-content:space-between; border:1.5px solid #dfe3ee; border-radius:8px; padding:12px 14px; cursor:pointer; transition:all 0.15s ease; }
-.wallet-row.active { border-color:#3395ff; background:#eaf4ff; }
-.wallet-row:hover:not(.active) { border-color:#b9c2d6; }
-.wallet-row .wlab { font-size:0.85rem; font-weight:600; display:flex; align-items:center; gap:8px; }
-.wallet-row .arrow { color:#b9c2d6; }
 
 .cash-wrap { text-align:center; padding:20px 0 4px; }
 .cash-icon { width:64px; height:64px; background:#fff4e0; border:2px solid #f5a623; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.8rem; margin:0 auto 16px; }
@@ -170,7 +163,7 @@
                 {% for item in order.items.all %}
                 <div class="order-item-row">
                     <span class="item-dot"></span>
-                    <span class="item-name">{{ item.food_item.name }}<span class="qty">x {{ item.quantity }}</span></span>
+                    <span class="item-name">{{ item.food_item.name }}<span class="qty">x {{ item.quantity }}</span>{% if item.options_text %}<small style="display:block;font-size:.8em;font-weight:600;color:#d97706;margin-top:2px">{{ item.options_text }}</small>{% endif %}</span>
                     <span class="item-price">₹{{ item.subtotal|inr }}</span>
                 </div>
                 {% empty %}
@@ -202,9 +195,6 @@
                 <div class="method-tab" data-pane="qr"><span class="tab-icon">▦</span>QR Code</div>
                 <div class="method-tab active" data-pane="card"><span class="tab-icon">💳</span>Card</div>
                 <div class="method-tab" data-pane="upi"><span class="tab-icon">📱</span>UPI</div>
-                <div class="method-tab" data-pane="netbanking"><span class="tab-icon">🏦</span>Netbanking</div>
-                <div class="method-tab" data-pane="wallet"><span class="tab-icon">👛</span>Wallet</div>
-                <div class="method-tab" data-pane="cash"><span class="tab-icon">💵</span>Cash</div>
             </div>
 
             <form id="payForm" method="post" action="{% url 'orders:payment_success' order.id %}">
@@ -260,39 +250,6 @@
                         <div class="pay-field">
                             <label>UPI ID</label>
                             <input type="text" placeholder="yourname@upi">
-                        </div>
-                    </div>
-
-                    <div class="method-pane" id="pane-netbanking">
-                        <div class="bank-select-note">Select your bank to continue securely</div>
-                        <div class="pay-field">
-                            <label>Bank</label>
-                            <select>
-                                <option>State Bank of India</option>
-                                <option>HDFC Bank</option>
-                                <option>ICICI Bank</option>
-                                <option>Axis Bank</option>
-                                <option>Kotak Mahindra Bank</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="method-pane" id="pane-wallet">
-                        <div class="wallet-list">
-                            <div class="wallet-row active" data-wallet="paytm"><span class="wlab">🔵 Paytm Wallet</span><span class="arrow">›</span></div>
-                            <div class="wallet-row" data-wallet="amazonpay"><span class="wlab">🟠 Amazon Pay</span><span class="arrow">›</span></div>
-                            <div class="wallet-row" data-wallet="mobikwik"><span class="wlab">🔴 MobiKwik</span><span class="arrow">›</span></div>
-                        </div>
-                    </div>
-
-                    <div class="method-pane" id="pane-cash">
-                        <div class="cash-wrap">
-                            <div class="cash-icon">💵</div>
-                            <h4>Pay at the Restaurant</h4>
-                            <p>No need to pay online. Confirm your order now and pay ₹{{ order.total_amount|inr }} in cash when you arrive or on delivery.</p>
-                            <div class="cash-note">
-                                Your table/order will be marked <strong>Confirmed</strong> immediately. Staff will collect ₹{{ order.total_amount|inr }} in cash.
-                            </div>
                         </div>
                     </div>
 
@@ -375,14 +332,6 @@
         app.addEventListener('click', () => {
             document.querySelectorAll('.upi-app').forEach(a => a.classList.remove('active'));
             app.classList.add('active');
-        });
-    });
-
-    // Wallet selector
-    document.querySelectorAll('.wallet-row').forEach(row => {
-        row.addEventListener('click', () => {
-            document.querySelectorAll('.wallet-row').forEach(r => r.classList.remove('active'));
-            row.classList.add('active');
         });
     });
 

@@ -5,14 +5,15 @@
 .oh-head h2 { font-size:25px; color:#1a1a2e; margin:0; }
 .oh-head p { font-size:13px; color:#999; margin:3px 0 0; }
 .oh-actions { display:flex; gap:8px; }
-.btn { border:1.5px solid #e2e4ea; background:#fff; color:#1a1a2e; padding:9px 15px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; transition:.15s; }
-.btn:hover { border-color:#1a1a2e; }
+.btn { display:inline-block; text-decoration:none; border:1.5px solid #e2e4ea; background:#fff; color:#1a1a2e; padding:9px 15px; border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; transition:.15s; }
+.btn:hover { border-color:#1a1a2e; color:#1a1a2e; }
 .btn.live-on { border-color:#2ecc71; color:#1e9e55; background:#effcf4; }
 
 .oh-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:18px; }
-.st { background:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer;
+.st { background:#fff; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:12px; cursor:pointer; text-decoration:none; color:inherit;
 box-shadow:0 4px 14px rgba(0,0,0,.05); border:2px solid transparent; transition:.15s; }
-.st:hover { transform:translateY(-2px); }
+.st:hover { transform:translateY(-2px); color:inherit; }
+.st.static { cursor:default; } .st.static:hover { transform:none; }
 .st.on { border-color:#1a1a2e; }
 .st .ic { width:42px; height:42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:21px; background:#eef2ff; }
 .st.amber .ic { background:#fff3cd; } .st.blue .ic { background:#e3f0ff; } .st.green .ic { background:#e3f9ec; }
@@ -30,17 +31,17 @@ box-shadow:0 4px 14px rgba(0,0,0,.05); border:2px solid transparent; transition:
 /* payment chips row */
 .pay-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px; }
 .pay-row .lbl { font-size:11.5px; font-weight:800; color:#8b8fa3; text-transform:uppercase; letter-spacing:.4px; margin-right:4px; }
-.pay-chip { padding:8px 14px; border-radius:20px; font-size:13px; font-weight:700; background:#fff; color:#555; cursor:pointer; border:1.5px solid #e6e6ee; transition:.15s; white-space:nowrap; user-select:none; }
+.pay-chip { padding:8px 14px; border-radius:20px; font-size:13px; font-weight:700; background:#fff; color:#555; cursor:pointer; border:1.5px solid #e6e6ee; transition:.15s; white-space:nowrap; user-select:none; text-decoration:none; }
 .pay-chip b { margin-left:5px; background:rgba(0,0,0,.07); padding:1px 7px; border-radius:10px; font-size:11.5px; }
-.pay-chip:hover:not(.active) { border-color:#F63A3A; transform:translateY(-1px); }
+.pay-chip:hover:not(.active) { border-color:#F63A3A; transform:translateY(-1px); color:#555; }
 .pay-chip.active { background:#F63A3A; border-color:#F63A3A; color:#fff; box-shadow:0 6px 14px rgba(246,58,58,.3); }
 .pay-chip.active b { background:rgba(255,255,255,.25); }
 
 .chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
-.filter-chip { padding:8px 14px; border-radius:20px; font-size:13px; font-weight:700; background:#f1f2f6; color:#666; cursor:pointer; border:1.5px solid transparent; transition:.15s; white-space:nowrap; }
+.filter-chip { padding:8px 14px; border-radius:20px; font-size:13px; font-weight:700; background:#f1f2f6; color:#666; cursor:pointer; border:1.5px solid transparent; transition:.15s; white-space:nowrap; text-decoration:none; }
 .filter-chip b { margin-left:5px; background:rgba(0,0,0,.08); padding:1px 7px; border-radius:10px; font-size:11.5px; }
 .filter-chip.active { background:#1a1a2e; color:#fff; } .filter-chip.active b { background:rgba(255,255,255,.2); }
-.filter-chip:hover:not(.active) { border-color:#ccc; }
+.filter-chip:hover:not(.active) { border-color:#ccc; color:#666; }
 .shown { font-size:12.5px; color:#8b8fa3; margin-left:auto; align-self:center; }
 
 .oh-wrap { background:#fff; border-radius:16px; box-shadow:0 6px 20px rgba(0,0,0,.06); overflow:hidden; }
@@ -68,12 +69,26 @@ table.orders-table { width:100%; border-collapse:collapse; }
 .amount { font-weight:800; color:#1a1a2e; white-space:nowrap; }
 .table-tag { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:12.5px; font-weight:700; background:#eef2ff; color:#4f46e5; white-space:nowrap; }
 .table-tag.takeaway { background:#f3f4f8; color:#888; }
+.sitting-tag { display:inline-flex; align-items:center; gap:5px; margin-top:6px; padding:4px 10px; border-radius:20px; font-size:11.5px; font-weight:700; background:#fff7e0; color:#92650a; border:1px solid #f0dc9a; white-space:nowrap; }
+.ord-block + .ord-block { margin-top:12px; padding-top:12px; border-top:1px dashed #dfe2ea; }
+.ord-sub { font-size:12px; font-weight:800; color:#1a1a2e; margin-bottom:6px; display:flex; gap:8px; align-items:center; }
+.ord-sub span { color:#8b8fa3; font-weight:700; }
+.ids-stack { display:flex; flex-direction:column; gap:3px; }
+.amt-split { display:block; font-size:11.5px; color:#9aa0b4; font-weight:600; margin-top:3px; }
+.pay-id, .st-id { font-size:11px; font-weight:800; color:#8b8fa3; margin-right:4px; }
+.stack { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+
+/* chef who took the order (Prepared by column) */
+.chef-tag { display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:12.5px; font-weight:700; background:#eef2ff; color:#3730a3; border:1px solid #c7d2fe; white-space:nowrap; }
+.chef-none { color:#c0c4d0; font-weight:700; }
 
 .pay-cell { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
 .pay-badge { padding:4px 11px; border-radius:16px; font-size:11.5px; font-weight:700; white-space:nowrap; }
 .pay-badge.online { background:#e3f0ff; color:#3498db; } .pay-badge.cash-pending { background:#fff3cd; color:#b06a00; }
 .pay-badge.paid { background:#e3f9ec; color:#1e9e55; } .pay-badge.unpaid { background:#f3f4f8; color:#888; }
 .pay-badge.refund-pending { background:#ffe5e5; color:#e74c3c; } .pay-badge.refunded { background:#e3f9ec; color:#1e9e55; }
+/* cancelled cash order: nothing to collect */
+.pay-badge.cancelled { background:#ffe5e5; color:#e74c3c; }
 .cash-btn { padding:5px 11px; border-radius:8px; border:1.5px solid #2ecc71; background:#fff; color:#1e9e55; font-size:11.5px; font-weight:700; cursor:pointer; transition:.15s; }
 .cash-btn:hover { background:#2ecc71; color:#fff; } .cash-btn:disabled { opacity:.5; cursor:default; }
 .refund-btn { padding:5px 11px; border-radius:8px; border:1.5px solid #e74c3c; background:#fff; color:#e74c3c; font-size:11.5px; font-weight:700; cursor:pointer; transition:.15s; }
@@ -85,158 +100,206 @@ table.orders-table { width:100%; border-collapse:collapse; }
 .status-badge.status-confirmed { background:#fdecec; color:#F63A3A; }
 .status-badge.status-preparing { background:#e3f0ff; color:#3498db; }
 .status-badge.status-ready { background:#f3e5f9; color:#9b59b6; }
-.status-badge.status-out_for_delivery { background:#e0f7f4; color:#0f766e; }
 .status-badge.status-delivered, .status-badge.status-completed { background:#e3f9ec; color:#1e9e55; }
 .status-badge.status-cancelled { background:#ffe5e5; color:#e74c3c; }
 .status-badge.waiting-server { background:#fff3cd; color:#b06a00; }
 .status-badge.await-pay { background:#f3f4f8; color:#888; }
 
-.empty-state { display:none; text-align:center; padding:50px 20px; color:#aaa; }
-.empty-state.show { display:block; } .empty-state .big { font-size:42px; }
+.empty-cell { text-align:center; padding:50px 20px !important; color:#aaa; }
+.empty-cell .big { font-size:42px; }
 
 #toasts { position:fixed; right:18px; bottom:18px; z-index:10000; display:flex; flex-direction:column; gap:8px; }
 .toast { background:#1a1a2e; color:#fff; padding:11px 16px; border-radius:10px; font-size:13.5px; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.25); animation:tIn .25s ease; }
 .toast.err { background:#e74c3c; }
 @keyframes tIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
-@media (max-width:760px) { .oh-wrap { overflow-x:auto; } table.orders-table { min-width:1000px; } .shown { margin-left:0; } }
+@media (max-width:760px) { .oh-wrap { overflow-x:auto; } table.orders-table { min-width:1100px; } .shown { margin-left:0; } }
 </style>
 
 <div class="oh-head">
-<div>
-<h2>🧾 Orders</h2>
-<p>Monitor every order. The server sends orders to the kitchen; you collect cash and pay refunds here.</p>
-</div>
-<div class="oh-actions">
-<button type="button" class="btn live-on" id="liveBtn" onclick="toggleLive()">🟢 Live</button>
-<button type="button" class="btn" onclick="exportCsv()">⬇️ Export CSV</button>
-</div>
-</div>
-
-<div class="oh-stats">
-<div class="st" data-f="all" onclick="setFilter('all')"><div class="ic">📦</div><div><b id="sTotal">0</b><span>Total orders</span></div></div>
-<div class="st amber" data-f="approval" onclick="setFilter('approval')"><div class="ic">⏳</div><div><b id="sApproval">0</b><span>Waiting for server</span></div></div>
-<div class="st blue" data-f="kitchen" onclick="setFilter('kitchen')"><div class="ic">👨‍🍳</div><div><b id="sKitchen">0</b><span>In kitchen</span></div></div>
-<div class="st green" data-f="delivered" onclick="setFilter('delivered')"><div class="ic">✅</div><div><b id="sDelivered">0</b><span>Delivered</span></div></div>
-<div class="st teal"><div class="ic">💰</div><div><b id="sSales">₹0</b><span>Today's sales</span></div></div>
-<div class="st red" onclick="setPay('cashpending')"><div class="ic">💵</div><div><b id="sCash">₹0</b><span>Cash to collect</span></div></div>
-<div class="st red" onclick="setPay('refundpending')"><div class="ic">💸</div><div><b id="sRefund">₹0</b><span>Refunds to pay</span></div></div>
+  <div>
+    <h2>🧾 Orders</h2>
+    <p>Monitor every order. The server sends orders to the kitchen; you collect cash and pay refunds here.</p>
+  </div>
+  <div class="oh-actions">
+    <button type="button" class="btn live-on" id="liveBtn" onclick="toggleLive()">🟢 Live</button>
+    <a class="btn" href="?{{ querystring }}export=csv">⬇️ Export CSV</a>
+  </div>
 </div>
 
-<div class="oh-bar">
-<div class="search-box"><input type="text" id="orderSearch" placeholder="Search order ID, customer or dish...  ( / )" autocomplete="off"></div>
-<select id="sortBy" autocomplete="off">
-<option value="attention">⚡ Needs attention first</option>
-<option value="newest">🕒 Newest first</option>
-<option value="oldest">🕰️ Oldest first</option>
-<option value="amount">💰 Highest amount</option>
-</select>
+<div id="statsBox">
+  <div class="oh-stats">
+    <a class="st {% if f_filter == 'all' and f_pay == 'all' %}on{% endif %}" href="?filter=all&pay=all&sort={{ f_sort }}&q={{ f_q|urlencode }}"><div class="ic">📦</div><div><b>{{ st.total }}</b><span>Total orders</span></div></a>
+    <a class="st amber {% if f_filter == 'approval' %}on{% endif %}" href="?filter=approval&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}"><div class="ic">⏳</div><div><b>{{ st.approval }}</b><span>Waiting for server</span></div></a>
+    <a class="st blue {% if f_filter == 'kitchen' %}on{% endif %}" href="?filter=kitchen&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}"><div class="ic">👨‍🍳</div><div><b>{{ st.kitchen }}</b><span>In kitchen</span></div></a>
+    <a class="st green {% if f_filter == 'delivered' %}on{% endif %}" href="?filter=delivered&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}"><div class="ic">✅</div><div><b>{{ st.delivered }}</b><span>Delivered</span></div></a>
+    <div class="st teal static"><div class="ic">💰</div><div><b>₹{{ st.sales|inr }}</b><span>Today's sales</span></div></div>
+    <a class="st red {% if f_pay == 'cashpending' %}on{% endif %}" href="?filter=all&pay=cashpending&sort={{ f_sort }}&q={{ f_q|urlencode }}"><div class="ic">💵</div><div><b>₹{{ st.cash|inr }}</b><span>Cash to collect</span></div></a>
+    <a class="st red {% if f_pay == 'refundpending' %}on{% endif %}" href="?filter=all&pay=refundpending&sort={{ f_sort }}&q={{ f_q|urlencode }}"><div class="ic">💸</div><div><b>₹{{ st.refund|inr }}</b><span>Refunds to pay</span></div></a>
+  </div>
 </div>
 
-<div class="pay-row" id="payRow">
-<span class="lbl">Payment</span>
-<div class="pay-chip active" data-pay="all">All payments<b>0</b></div>
-<div class="pay-chip" data-pay="cashpending">💵 Cash pending<b>0</b></div>
-<div class="pay-chip" data-pay="cashpaid">💵 Cash paid<b>0</b></div>
-<div class="pay-chip" data-pay="online">💳 Paid online<b>0</b></div>
-<div class="pay-chip" data-pay="refundpending">💸 Refund pending<b>0</b></div>
-<div class="pay-chip" data-pay="refunded">↩️ Refunded<b>0</b></div>
-<div class="pay-chip" data-pay="unpaid">⏳ Unpaid<b>0</b></div>
-</div>
+<form method="get" id="filterForm">
+  <input type="hidden" name="filter" value="{{ f_filter }}">
+  <input type="hidden" name="pay" value="{{ f_pay }}">
+  <div class="oh-bar">
+    <div class="search-box"><input type="text" id="orderSearch" name="q" value="{{ f_q }}" placeholder="Search order ID, customer or dish...  ( / )" autocomplete="off"></div>
+    <select id="sortBy" name="sort" autocomplete="off" onchange="this.form.submit()">
+      <option value="attention" {% if f_sort == 'attention' %}selected{% endif %}>⚡ Needs attention first</option>
+      <option value="newest" {% if f_sort == 'newest' %}selected{% endif %}>🕒 Newest first</option>
+      <option value="oldest" {% if f_sort == 'oldest' %}selected{% endif %}>🕰️ Oldest first</option>
+      <option value="amount" {% if f_sort == 'amount' %}selected{% endif %}>💰 Highest amount</option>
+    </select>
+    <button type="submit" class="btn">Search</button>
+    {% if f_q or f_filter != 'all' or f_pay != 'all' %}<a class="btn" href="?">✖ Clear</a>{% endif %}
+  </div>
+</form>
 
-<div class="chips">
-<div class="filter-chip active" data-filter="all" onclick="setFilter('all')">All<b>0</b></div>
-<div class="filter-chip" data-filter="approval" onclick="setFilter('approval')">Waiting for server<b>0</b></div>
-<div class="filter-chip" data-filter="pending" onclick="setFilter('pending')">Pending<b>0</b></div>
-<div class="filter-chip" data-filter="kitchen" onclick="setFilter('kitchen')">In kitchen<b>0</b></div>
-<div class="filter-chip" data-filter="delivered" onclick="setFilter('delivered')">Delivered<b>0</b></div>
-<div class="filter-chip" data-filter="cancelled" onclick="setFilter('cancelled')">Cancelled<b>0</b></div>
-<span class="shown" id="shownCount"></span>
+<div id="chipsBox">
+  <div class="pay-row">
+    <span class="lbl">Payment</span>
+    <a class="pay-chip {% if f_pay == 'all' %}active{% endif %}" href="?filter={{ f_filter }}&pay=all&sort={{ f_sort }}&q={{ f_q|urlencode }}">All payments<b>{{ st.total }}</b></a>
+    <a class="pay-chip {% if f_pay == 'cashpending' %}active{% endif %}" href="?filter={{ f_filter }}&pay=cashpending&sort={{ f_sort }}&q={{ f_q|urlencode }}">💵 Cash pending<b>{{ st.p_cashpending }}</b></a>
+    <a class="pay-chip {% if f_pay == 'cashpaid' %}active{% endif %}" href="?filter={{ f_filter }}&pay=cashpaid&sort={{ f_sort }}&q={{ f_q|urlencode }}">💵 Cash paid<b>{{ st.p_cashpaid }}</b></a>
+    <a class="pay-chip {% if f_pay == 'online' %}active{% endif %}" href="?filter={{ f_filter }}&pay=online&sort={{ f_sort }}&q={{ f_q|urlencode }}">💳 Paid online<b>{{ st.p_online }}</b></a>
+    <a class="pay-chip {% if f_pay == 'refundpending' %}active{% endif %}" href="?filter={{ f_filter }}&pay=refundpending&sort={{ f_sort }}&q={{ f_q|urlencode }}">💸 Refund pending<b>{{ st.p_refundpending }}</b></a>
+    <a class="pay-chip {% if f_pay == 'refunded' %}active{% endif %}" href="?filter={{ f_filter }}&pay=refunded&sort={{ f_sort }}&q={{ f_q|urlencode }}">↩️ Refunded<b>{{ st.p_refunded }}</b></a>
+    <a class="pay-chip {% if f_pay == 'unpaid' %}active{% endif %}" href="?filter={{ f_filter }}&pay=unpaid&sort={{ f_sort }}&q={{ f_q|urlencode }}">⏳ Unpaid<b>{{ st.p_unpaid }}</b></a>
+  </div>
+
+  <div class="chips">
+    <a class="filter-chip {% if f_filter == 'all' %}active{% endif %}" href="?filter=all&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">All<b>{{ st.total }}</b></a>
+    <a class="filter-chip {% if f_filter == 'approval' %}active{% endif %}" href="?filter=approval&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">Waiting for server<b>{{ st.approval }}</b></a>
+    <a class="filter-chip {% if f_filter == 'pending' %}active{% endif %}" href="?filter=pending&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">Pending<b>{{ st.pending }}</b></a>
+    <a class="filter-chip {% if f_filter == 'kitchen' %}active{% endif %}" href="?filter=kitchen&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">In kitchen<b>{{ st.kitchen }}</b></a>
+    <a class="filter-chip {% if f_filter == 'delivered' %}active{% endif %}" href="?filter=delivered&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">Delivered<b>{{ st.delivered }}</b></a>
+    <a class="filter-chip {% if f_filter == 'cancelled' %}active{% endif %}" href="?filter=cancelled&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">Cancelled<b>{{ st.cancelled }}</b></a>
+    <span class="shown">{{ page_obj.paginator.count }} orders match</span>
+  </div>
 </div>
 
 <div class="oh-wrap">
-<table class="orders-table">
-<thead>
-<tr><th>Order</th><th>Customer</th><th>Table</th><th>Items</th><th>Amount</th><th>Payment</th><th>Status</th><th>Placed On</th></tr>
-</thead>
-<tbody id="ordersTableBody">
+  <table class="orders-table">
+    <thead>
+      <tr><th>Order</th><th>Customer</th><th>Table</th><th>Items</th><th>Amount</th><th>Payment</th><th>Status</th><th>Prepared by</th><th>Placed On</th></tr>
+    </thead>
+    <tbody id="ordersTableBody">
       {% for order in orders %}
       {% with cname=order.user.get_full_name|default:order.user.username %}
-<tr data-id="{{ order.id }}" data-status="{{ order.status|lower }}"
-data-approval="{% if order.status == 'pending' and order.payment_status != 'pending' %}1{% else %}0{% endif %}"
-data-pay="{% if order.payment_status == 'pending' %}unpaid{% elif order.payment_method == 'cash' %}{% if order.payment_status == 'paid' %}cashpaid{% else %}cashpending{% endif %}{% elif order.status == 'cancelled' and order.payment_status == 'paid' %}{% if order.refunded %}refunded{% else %}refundpending{% endif %}{% else %}online{% endif %}"
-data-amount="{{ order.total_amount|stringformat:'s' }}"
-data-ts="{{ order.created_at|date:'U' }}"
-data-day="{{ order.created_at|date:'Y-m-d' }}"
-data-date="{{ order.created_at|date:'d M Y H:i' }}"
-data-cust="{{ cname }}"
-class="{% if order.status == 'pending' and order.payment_status != 'pending' %}needs-approval{% endif %}"
-data-search="{{ order.id }} {{ cname|lower }} {% for item in order.items.all %}{{ item.food_item.name|lower }} {% endfor %}">
-<td><span class="order-id">#{{ order.id }}</span></td>
-<td><div class="cust"><span class="av">{{ cname|slice:":1"|upper }}</span>{{ cname }}</div></td>
-<td>
+      <tr data-id="{{ order.id }}" class="{% if order.sitting_needs_approval %}needs-approval{% endif %}">
+        <td>
+          <div class="ids-stack">
+            {% for o in order.sitting_orders %}<span class="order-id">#{{ o.id }}</span>{% endfor %}
+          </div>
+        </td>
+        <td><div class="cust"><span class="av">{{ cname|slice:":1"|upper }}</span>{{ cname }}</div></td>
+        <td>
           {# Monitor only: the server assigns tables from the Server Dashboard #}
           {% if order.table %}
-<span class="table-tag" id="tableTag{{ order.id }}">🪑 #{{ order.table.number }}</span>
+          <span class="table-tag" id="tableTag{{ order.id }}">🪑 #{{ order.table.number }}</span>
           {% elif order.is_takeaway %}
-<span class="table-tag takeaway" id="tableTag{{ order.id }}">🥡 Takeaway</span>
-          {% elif order.is_delivery %}
-<span class="table-tag takeaway" id="tableTag{{ order.id }}">🛵 Home delivery</span>
+          <span class="table-tag takeaway" id="tableTag{{ order.id }}">🥡 Takeaway</span>
           {% else %}
-<span class="table-tag" id="tableTag{{ order.id }}">🍽️ No table yet</span>
+          <span class="table-tag" id="tableTag{{ order.id }}">🍽️ No table yet</span>
           {% endif %}
-</td>
-<td>
-          {% include 'dashboard/_order_meta.html' %}
-<div class="items">
-            {% for item in order.items.all %}
-<div class="it">
-              {% if item.food_item.image %}<img src="{{ item.food_item.image.url }}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="ph" style="display:none" data-n="{{ item.food_item.name }}"></span>{% else %}<span class="ph" data-n="{{ item.food_item.name }}"></span>{% endif %}
-<span class="q">{{ item.quantity }}×</span><span class="n">{{ item.food_item.name }}</span>
-</div>
-            {% endfor %}
-</div>
-</td>
-<td class="amount">₹{{ order.total_amount|inr }}</td>
-<td>
-<div class="pay-cell">
-            {% if order.payment_status == 'pending' %}
-<span class="pay-badge unpaid" id="payBadge{{ order.id }}">⏳ Payment Pending</span>
-            {% elif order.payment_method == 'cash' %}
-              {% if order.payment_status == 'paid' %}
-<span class="pay-badge paid" id="payBadge{{ order.id }}">💵 Cash Paid</span>
-              {% else %}
-<span class="pay-badge cash-pending" id="payBadge{{ order.id }}">💵 Cash Pending</span>
-<button class="cash-btn" id="cashBtn{{ order.id }}" onclick="markCashReceived({{ order.id }})">Mark Received</button>
-              {% endif %}
-            {% elif order.status == 'cancelled' and order.payment_status == 'paid' %}
-              {% if order.refunded %}
-<span class="pay-badge refunded" id="payBadge{{ order.id }}">↩️ Refunded</span>
-              {% else %}
-<span class="pay-badge refund-pending" id="payBadge{{ order.id }}">💸 Refund pending</span>
-<button class="refund-btn" id="refundBtn{{ order.id }}" onclick="markRefunded({{ order.id }})">Mark Refunded</button>
-              {% endif %}
+          {# Running table with more than one order: one combined row and one bill #}
+          {% if order.sitting_count > 1 %}
+          <div><span class="sitting-tag" title="Orders of this table that are billed together">🔗 {{ order.sitting_count }} orders · one bill</span></div>
+          {% endif %}
+        </td>
+        <td>
+          {% for o in order.sitting_orders %}
+          <div class="ord-block">
+            {% if order.sitting_count > 1 %}<div class="ord-sub">#{{ o.id }} <span>₹{{ o.total_amount|inr }}</span></div>{% endif %}
+            {% include 'dashboard/_order_meta.html' with order=o %}
+            <div class="items">
+              {% for item in o.items.all %}
+              <div class="it">
+                {% if item.food_item.image %}<img src="{{ item.food_item.image.url }}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="ph" style="display:none" data-n="{{ item.food_item.name }}"></span>{% else %}<span class="ph" data-n="{{ item.food_item.name }}"></span>{% endif %}
+                <span class="q">{{ item.quantity }}×</span><span class="n">{{ item.food_item.name }}{% if item.options_text %} <small style="font-size:.8em;font-weight:600;color:#d97706">({{ item.options_text }})</small>{% endif %}</span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </td>
+        <td class="amount">
+          ₹{{ order.sitting_total|inr }}
+          {% if order.sitting_count > 1 %}<span class="amt-split">{% for o in order.sitting_orders %}₹{{ o.total_amount|inr }}{% if not forloop.last %} + {% endif %}{% endfor %}</span>{% endif %}
+        </td>
+        <td>
+          <div class="pay-cell">
+            {% if order.sitting_cash_ids %}
+            {# One button collects cash for every unpaid cash order of this table #}
+            <span class="pay-badge cash-pending" id="payBadge{{ order.id }}">💵 Cash Pending{% if order.sitting_count > 1 %} · ₹{{ order.sitting_cash_total|inr }}{% endif %}</span>
+            <button class="cash-btn" id="cashBtn{{ order.id }}" data-ids="{{ order.sitting_cash_ids|join:',' }}" onclick="markCashReceived(this)">Mark Received{% if order.sitting_count > 1 %} · ₹{{ order.sitting_cash_total|inr }}{% endif %}</button>
             {% else %}
-<span class="pay-badge online" id="payBadge{{ order.id }}">💳 Paid Online</span>
+            {% for o in order.sitting_orders %}
+            <div class="stack">
+              {% if o.payment_status == 'pending' %}
+              <span><span class="pay-id">{% if order.sitting_count > 1 %}#{{ o.id }}{% endif %}</span><span class="pay-badge unpaid" id="payBadge{{ o.id }}">⏳ Payment Pending</span></span>
+              {% elif o.payment_method == 'cash' %}
+                {% if o.status == 'cancelled' %}
+                <span><span class="pay-id">{% if order.sitting_count > 1 %}#{{ o.id }}{% endif %}</span><span class="pay-badge cancelled" id="payBadge{{ o.id }}">🚫 Cancelled</span></span>
+                {% else %}
+                <span><span class="pay-id">{% if order.sitting_count > 1 %}#{{ o.id }}{% endif %}</span><span class="pay-badge paid" id="payBadge{{ o.id }}">💵 Cash Paid</span></span>
+                {% endif %}
+              {% elif o.status == 'cancelled' and o.payment_status == 'paid' %}
+                {% if o.refunded %}
+                <span><span class="pay-id">{% if order.sitting_count > 1 %}#{{ o.id }}{% endif %}</span><span class="pay-badge refunded" id="payBadge{{ o.id }}">↩️ Refunded</span></span>
+                {% else %}
+                <span class="pay-id">{% if order.sitting_count > 1 %}#{{ o.id }}{% endif %}</span>
+                <span class="pay-badge refund-pending" id="payBadge{{ o.id }}">💸 Refund pending</span>
+                <button class="refund-btn" id="refundBtn{{ o.id }}" onclick="markRefunded({{ o.id }})">Mark Refunded</button>
+                {% endif %}
+              {% else %}
+              <span><span class="pay-id">{% if order.sitting_count > 1 %}#{{ o.id }}{% endif %}</span><span class="pay-badge online" id="payBadge{{ o.id }}">💳 Paid Online</span></span>
+              {% endif %}
+            </div>
+            {% endfor %}
             {% endif %}
-</div>
-</td>
-<td>
-          {# Monitor only: read-only status. The server and kitchen move the order along. #}
+          </div>
+        </td>
+        <td>
+          {# Monitor only: read-only status. One badge when all orders of the table share a status. #}
+          {% if order.sitting_count < 2 or order.sitting_same_status %}
           {% if order.status == 'pending' and order.payment_status != 'pending' %}
-<span class="status-badge waiting-server">⏳ Waiting for server</span>
+          <span class="status-badge waiting-server">⏳ Waiting for server</span>
           {% elif order.status == 'pending' %}
-<span class="status-badge await-pay">⏳ Awaiting payment</span>
+          <span class="status-badge await-pay">⏳ Awaiting payment</span>
           {% else %}
-<span class="status-badge status-{{ order.status|lower }}" data-status-badge>{{ order.get_status_display }}</span>
+          <span class="status-badge status-{{ order.status|lower }}">{{ order.get_status_display }}</span>
           {% endif %}
-</td>
-<td>{{ order.created_at|date:"d M Y, g:i A" }}<span class="ago">{{ order.created_at|timesince }} ago</span></td>
-</tr>
+          {% else %}
+          <div class="stack">
+            {% for o in order.sitting_orders %}
+            <span><span class="st-id">#{{ o.id }}</span>
+            {% if o.status == 'pending' and o.payment_status != 'pending' %}<span class="status-badge waiting-server">⏳ Waiting for server</span>
+            {% elif o.status == 'pending' %}<span class="status-badge await-pay">⏳ Awaiting payment</span>
+            {% else %}<span class="status-badge status-{{ o.status|lower }}">{{ o.get_status_display }}</span>{% endif %}</span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </td>
+        <td>
+          {# Chef(s) who clicked "Start Preparing". Blank until a chef takes the order (and for old orders). #}
+          {% if order.sitting_chefs %}
+          <div class="stack">{% for name in order.sitting_chefs %}<span class="chef-tag">👨‍🍳 {{ name }}</span>{% endfor %}</div>
+          {% else %}
+          <span class="chef-none">—</span>
+          {% endif %}
+        </td>
+        <td>{{ order.sitting_first|date:"d M Y, g:i A" }}<span class="ago">{{ order.sitting_first|timesince }} ago</span></td>
+      </tr>
       {% endwith %}
+      {% empty %}
+      <tr><td colspan="9" class="empty-cell"><div class="big">🧾</div><p>No orders match your filters.</p></td></tr>
       {% endfor %}
-</tbody>
-</table>
-<div class="empty-state" id="emptyState"><div class="big">🧾</div><p>No orders match your filters.</p></div>
+    </tbody>
+  </table>
+</div>
+
+<div id="pagerBox">
+  {% include 'includes/_pagination.html' %}
 </div>
 
 <div id="toasts"></div>
@@ -244,21 +307,8 @@ data-search="{{ order.id }} {{ cname|lower }} {% for item in order.items.all %}{
 <script>
 const tbody = document.getElementById('ordersTableBody');
 const searchInput = document.getElementById('orderSearch');
-const KITCHEN = ['confirmed', 'preparing', 'ready', 'out_for_delivery'];
-const PAID = ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
-const STATUS_LABELS = {
-  pending: 'Pending', confirmed: 'Confirmed', preparing: 'Preparing', ready: 'Ready',
-  out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled'
-};
-let currentFilter = 'all', payFilter = 'all', sortBy = 'attention', live = true;
+let live = true;
 
-const getRows = () => Array.from(tbody.querySelectorAll('tr[data-status]'));
-const money = n => '₹' + Math.round(n).toLocaleString('en-IN');
-const setText = (id, v) => { document.getElementById(id).textContent = v; };
-function todayStr() {
-  const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
 function getCsrfToken() { return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || ''; }
 
 function toast(msg, err) {
@@ -267,23 +317,6 @@ function toast(msg, err) {
   t.textContent = msg;
   document.getElementById('toasts').appendChild(t);
   setTimeout(() => t.remove(), 3200);
-}
-
-/* ---- remember filters, so a page refresh does not reset them ---- */
-const VIEW_KEY = 'ordersViewState';
-function saveView() {
-  try { sessionStorage.setItem(VIEW_KEY, JSON.stringify({ f: currentFilter, p: payFilter, s: sortBy, q: searchInput.value })); } catch (e) {}
-}
-function loadView() {
-  try {
-    const v = JSON.parse(sessionStorage.getItem(VIEW_KEY) || 'null');
-    if (!v) return;
-    currentFilter = v.f || 'all';
-    payFilter = v.p || 'all';
-    sortBy = v.s || 'attention';
-    searchInput.value = v.q || '';
-    document.getElementById('sortBy').value = sortBy;
-  } catch (e) {}
 }
 
 /* ---- dish icons when there is no photo ---- */
@@ -309,178 +342,100 @@ function fillPh(root) {
   });
 }
 
-/* ---- filters / stats / sort ---- */
-function inFilter(r, f) {
-  const s = r.dataset.status;
-  if (f === 'all') return true;
-  if (f === 'approval') return r.dataset.approval === '1';
-  if (f === 'kitchen') return KITCHEN.includes(s);
-  if (f === 'delivered') return s === 'delivered' || s === 'completed';
-  return s === f;
-}
-function stats() {
-  const rs = getRows(), t = todayStr();
-  let sales = 0, cash = 0, refund = 0;
-  rs.forEach(r => {
-    const amt = parseFloat(r.dataset.amount) || 0;
-    if (r.dataset.day === t && PAID.includes(r.dataset.status)) sales += amt;
-    if (r.dataset.pay === 'cashpending' && r.dataset.status !== 'cancelled') cash += amt;
-    if (r.dataset.pay === 'refundpending') refund += amt;
-  });
-  const c = f => rs.filter(r => inFilter(r, f)).length;
-  setText('sTotal', rs.length); setText('sApproval', c('approval'));
-  setText('sKitchen', c('kitchen')); setText('sDelivered', c('delivered'));
-  setText('sSales', money(sales)); setText('sCash', money(cash)); setText('sRefund', money(refund));
-  document.querySelectorAll('.filter-chip').forEach(ch => { ch.querySelector('b').textContent = c(ch.dataset.filter); });
-  document.querySelectorAll('.pay-chip').forEach(ch => {
-    const p = ch.dataset.pay;
-    ch.querySelector('b').textContent = p === 'all' ? rs.length : rs.filter(r => r.dataset.pay === p).length;
-  });
-}
-function sortRows() {
-  const rs = getRows();
-  rs.sort((a, b) => {
-    if (sortBy === 'attention') { const d = (b.dataset.approval | 0) - (a.dataset.approval | 0); if (d) return d; }
-    if (sortBy === 'oldest') return a.dataset.ts - b.dataset.ts;
-    if (sortBy === 'amount') return parseFloat(b.dataset.amount) - parseFloat(a.dataset.amount);
-    return b.dataset.ts - a.dataset.ts;
-  });
-  rs.forEach(r => tbody.appendChild(r));
-}
-function applyFilters() {
-  const q = searchInput.value.trim().replace(/^#/, '').toLowerCase();
-  let shown = 0;
-  getRows().forEach(r => {
-    const ok = r.dataset.search.includes(q) && inFilter(r, currentFilter) && (payFilter === 'all' || r.dataset.pay === payFilter);
-    r.style.display = ok ? '' : 'none';
-    if (ok) shown++;
-  });
-  document.getElementById('emptyState').classList.toggle('show', shown === 0);
-  setText('shownCount', shown + ' / ' + getRows().length + ' orders');
-  document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === currentFilter));
-  document.querySelectorAll('.pay-chip').forEach(c => c.classList.toggle('active', c.dataset.pay === payFilter));
-  document.querySelectorAll('.st[data-f]').forEach(c => c.classList.toggle('on', c.dataset.f === currentFilter && currentFilter !== 'all'));
-  saveView();
-}
-function refreshView() { sortRows(); stats(); applyFilters(); }
-function setFilter(f) { currentFilter = f; applyFilters(); }
-function setPay(p) { payFilter = payFilter === p ? 'all' : p; applyFilters(); }
-
-searchInput.addEventListener('input', applyFilters);
-document.getElementById('payRow').addEventListener('click', e => {
-  const chip = e.target.closest('.pay-chip');
-  if (!chip) return;
-  payFilter = chip.dataset.pay;
-  applyFilters();
-});
-document.getElementById('sortBy').addEventListener('change', e => { sortBy = e.target.value; refreshView(); });
+/* "/" focuses the search box */
 document.addEventListener('keydown', e => {
   const tag = (e.target.tagName || '').toLowerCase();
   if (e.key === '/' && tag !== 'input' && tag !== 'textarea' && tag !== 'select') { e.preventDefault(); searchInput.focus(); }
 });
 
-/* ---- update one row without reloading (used after Mark Received) ---- */
-function setRowStatus(row, status) {
-  row.dataset.status = status;
-  if (status !== 'pending') { row.dataset.approval = '0'; row.classList.remove('needs-approval'); }
-  const badge = row.querySelector('[data-status-badge]');
-  if (badge) {
-    badge.className = 'status-badge status-' + status;
-    badge.textContent = STATUS_LABELS[status] || status;
-  }
-  stats(); applyFilters();
+/* Reads the JSON reply. A failed reply (400/409) throws the server's own error message,
+   so the admin sees the real reason instead of a generic text. */
+function readJson(res) {
+  return res.json().catch(() => ({})).then(data => {
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Could not update. Try again.');
+    }
+    return data;
+  });
 }
 
 /* ---- cash received / refund paid (admin money actions) ---- */
-function markCashReceived(orderId) {
-  const btn = document.getElementById('cashBtn' + orderId);
-  const badge = document.getElementById('payBadge' + orderId);
-  const row = badge.closest('tr');
-  if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
-  fetch(`/dashboard/orders/${orderId}/mark-cash-received/`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() }
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (!data.success) throw new Error('fail');
-      badge.className = 'pay-badge paid';
-      badge.textContent = '💵 Cash Paid';
-      if (btn) btn.remove();
-      row.dataset.pay = 'cashpaid';
-      if (data.status) setRowStatus(row, data.status); else { stats(); applyFilters(); }
-      toast(data.status === 'delivered' ? 'Cash received. Order #' + orderId + ' delivered ✅' : 'Cash received for order #' + orderId);
-    })
-    .catch(() => {
-      if (btn) { btn.disabled = false; btn.textContent = 'Mark Received'; }
-      toast('Could not update. Try again.', true);
-    });
+/* One click collects cash for every unpaid cash order of the row (ids are in data-ids). */
+async function markCashReceived(btn) {
+  const ids = (btn.dataset.ids || '').split(',').filter(Boolean);
+  if (!ids.length) return;
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Updating...';
+  let done = 0, failure = null;
+  for (const id of ids) {
+    try {
+      const res = await fetch(`/dashboard/orders/${id}/mark-cash-received/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() }
+      });
+      await readJson(res);
+      done++;
+    } catch (err) {
+      failure = err;
+      break;
+    }
+  }
+  if (failure) {
+    btn.disabled = false;
+    btn.textContent = label;
+    toast((done ? done + ' of ' + ids.length + ' updated. ' : '') + (failure.message || 'Could not update. Try again.'), true);
+  } else {
+    toast(ids.length > 1 ? 'Cash received for ' + ids.length + ' orders ✅' : 'Cash received for order #' + ids[0] + ' ✅');
+  }
+  liveRefresh(true);   // stat cards, chip counts and rows come from the server, so reload them
 }
 
 function markRefunded(orderId) {
   const btn = document.getElementById('refundBtn' + orderId);
   const badge = document.getElementById('payBadge' + orderId);
-  const row = badge.closest('tr');
   if (!confirm('Mark order #' + orderId + ' as refunded?')) return;
   if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
   fetch(`/dashboard/orders/${orderId}/mark-refunded/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() }
   })
-    .then(res => res.json())
+    .then(readJson)
     .then(data => {
-      if (!data.success) throw new Error('fail');
       badge.className = 'pay-badge refunded';
       badge.textContent = '↩️ Refunded';
       if (btn) btn.remove();
-      row.dataset.pay = 'refunded';
-      stats(); applyFilters();
       toast('Order #' + orderId + ' refunded ✅');
+      liveRefresh(true);
     })
-    .catch(() => {
+    .catch(err => {
       if (btn) { btn.disabled = false; btn.textContent = 'Mark Refunded'; }
-      toast('Could not update. Try again.', true);
+      toast(err.message || 'Could not update. Try again.', true);
     });
 }
 
-/* ---- live refresh + CSV ---- */
+/* ---- live refresh (keeps the same filters and page, because it reloads location.href) ---- */
 function toggleLive() {
   live = !live;
   const b = document.getElementById('liveBtn');
   b.textContent = live ? '🟢 Live' : '⏸️ Paused';
   b.classList.toggle('live-on', live);
 }
-async function liveRefresh() {
-  if (!live || document.hidden) return;
+async function liveRefresh(force) {
+  if (!force && (!live || document.hidden)) return;
   try {
-    const r = await fetch(location.pathname, { credentials: 'same-origin' });
+    const r = await fetch(location.href, { credentials: 'same-origin' });
     if (!r.ok) return;
     const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
-    const nb = doc.getElementById('ordersTableBody');
-    if (!nb) return;
-    tbody.innerHTML = nb.innerHTML;
-    fillPh(tbody); refreshView();
+    ['statsBox', 'chipsBox', 'ordersTableBody', 'pagerBox'].forEach(id => {
+      const fresh = doc.getElementById(id), cur = document.getElementById(id);
+      if (fresh && cur) cur.innerHTML = fresh.innerHTML;
+    });
+    fillPh(tbody);
   } catch (e) {}
 }
 setInterval(liveRefresh, 15000);
 
-function exportCsv() {
-  const q = s => '"' + String(s).replace(/"/g, '""') + '"';
-  const lines = [['Order', 'Customer', 'Table', 'Items', 'Amount', 'Payment', 'Status', 'Placed'].map(q).join(',')];
-  getRows().filter(r => r.style.display !== 'none').forEach(r => {
-    const items = Array.from(r.querySelectorAll('.it')).map(i => i.querySelector('.q').textContent + ' ' + i.querySelector('.n').textContent).join('; ');
-    lines.push([r.dataset.id, r.dataset.cust, r.querySelector('.table-tag').textContent.trim(), items,
-      r.dataset.amount, r.dataset.pay, r.dataset.status, r.dataset.date].map(q).join(','));
-  });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
-  a.download = 'orders_' + todayStr() + '.csv';
-  a.click();
-  toast('CSV downloaded');
-}
-
 fillPh(document);
-loadView();
-refreshView();
 </script>
 {% endblock %}

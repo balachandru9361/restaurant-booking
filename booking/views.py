@@ -6,16 +6,16 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
 from django.http import JsonResponse
-from django.db import transaction
 from django.core.mail import send_mail
 from django.conf import settings
 from .forms import TableBookingForm, SEATS_PER_TABLE, MAX_GUESTS, tables_needed
 from .models import TableBooking, Table
-from .availability import (
-    booking_window, busy_table_ids_for_slot, free_tables_for_slot, pick_tables_for_party,
-)
+from .availability import busy_table_ids_for_slot, free_tables_for_slot
 
 logger = logging.getLogger(__name__)
+
+# Bookings in these states no longer hold a table.
+INACTIVE_STATUSES = ('rejected', 'cancelled')
 
 
 def _parse_slot(date_str, time_str):
@@ -26,6 +26,29 @@ def _parse_slot(date_str, time_str):
     except (TypeError, ValueError):
         return None
     return timezone.make_aware(datetime.combine(d, t))
+
+
+def _is_past_slot(slot_start):
+    """True if the slot is already over (earlier than right now)."""
+    return slot_start < timezone.now()
+
+
+def _free_tables(slot_start, guests):
+    """Free tables for this slot. Up to 6 guests: tables big enough for the party.
+    7+ guests: every free table (the admin gives several tables together)."""
+    if guests <= SEATS_PER_TABLE:
+        return free_tables_for_slot(slot_start, guests)
+    busy_ids = busy_table_ids_for_slot(slot_start)
+    return [t for t in Table.objects.all().order_by('number') if t.id not in busy_ids]
+
+
+def _enough_free_seats(free_tables, guests):
+    """True if the free tables can seat the party. Up to 6 guests the tables are already
+    filtered to ones big enough; for 7+ guests the admin may combine tables, so the total
+    free seats must cover the guests (a single big table is enough too)."""
+    if guests <= SEATS_PER_TABLE:
+        return len(free_tables) >= 1
+    return sum(t.capacity for t in free_tables) >= guests
 
 
 @login_required
@@ -40,65 +63,54 @@ def book_table(request):
                 messages.error(request, f'Max {MAX_GUESTS} guests allowed per booking.')
                 return render(request, 'booking/booking_form.html', {'form': form})
 
-            # The JS table-grid sends the table the customer clicked (optional).
-            # For parties above 6 the form ignores it (several tables are given instead).
-            selected_table = form.cleaned_data.get('table')
+            if booking.guests < 1:
+                messages.error(request, 'At least 1 guest is required.')
+                return render(request, 'booking/booking_form.html', {'form': form})
 
-            # Server-side availability double-check + assign tables.
-            # A booked table is held for 2 hours from the booked time.
-            with transaction.atomic():
-                slot_start = timezone.make_aware(
-                    datetime.combine(booking.booking_date, booking.booking_time)
+            # Past date / past time is not allowed
+            requested_slot = timezone.make_aware(
+                datetime.combine(booking.booking_date, booking.booking_time)
+            )
+            if _is_past_slot(requested_slot):
+                messages.error(
+                    request,
+                    'You cannot book a table for a past date or time. '
+                    'Please choose a future date and time.'
                 )
+                return render(request, 'booking/booking_form.html', {'form': form})
 
-                if selected_table and booking.guests <= SEATS_PER_TABLE:
-                    # Re-check the customer's chosen table is still free and big
-                    # enough - someone else may have booked it in the meantime.
-                    busy_ids = busy_table_ids_for_slot(slot_start)
-                    if selected_table.id in busy_ids or selected_table.capacity < booking.guests:
-                        messages.error(
-                            request,
-                            f'Sorry, Table #{selected_table.number} was just booked or is too small. '
-                            'Please pick another table.'
-                        )
-                        return render(request, 'booking/booking_form.html', {'form': form})
+            # The customer does not pick a table. We only check that enough
+            # seats are free for this slot; the admin chooses the table(s)
+            # when approving the request.
+            if not _enough_free_seats(_free_tables(requested_slot, booking.guests), booking.guests):
+                if booking.guests > SEATS_PER_TABLE:
+                    msg = (f'Sorry, there are not enough free seats for {booking.guests} guests '
+                           'at this time. Please choose another time or reduce guests.')
+                else:
+                    msg = ('Sorry, no table is free for this time slot. '
+                           'Please choose another time or reduce guests.')
+                messages.error(request, msg)
+                return render(request, 'booking/booking_form.html', {'form': form})
 
-                chosen = pick_tables_for_party(slot_start, booking.guests, preferred=selected_table)
-
-                if not chosen:
-                    if booking.guests > SEATS_PER_TABLE:
-                        msg = (f'Sorry, {tables_needed(booking.guests)} tables are needed for '
-                               f'{booking.guests} guests, but not enough tables are free for this time slot. '
-                               'Please choose another time or reduce guests.')
-                    else:
-                        msg = ('Sorry, no table is free for this time slot. '
-                               'Please choose another time or reduce guests.')
-                    messages.error(request, msg)
-                    return render(request, 'booking/booking_form.html', {'form': form})
-
-                booking.user = request.user
-                booking.table = chosen[0]
-                # The booking waits for the admin. It is NOT confirmed yet.
-                booking.status = 'pending'
-                booking.save()
-                booking.extra_tables.set(chosen[1:])
+            booking.user = request.user
+            # No table yet: it stays empty until the admin approves and picks tables.
+            booking.table = None
+            booking.status = 'pending'
+            booking.save()
 
             # --- Tell the customer the request was received (never fail the booking if mail is down) ---
             if request.user.email:
                 try:
-                    table_line = ''
-                    if len(chosen) > 1:
-                        table_line = f"Tables reserved: {len(chosen)}\n"
                     send_mail(
                         subject=f'Table Booking Request Received - {booking.booking_date}',
                         message=(
                             f"Hi {booking.name},\n\n"
                             f"We received your table booking request. It is waiting for admin approval.\n"
+                            f"Your table will be confirmed by the admin. "
                             f"You will get another email as soon as it is approved.\n\n"
                             f"Date: {booking.booking_date}\n"
                             f"Time: {booking.booking_time.strftime('%I:%M %p')}\n"
                             f"Guests: {booking.guests}\n"
-                            f"{table_line}"
                             f"Occasion: {booking.get_occasion_display()}\n\n"
                             f"Chandru Restaurant"
                         ),
@@ -120,9 +132,9 @@ def book_table(request):
 
 @login_required
 def check_availability(request):
-    """AJAX endpoint: are tables free for this date + time + guests?
-    A booking holds a table for 2 hours, so slots that overlap are checked too.
-    One table seats 6, so a bigger party needs several free tables."""
+    """AJAX endpoint: are seats free for this date + time + guests?
+    This is only a hint for the customer - the admin picks the real table(s),
+    so for big parties we do not promise a number of tables."""
     date = request.GET.get('date')
     time = request.GET.get('time')
     guests = request.GET.get('guests', 1)
@@ -135,6 +147,12 @@ def check_availability(request):
     if not date or not time:
         return JsonResponse({'available': False, 'message': 'Date and time required'})
 
+    if guests < 1:
+        return JsonResponse({
+            'available': False,
+            'message': '⚠️ At least 1 guest is required.'
+        })
+
     if guests > MAX_GUESTS:
         return JsonResponse({
             'available': False,
@@ -145,23 +163,24 @@ def check_availability(request):
     if slot_start is None:
         return JsonResponse({'available': False, 'message': 'Invalid date or time'})
 
+    if _is_past_slot(slot_start):
+        return JsonResponse({
+            'available': False,
+            'message': '⚠️ This date/time is in the past. Please choose a future slot.'
+        })
+
+    big_party = guests > SEATS_PER_TABLE
     needed = tables_needed(guests)
-
-    if guests <= SEATS_PER_TABLE:
-        free_tables = free_tables_for_slot(slot_start, guests)
-    else:
-        busy_ids = busy_table_ids_for_slot(slot_start)
-        free_tables = [t for t in Table.objects.all().order_by('number') if t.id not in busy_ids]
-
+    free_tables = _free_tables(slot_start, guests)
     free_seats = sum(t.capacity for t in free_tables)
     n = len(free_tables)
 
-    if n < needed:
-        if needed == 1:
-            msg = '❌ No table free for this time (each booking holds a table for 2 hours). Try another slot.'
+    if not _enough_free_seats(free_tables, guests):
+        if not big_party:
+            msg = '❌ No table free for this time. Try another slot.'
         else:
-            msg = (f'❌ {guests} guests need {needed} tables (one table seats {SEATS_PER_TABLE}), '
-                   f'but only {n} free for this slot. Try another time or fewer guests.')
+            msg = (f'❌ Not enough free seats for {guests} guests at this time '
+                   f'({free_seats} seats free). Try another time or fewer guests.')
         return JsonResponse({
             'available': False,
             'remaining': free_seats,
@@ -169,13 +188,12 @@ def check_availability(request):
             'message': msg,
         })
 
-    if needed == 1:
+    if not big_party:
         msg = (f'✅ Available! {n} table{"s" if n != 1 else ""} free for this slot. '
-               'Your booking will be confirmed after admin approval.')
+               'Your table will be confirmed by the admin.')
     else:
-        msg = (f'✅ Available! {guests} guests will get {needed} tables '
-               f'(one table seats {SEATS_PER_TABLE}). '
-               'Your booking will be confirmed after admin approval.')
+        msg = (f'✅ Available! Our team will arrange seating for {guests} guests '
+               'and confirm your booking.')
     return JsonResponse({
         'available': True,
         'remaining': free_seats,
@@ -186,11 +204,9 @@ def check_availability(request):
 
 @login_required
 def table_status_for_slot(request):
-    """AJAX endpoint: per-table free/booked status for a given date + time
-    (+ optional guests, to flag tables too small for the party), so the
-    booking page can render a table grid like the cart page does.
-    For parties above 6 guests every free table counts as fitting, because
-    several tables are given together."""
+    """AJAX endpoint: per-table free/booked status for a given date + time.
+    The customer no longer picks a table, but this stays so existing URLs and
+    any admin/status widgets that call it keep working."""
     date = request.GET.get('date')
     time = request.GET.get('time')
     guests = request.GET.get('guests', 1)
@@ -227,8 +243,9 @@ def table_status_for_slot(request):
 
 @login_required
 def bookings_for_date(request):
-    """AJAX endpoint: bookings (with their 2-hour window) for a given date, plus
-    how many seats are held at the chosen time (or right now, for today)."""
+    """AJAX endpoint: bookings for a given date, plus how many seats are held
+    at the chosen time (or right now, for today).
+    There is no 2-hour window any more, so no 'until' time is sent."""
     date = request.GET.get('date')
     time = request.GET.get('time')
 
@@ -241,22 +258,26 @@ def bookings_for_date(request):
             'remaining': 0,
         })
 
-    # Rejected bookings are not shown (they do not hold a table)
+    try:
+        datetime.strptime(date, '%Y-%m-%d')
+    except (TypeError, ValueError):
+        return JsonResponse({'bookings': [], 'tables': [], 'total_capacity': 0,
+                             'booked_guests': 0, 'remaining': 0})
+
+    # Rejected and cancelled bookings are not shown (they do not hold a table)
     bookings = (TableBooking.objects.filter(booking_date=date)
-                .exclude(status='rejected')
+                .exclude(status__in=INACTIVE_STATUSES)
                 .prefetch_related('extra_tables')
                 .order_by('booking_time'))
 
     data = []
     for b in bookings:
-        start, end = booking_window(b)
         data.append({
-            'name': b.name,
             'time': b.booking_time.strftime('%I:%M %p'),
-            'until': timezone.localtime(end).strftime('%I:%M %p'),
+            'until': '',
             'guests': b.guests,
-            'tables_count': 1 + len(b.extra_tables.all()),
-            'occasion': b.get_occasion_display(),
+            # 0 while the admin has not chosen tables yet
+            'tables_count': (1 if b.table_id else 0) + len(b.extra_tables.all()),
             'opened': b.released,
             'status': b.status,
         })
@@ -308,9 +329,19 @@ def booking_history(request):
 def cancel_booking(request, booking_id):
     booking = get_object_or_404(TableBooking, id=booking_id, user=request.user)
 
+    # Already cancelled / rejected, or the table was already opened for the guests
+    if booking.status in INACTIVE_STATUSES:
+        messages.info(request, 'This booking is already closed.')
+        return redirect('booking_history')
+    if booking.released:
+        messages.error(request, 'This booking is already in progress and cannot be cancelled.')
+        return redirect('booking_history')
+
     if request.method == 'POST':
-        booking.delete()
+        # Keep the record: only change the status.
+        booking.status = 'cancelled'
+        booking.save(update_fields=['status'])
         messages.success(request, 'Your booking has been cancelled.')
         return redirect('booking_history')
 
-    return render(request, 'booking/cancel_confirm.html', {'booking': booking})
+    return render(request, 'booking/booking/cancel_confirm.html', {'booking': booking})

@@ -14,6 +14,7 @@
         --bh-green: #16a34a;
         --bh-amber: #d97706;
         --bh-red: #dc2626;
+        --bh-grey: #94a3b8;
         max-width: 860px;
         margin: 36px auto 60px;
         padding: 0 14px;
@@ -153,6 +154,8 @@
     .bh-card:hover { transform: translateY(-5px); box-shadow: 0 16px 34px rgba(0, 0, 0, 0.12); }
     .bh-card.is-pending  { border-left-color: var(--bh-amber); }
     .bh-card.is-rejected { border-left-color: var(--bh-red); }
+    .bh-card.is-cancelled { border-left-color: var(--bh-grey); background: #f8fafc; }
+    .bh-card.is-cancelled .bh-name { color: var(--bh-muted); text-decoration: line-through; }
     .bh-card.is-past { filter: saturate(0.75); }
 
     .bh-card.is-pending::before {
@@ -198,6 +201,7 @@
     .bh-pill.approved { background: #dcfce7; color: #166534; }
     .bh-pill.pending  { background: #fef3c7; color: #92400e; }
     .bh-pill.rejected { background: #fee2e2; color: #b91c1c; }
+    .bh-pill.cancelled { background: #e5e7eb; color: #4b5563; }
     .bh-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
     .bh-pill.pending .dot { animation: bhPulse 1.3s ease-in-out infinite; }
     .bh-pill .hg { display: inline-block; animation: bhFlip 2.4s ease-in-out infinite; }
@@ -232,6 +236,16 @@
         background: #fffbeb;
         border: 1px solid #fde68a;
         color: #92400e;
+        border-radius: 12px;
+        padding: 9px 12px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+    .bh-cancelled-note {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #475569;
         border-radius: 12px;
         padding: 9px 12px;
         font-size: 0.82rem;
@@ -328,6 +342,7 @@
             <button type="button" class="bh-tab" data-filter="pending">⏳ Waiting <span class="c" data-count="pending">0</span></button>
             <button type="button" class="bh-tab" data-filter="approved">✅ Confirmed <span class="c" data-count="approved">0</span></button>
             <button type="button" class="bh-tab" data-filter="rejected">❌ Rejected <span class="c" data-count="rejected">0</span></button>
+            <button type="button" class="bh-tab" data-filter="cancelled">🚫 Cancelled <span class="c" data-count="cancelled">0</span></button>
         </div>
 
         <div class="bh-empty bh-filter-empty" id="bhFilterEmpty">
@@ -362,6 +377,8 @@
                                 <span class="bh-pill pending"><span class="hg">⏳</span> Waiting for approval</span>
                             {% elif booking.status == 'rejected' %}
                                 <span class="bh-pill rejected"><span class="dot"></span> Rejected</span>
+                            {% elif booking.status == 'cancelled' %}
+                                <span class="bh-pill cancelled"><span class="dot"></span> Cancelled</span>
                             {% else %}
                                 <span class="bh-pill approved"><span class="dot"></span> Confirmed</span>
                             {% endif %}
@@ -370,7 +387,7 @@
                         <div class="bh-chips">
                             <span class="bh-chip">🕐 {{ booking.booking_time|time:"h:i A" }}</span>
                             <span class="bh-chip">👥 {{ booking.guests }} guest{{ booking.guests|pluralize }}</span>
-                            {% if booking.table and booking.status != 'rejected' %}
+                            {% if booking.table and booking.status != 'rejected' and booking.status != 'cancelled' %}
                                 <span class="bh-chip">🪑 Table {{ booking.table.number }}</span>
                             {% endif %}
                             {% if booking.occasion and booking.occasion != 'none' %}
@@ -389,6 +406,8 @@
                             <div class="bh-reason">
                                 ❌ Not accepted{% if booking.reject_reason %}: {{ booking.reject_reason }}{% endif %}
                             </div>
+                        {% elif booking.status == 'cancelled' %}
+                            <div class="bh-cancelled-note">🚫 You cancelled this booking.</div>
                         {% endif %}
 
                         <div class="bh-foot">
@@ -398,10 +417,11 @@
                                 <span></span>
                             {% endif %}
 
-                            {% if booking.status == 'rejected' %}
-                                <a href="{% url 'cancel_booking' booking.id %}" class="bh-cancel">🗑️ Remove</a>
-                            {% else %}
-                                <a href="{% url 'cancel_booking' booking.id %}" class="bh-cancel">✕ Cancel Booking</a>
+                            {# Only a pending or approved booking that is not yet opened can be cancelled #}
+                            {% if booking.status == 'pending' or booking.status == 'approved' %}
+                                {% if not booking.released %}
+                                    <a href="{% url 'cancel_booking' booking.id %}" class="bh-cancel">✕ Cancel Booking</a>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>
@@ -434,6 +454,8 @@
                                 <span class="bh-pill pending"><span class="dot"></span> Not approved in time</span>
                             {% elif booking.status == 'rejected' %}
                                 <span class="bh-pill rejected"><span class="dot"></span> Rejected</span>
+                            {% elif booking.status == 'cancelled' %}
+                                <span class="bh-pill cancelled"><span class="dot"></span> Cancelled</span>
                             {% else %}
                                 <span class="bh-pill approved"><span class="dot"></span> Completed</span>
                             {% endif %}
@@ -468,7 +490,7 @@
     var cards = document.querySelectorAll('.bh-card');
 
     // ---- Stats: count cards by status, animate the numbers ----
-    var counts = { total: cards.length, pending: 0, approved: 0, rejected: 0 };
+    var counts = { total: cards.length, pending: 0, approved: 0, rejected: 0, cancelled: 0 };
     cards.forEach(function (c) {
         var s = c.getAttribute('data-status');
         if (counts.hasOwnProperty(s)) counts[s]++;

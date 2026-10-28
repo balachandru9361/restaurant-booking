@@ -13,31 +13,58 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
+# ---------------------------------------------------------------------------
+# Security settings. Real values come from environment variables, so no secret
+# is written in this file (and none is committed to GitHub by mistake).
+#
+#   DJANGO_DEBUG        "1" (default, local work) or "0" (live server)
+#   DJANGO_SECRET_KEY   required when DJANGO_DEBUG=0
+# ---------------------------------------------------------------------------
+DEBUG = os.environ.get('DJANGO_DEBUG', '1') == '1'
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-!dgo8w-yg_zsg7*2pf8014la9cu4r3htzb9mjp5c5@99--^t5!'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+_DEV_SECRET_KEY = 'django-insecure-local-development-key-do-not-use-live'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = _DEV_SECRET_KEY
+    else:
+        raise ImproperlyConfigured('Set the DJANGO_SECRET_KEY environment variable when DJANGO_DEBUG=0.')
 
 ALLOWED_HOSTS = ['balachandru.pythonanywhere.com', '127.0.0.1', 'localhost', '192.168.1.5']
+
+# Needed for POST forms (login, payment ...) on the live HTTPS site
+CSRF_TRUSTED_ORIGINS = ['https://balachandru.pythonanywhere.com']
+
+if not DEBUG:
+    # Live server only: cookies travel over HTTPS only
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # PythonAnywhere terminates HTTPS at its proxy and tells Django through this header
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Razorpay (online payment). Test keys start with rzp_test_, live keys with rzp_live_.
+# Leave them empty to switch online payment off (Cash still works).
+RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', '')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', '')
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',  # must stay first so runserver serves ASGI / WebSockets
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',
     'accounts',
     'menu',
     'booking',
@@ -69,6 +96,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'orders.context_processors.cart_summary',
             ],
             'builtins': ['orders.templatetags.inr_filters'],
         },
@@ -76,6 +104,18 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'restaurant_project.wsgi.application'
+
+# ASGI entry point (used by Daphne for WebSockets)
+ASGI_APPLICATION = 'restaurant_project.asgi.application'
+
+# Channel layer for real-time updates.
+# InMemory works for local development with a single process.
+# For production with several workers, switch to Redis (channels_redis).
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    }
+}
 
 
 # Database
@@ -125,6 +165,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'   # `python manage.py collectstatic` copies files here for the live server
 
 # Media files (user uploaded food images)
 MEDIA_URL = '/media/'
@@ -153,3 +194,9 @@ DEFAULT_FROM_EMAIL = 'Chandru Restaurant <nbalachandru22122002@gmail.com>'
 LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'home'
+
+# Store stock and customer orders.
+# False = placing / preparing an order does NOT reduce grocery stock.
+# Store stock is then changed only by the Store Manager (stock in / out / damage).
+# Set True to bring back automatic deduction from recipes.
+AUTO_DEDUCT_STOCK = False

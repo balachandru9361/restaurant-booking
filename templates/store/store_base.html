@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,9 +54,20 @@
   .radio-row { display:flex; gap:10px; flex-wrap:wrap; }
   .radio-row label { display:flex; align-items:center; gap:6px; padding:9px 14px; border:1.5px solid var(--line); border-radius:12px; cursor:pointer; font-size:.88rem; font-weight:600; color:var(--ink); text-transform:none; letter-spacing:0; margin:0; }
   .radio-row input { width:auto; }
+  .side .live-pill { display:inline-flex; align-items:center; gap:8px; margin:14px 8px 0; padding:6px 12px; border-radius:999px; background:rgba(255,255,255,.08); color:#cbd5e1; font-size:.75rem; font-weight:700; }
+  .side .live-pill .dot { width:8px; height:8px; border-radius:50%; background:#e0a800; }
+  .side .live-pill[data-state="live"] .dot { background:#22c55e; animation:livePulse 1.8s infinite; }
+  .side .live-pill[data-state="poll"] .dot { background:#e0a800; }
+  @keyframes livePulse { 0% { box-shadow:0 0 0 0 rgba(34,197,94,.55); } 70% { box-shadow:0 0 0 7px rgba(34,197,94,0); } 100% { box-shadow:0 0 0 0 rgba(34,197,94,0); } }
   #storeToasts { position:fixed; top:18px; right:18px; z-index:10000; display:flex; flex-direction:column; gap:10px; max-width:340px; }
   .store-toast { background:#0d1b2a; color:#fff; border-left:5px solid #dc2626; border-radius:10px; padding:12px 16px; font-size:14px; font-weight:600; box-shadow:0 10px 28px rgba(0,0,0,.3); }
+  .store-toast.expired, .store-toast.spoiled { border-left-color:#7c3aed; }
+  .store-toast.urgent { border-left-color:#f59e0b; }
+  .store-toast.quality { border-left-color:#0ea5e9; }
   .store-toast small { display:block; font-weight:400; color:#a0a0c0; margin-top:2px; }
+  .side .sound-btn { display:inline-flex; align-items:center; gap:6px; margin:10px 8px 0; padding:6px 12px; border-radius:999px; border:1px solid #d9a441; background:transparent; color:#f5c451; font-size:.75rem; font-weight:700; cursor:pointer; font-family:inherit; }
+  .side .sound-btn:hover { background:rgba(217,164,65,.15); }
+  .side .sound-btn.on { border-color:#22c55e; color:#86efac; cursor:default; }
   @media (max-width: 820px) {
     .layout { flex-direction:column; } .side { width:100%; height:auto; position:static; display:flex; flex-wrap:wrap; gap:4px; padding:12px; }
     .side h2, .side .who, .side .sep { display:none; } .side a, .side button.linklike { width:auto; } .main { padding:16px; } .grid2 { grid-template-columns:1fr; }
@@ -66,13 +78,18 @@
 <div class="layout">
   <nav class="side">
     <h2>🛒 Store Management</h2>
+    {% if request.user.is_superuser %}<a href="{% url 'dashboard:admin_home' %}">⬅️ Back to Admin</a>{% endif %}
     <a href="{% url 'store:dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' and request.resolver_match.namespace == 'store' %}active{% endif %}">📊 Dashboard</a>
     <a href="{% url 'store:stock_in' %}" class="{% if 'stock_in' in request.resolver_match.url_name %}active{% endif %}">📥 Stock In</a>
     <a href="{% url 'store:stock_out' %}" class="{% if 'stock_out' in request.resolver_match.url_name %}active{% endif %}">📤 Stock Out</a>
     <a href="{% url 'store:damage' %}" class="{% if 'damage' in request.resolver_match.url_name %}active{% endif %}">🗑️ Damage / Expired</a>
     <a href="{% url 'store:movements' %}" class="{% if request.resolver_match.url_name == 'movements' %}active{% endif %}">📜 Stock History</a>
     <a href="{% url 'store:item_list' %}" class="{% if request.resolver_match.url_name == 'item_list' or request.resolver_match.url_name == 'item_add' or request.resolver_match.url_name == 'item_edit' or request.resolver_match.url_name == 'stock_update' or request.resolver_match.url_name == 'categories' %}active{% endif %}">🥬 Groceries</a>
+    <a href="{% url 'store:recipes' %}" class="{% if request.resolver_match.url_name == 'recipes' or request.resolver_match.url_name == 'recipe_edit' %}active{% endif %}">📖 Recipes</a>
     <a href="{% url 'store:stock_alert' %}" class="{% if request.resolver_match.url_name == 'stock_alert' %}active{% endif %}">⚠️ Stock Alert <span class="nav-badge" id="oosBadge">0</span></a>
+
+    <div class="live-pill" id="livePill" data-state="poll"><span class="dot"></span><span id="livePillText">Connecting</span></div>
+    <div class="sound-btn" id="soundHint" style="display:none">🔇 Click anywhere once for voice alerts</div>
 
     <div class="who">Logged in as {{ request.user.username }}</div>
     <form method="post" action="{% url 'store:logout' %}">{% csrf_token %}<button class="linklike" type="submit">🚪 Logout</button></form>
@@ -86,16 +103,45 @@
 
 <div id="storeToasts"></div>
 
+<script src="{% static 'js/speak.js' %}"></script>
 <script>
-  // Kitchen -> Store live alerts: pending count badge + toast when kitchen reports an out-of-stock item
+  // Kitchen -> Store live alerts: pending count badge + toast + voice when kitchen reports an item
+  // (out of stock / finished / expired / spoiled / urgent / quality issue)
   (function () {
     var KEY = 'storeLastOutId';
     var badge = document.getElementById('oosBadge');
     var box = document.getElementById('storeToasts');
+    var hint = document.getElementById('soundHint');
 
-    function toast(title, text) {
+    // CHANGED: every option the chef clicks has its own toast title and its own voice line
+    var REASON_TITLE = {
+      out_of_stock: '🚫 Kitchen out-of-stock report',
+      finished:     '🚫 Kitchen: item finished',
+      expired:      '⏰ Kitchen: item EXPIRED',
+      spoiled:      '🤢 Kitchen: item SPOILED',
+      urgent:       '🔥 URGENT request from kitchen',
+      quality:      '⚠️ Kitchen: quality issue'
+    };
+    var REASON_VOICE = {
+      out_of_stock: function (n) { return n + ' is out of stock'; },
+      finished:     function (n) { return n + ' is finished'; },
+      expired:      function (n) { return n + ' is expired'; },
+      spoiled:      function (n) { return n + ' is spoiled'; },
+      urgent:       function (n) { return 'Urgent. ' + n + ' is needed urgently'; },
+      quality:      function (n) { return n + ' has a quality issue'; }
+    };
+    var GENERIC_VOICE = {
+      out_of_stock: 'Kitchen reported an out of stock item',
+      finished:     'Kitchen reported a finished item',
+      expired:      'Kitchen reported an expired item',
+      spoiled:      'Kitchen reported a spoiled item',
+      urgent:       'Urgent request from the kitchen',
+      quality:      'Kitchen reported a quality issue'
+    };
+
+    function toast(title, text, reason) {
       var el = document.createElement('div');
-      el.className = 'store-toast';
+      el.className = 'store-toast' + (reason ? ' ' + reason : '');
       el.appendChild(document.createTextNode(title));
       var s = document.createElement('small');
       s.textContent = text;
@@ -106,6 +152,73 @@
 
     function store(key, val) { try { localStorage.setItem(key, val); } catch (e) {} }
     function load(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+
+    // ---- voice: automatic, no Enable Sound button ----
+    // Browsers only allow speech after the page has had ONE click / key press / tap.
+    // So: we listen silently for the first interaction, and until then any alert is
+    // kept in a queue (and spoken the moment the first click happens).
+    var pending = [];
+    var unlocked = false;
+
+    function hasActivation() {
+      try {
+        if (navigator.userActivation) return navigator.userActivation.hasBeenActive;
+      } catch (e) {}
+      return unlocked;   // old browsers: trust our own flag
+    }
+    function showHint(on) { if (hint) hint.style.display = on ? 'inline-flex' : 'none'; }
+
+    function reallySpeak(text) {
+      try {
+        if (!window.speechSynthesis) return;
+        var u = new SpeechSynthesisUtterance(text);
+        u.onerror = function (ev) {
+          // browser blocked it -> keep it and say it after the next click
+          if (ev && ev.error === 'not-allowed') { pending.push(text); showHint(true); }
+        };
+        window.speechSynthesis.speak(u);
+      } catch (e) {}
+    }
+
+    function say(text) {
+      if (!hasActivation()) { pending.push(text); showHint(true); return; }
+      reallySpeak(text);
+    }
+
+    function unlock() {
+      if (unlocked) return;
+      unlocked = true;
+      showHint(false);
+      try { sessionStorage.setItem('soundOn', '1'); } catch (e) {}
+      // wake the voice engine, then say anything that arrived before the first click
+      try {
+        var u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0;
+        window.speechSynthesis.speak(u);
+      } catch (e) {}
+      var list = pending.slice(-3);   // only the latest few, not a long backlog
+      pending = [];
+      list.forEach(reallySpeak);
+    }
+    ['pointerdown', 'click', 'keydown', 'touchstart'].forEach(function (evt) {
+      document.addEventListener(evt, unlock, { once: false, passive: true });
+    });
+
+    // Same product + same reason ku 30 sec gap
+    var lastSpoken = {};
+    // message looks like: "🚫 Kitchen → Store: Tomato is expired (0 kg left). Please restock."
+    var NAME_RE = /Store:\s*(.+?)\s+(?:is out of stock|is finished|is expired|is spoiled|is needed URGENTLY|has a quality issue)/i;
+
+    function announceReport(message, reason) {
+      if (!REASON_VOICE[reason]) reason = 'out_of_stock';
+      var m = NAME_RE.exec(message || '');
+      var name = m ? m[1] : null;
+      var key = (name || 'generic') + '|' + reason;
+      var now = Date.now();
+      if (lastSpoken[key] && now - lastSpoken[key] < 30000) return;
+      lastSpoken[key] = now;
+      say(name ? REASON_VOICE[reason](name) : GENERIC_VOICE[reason]);
+    }
 
     function poll() {
       fetch("{% url 'dashboard:kitchen_notifications_poll' %}", { credentials: 'same-origin' })
@@ -119,13 +232,150 @@
           if (stored === null) { store(KEY, d.stock_out_id); return; }
           if (d.stock_out_id > parseInt(stored, 10)) {
             store(KEY, d.stock_out_id);
-            toast('🚫 Kitchen out-of-stock report', d.stock_out_message);
+            var reason = d.stock_out_reason || 'out_of_stock';   // NEW: sent by kitchen_notifications_poll
+            toast(REASON_TITLE[reason] || REASON_TITLE.out_of_stock, d.stock_out_message, reason);
+            announceReport(d.stock_out_message, reason);
           }
         })
         .catch(function () {});
     }
     poll();
     setInterval(poll, 8000);
+  })();
+</script>
+
+{# Shared live-update client for admin and store pages. Include once per base template. #}
+<script>
+  (function () {
+    // Kitchen and Server pages already have their own live logic, so they are skipped here.
+    var SKIP = {% if request.resolver_match.url_name == 'kitchen_dashboard' or request.resolver_match.url_name == 'server_dashboard' %}true{% else %}false{% endif %};
+
+    var pill = document.getElementById('livePill');
+    var pillText = document.getElementById('livePillText');
+    function setState(state, text) {
+      if (!pill) return;
+      pill.setAttribute('data-state', state);
+      if (pillText) pillText.textContent = text;
+    }
+
+    // ---- restore scroll position after a soft reload ----
+    try {
+      var saved = JSON.parse(sessionStorage.getItem('liveScroll') || 'null');
+      if (saved && saved.url === location.pathname + location.search) {
+        sessionStorage.removeItem('liveScroll');
+        window.addEventListener('load', function () { window.scrollTo(0, saved.y); });
+      }
+    } catch (e) { /* storage not available */ }
+
+    // ---- never refresh while someone is filling a POST form ----
+    var dirty = false;
+    document.addEventListener('input', function (e) {
+      var f = e.target && e.target.closest ? e.target.closest('form') : null;
+      if (f && (f.method || '').toLowerCase() === 'post') dirty = true;
+    });
+
+    function isBusy() {
+      if (dirty) return true;
+      if (typeof window.liveBusy === 'function' && window.liveBusy()) return true;
+      var a = document.activeElement;
+      if (a && (a.tagName === 'TEXTAREA' || a.tagName === 'SELECT' || a.isContentEditable)) return true;
+      if (a && a.tagName === 'INPUT' && a.type !== 'checkbox' && a.type !== 'radio' && a.type !== 'button' && a.type !== 'submit') return true;
+      if (document.querySelector('.modal.show, .modal.open, .modal.active, dialog[open], [aria-modal="true"]:not([hidden])')) return true;
+      return false;
+    }
+
+    var timer = null;
+    function tryRefresh() {
+      if (SKIP) return;
+      if (document.hidden || isBusy()) {
+        clearTimeout(timer);
+        timer = setTimeout(tryRefresh, 3000);
+        return;
+      }
+      // Pages with a #liveRegion block swap only that block.
+      if (document.getElementById('liveRegion') && typeof window.refreshLive === 'function') {
+        window.refreshLive();
+        return;
+      }
+      // Pages can provide their own refresh function.
+      if (typeof window.onLiveUpdate === 'function') {
+        window.onLiveUpdate();
+        return;
+      }
+      // Default: reload the same page with a GET request (never re-submits a form).
+      try {
+        sessionStorage.setItem('liveScroll', JSON.stringify({
+          url: location.pathname + location.search,
+          y: window.scrollY
+        }));
+      } catch (e) { /* ignore */ }
+      location.assign(location.pathname + location.search);
+    }
+
+    function requestRefresh(delay) {
+      clearTimeout(timer);
+      timer = setTimeout(tryRefresh, delay || 900);
+    }
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) requestRefresh(400);
+    });
+
+    // ---- fallback when WebSockets are not available (for example on PythonAnywhere) ----
+    var fallbackTimer = null;
+    function startFallback() {
+      if (fallbackTimer || SKIP) return;
+      fallbackTimer = setInterval(function () { requestRefresh(100); }, 20000);
+    }
+    function stopFallback() {
+      if (fallbackTimer) { clearInterval(fallbackTimer); fallbackTimer = null; }
+    }
+
+    // ---- WebSocket ----
+    var ws = null;
+    var tries = 0;
+
+    function connect() {
+      var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      try {
+        ws = new WebSocket(proto + location.host + '/ws/orders/');
+      } catch (e) {
+        setState('poll', 'Auto refresh');
+        startFallback();
+        return;
+      }
+
+      ws.onopen = function () {
+        tries = 0;
+        setState('live', 'Live');
+        stopFallback();
+      };
+
+      ws.onmessage = function (ev) {
+        var data = null;
+        try { data = JSON.parse(ev.data); } catch (e) { return; }
+        if (data && data.type === 'orders_changed') requestRefresh(900);
+      };
+
+      ws.onclose = function (ev) {
+        setState('poll', 'Auto refresh');
+        startFallback();
+        if (ev && ev.code === 4403) return;   // not allowed on the socket, do not retry
+        tries += 1;
+        setTimeout(connect, Math.min(30000, 2000 * tries));
+      };
+
+      ws.onerror = function () {
+        try { ws.close(); } catch (e) { /* ignore */ }
+      };
+    }
+
+    if (!SKIP) {
+      setState('poll', 'Connecting');
+      connect();
+    } else {
+      setState('live', 'Live');
+    }
   })();
 </script>
 </body>

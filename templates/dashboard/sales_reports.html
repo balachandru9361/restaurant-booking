@@ -49,22 +49,14 @@
   .filter-chip.active { background: #1a1a2e; color: #fff; }
   .filter-chip:hover:not(.active) { border-color: #ddd; }
 
-  .chart-card {
-    background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); margin-bottom: 26px;
-  }
-  .chart-card h3 { font-size: 15px; color: #1a1a2e; margin-bottom: 18px; }
-  .bar-chart { display: flex; align-items: flex-end; gap: 10px; height: 180px; padding: 0 4px; }
-  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
-  .bar {
-    width: 100%; max-width: 34px; border-radius: 6px 6px 0 0;
-    background: linear-gradient(180deg, #ff9472, #F63A3A);
-    transition: height 0.4s ease; position: relative;
-  }
-  .bar:hover::after {
-    content: attr(data-value); position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
-    background: #1a1a2e; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 5px; white-space: nowrap;
-  }
-  .bar-label { font-size: 11px; color: #999; margin-top: 8px; }
+  /* ===== CHARTS ===== */
+  .sc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 18px; margin-bottom: 26px; }
+  .sc-card { background: #fff; border-radius: 16px; padding: 18px 18px 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
+  .sc-card h3 { font-size: 15px; margin: 0 0 2px; color: #1a1a2e; }
+  .sc-card p { font-size: 12px; color: #8b8fa3; margin: 0 0 12px; }
+  .sc-box { position: relative; height: 260px; }
+  .sc-empty { display: none; text-align: center; color: #aaa; padding: 90px 0; font-size: 13px; }
+  @media (max-width: 480px) { .sc-grid { grid-template-columns: 1fr; } }
 
   .reports-table-wrap { background: #fff; border-radius: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); overflow: hidden; }
   table.reports-table { width: 100%; border-collapse: collapse; }
@@ -100,7 +92,7 @@
     <h2>📊 Sales Reports</h2>
     <p>Revenue overview and order performance</p>
   </div>
-  <a class="btn-export" href="?range={{ range }}&export=csv">⬇ Export CSV ({{ range_label }})</a>
+  <a class="btn-export" href="?range={{ range }}&amp;export=csv">⬇ Export CSV ({{ range_label }})</a>
 </div>
 
 <div class="toolbar">
@@ -145,9 +137,34 @@
   </div>
 </div>
 
-<div class="chart-card">
-  <h3>Revenue by Order (latest 10 — {{ range_label }})</h3>
-  <div class="bar-chart" id="barChart"></div>
+<!-- ===== CHARTS: daily, monthly, best foods, least foods ===== -->
+<div class="sc-grid">
+  <div class="sc-card">
+    <h3>📈 Daily sales</h3>
+    <p>Last 30 days</p>
+    <div class="sc-box"><canvas id="chDaily"></canvas></div>
+  </div>
+  <div class="sc-card">
+    <h3>📊 Monthly sales</h3>
+    <p>Last 12 months</p>
+    <div class="sc-box"><canvas id="chMonthly"></canvas></div>
+  </div>
+  <div class="sc-card">
+    <h3>🏆 Best selling foods</h3>
+    <p>Top 5 by quantity ({{ range_label }})</p>
+    <div class="sc-box">
+      <canvas id="chTop"></canvas>
+      <div class="sc-empty" id="emTop">No sales in this range.</div>
+    </div>
+  </div>
+  <div class="sc-card">
+    <h3>📉 Least selling foods</h3>
+    <p>Bottom 5 by quantity ({{ range_label }})</p>
+    <div class="sc-box">
+      <canvas id="chLeast"></canvas>
+      <div class="sc-empty" id="emLeast">No sales in this range.</div>
+    </div>
+  </div>
 </div>
 
 <div class="reports-table-wrap">
@@ -193,32 +210,86 @@
     </tbody>
   </table>
 </div>
-{% if total_orders > 50 %}
-  <p class="table-note">Showing the latest 50 orders. Use Export CSV to get all {{ total_orders }} orders.</p>
+
+{% if page_obj.paginator.count %}
+  <p class="table-note">Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} orders. Use Export CSV to download all of them.</p>
 {% endif %}
 
+{% include 'includes/_pagination.html' %}
+
+{{ chart_data|json_script:"salesChartData" }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-  // Chart: latest 10 orders from the table (all totals come from the server)
   (function () {
-    const rows = Array.from(document.querySelectorAll('#reportsTableBody tr[data-amount]'));
-    const chart = document.getElementById('barChart');
-    const recent = rows.slice(0, 10).reverse();
-    if (recent.length === 0) {
-      chart.innerHTML = '<p style="color:#bbb; font-size:13px; margin:auto;">No data to chart yet.</p>';
-      return;
+    var D = JSON.parse(document.getElementById('salesChartData').textContent);
+    var rupee = function (v) { return '₹' + Number(v).toLocaleString('en-IN'); };
+
+    // Daily (line) and Monthly (bar) sales
+    function money(id, data, type) {
+      new Chart(document.getElementById(id), {
+        type: type,
+        data: {
+          labels: data.labels,
+          datasets: [{
+            label: 'Sales',
+            data: data.sales,
+            borderColor: '#F63A3A',
+            backgroundColor: type === 'line' ? 'rgba(246,58,58,.12)' : '#F63A3A',
+            fill: type === 'line',
+            tension: 0.3,
+            borderRadius: 6,
+            pointRadius: type === 'line' ? 2 : 0
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function (c) {
+                  return rupee(c.parsed.y) + '  (' + data.orders[c.dataIndex] + ' orders)';
+                }
+              }
+            }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } },
+            y: { beginAtZero: true, ticks: { callback: rupee } }
+          }
+        }
+      });
     }
-    const max = Math.max(...recent.map(r => parseFloat(r.dataset.amount || 0)), 1);
-    recent.forEach(r => {
-      const amt = parseFloat(r.dataset.amount || 0);
-      const heightPct = Math.max((amt / max) * 100, 4);
-      const col = document.createElement('div');
-      col.className = 'bar-col';
-      col.innerHTML = `
-        <div class="bar" style="height:${heightPct}%" data-value="₹${amt}"></div>
-        <div class="bar-label">${r.children[0].innerText}</div>
-      `;
-      chart.appendChild(col);
-    });
+
+    // Best / Least selling foods (horizontal bars)
+    function foods(id, emptyId, data, color) {
+      if (!data.labels.length) {
+        document.getElementById(id).style.display = 'none';
+        document.getElementById(emptyId).style.display = 'block';
+        return;
+      }
+      new Chart(document.getElementById(id), {
+        type: 'bar',
+        data: {
+          labels: data.labels,
+          datasets: [{ label: 'Qty sold', data: data.qty, backgroundColor: color, borderRadius: 6 }]
+        },
+        options: {
+          indexAxis: 'y',
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, ticks: { precision: 0 } },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    money('chDaily', D.daily, 'line');
+    money('chMonthly', D.monthly, 'bar');
+    foods('chTop', 'emTop', D.top_foods, '#1e9e55');
+    foods('chLeast', 'emLeast', D.least_foods, '#f39c12');
   })();
 </script>
 {% endblock %}

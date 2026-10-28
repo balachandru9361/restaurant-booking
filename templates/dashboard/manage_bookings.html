@@ -41,6 +41,7 @@
   .mini-stat.s-pending  { border-left-color: #f59e0b; }
   .mini-stat.s-approved { border-left-color: #22c55e; }
   .mini-stat.s-rejected { border-left-color: #ef4444; }
+  .mini-stat.s-cancelled { border-left-color: #94a3b8; }
   .mini-stat.s-pending.has-pending { animation: pendingGlow 1.8s ease-in-out infinite; }
   @keyframes pendingGlow {
     0%,100% { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
@@ -84,9 +85,10 @@
     opacity: 0.5;
   }
 
-  /* filter tabs */
-  .filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  /* filter tabs (links: the filtering is done by the server) */
+  .filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
   .filter-tab {
+    display: inline-block; text-decoration: none;
     border: 1.5px solid #e6e6ee; background: #fff; color: #555; font-weight: 700; font-size: 13px;
     padding: 8px 16px; border-radius: 22px; cursor: pointer; transition: all 0.2s ease;
   }
@@ -94,6 +96,7 @@
   .filter-tab.active { background: #1a1a2e; border-color: #1a1a2e; color: #fff; }
   .filter-tab .c { margin-left: 6px; background: rgba(0,0,0,0.08); padding: 1px 8px; border-radius: 10px; font-size: 11.5px; }
   .filter-tab.active .c { background: rgba(255,255,255,0.22); }
+  .filter-tabs.status-row { margin-bottom: 20px; }
 
   .bookings-list {
     display: flex;
@@ -107,6 +110,7 @@
     padding: 18px 20px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.06);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 18px;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -115,6 +119,10 @@
   }
   .booking-card.is-pending  { border-left-color: #f59e0b; background: #fffdf5; }
   .booking-card.is-rejected { border-left-color: #ef4444; opacity: 0.85; }
+  /* Cancelled by the customer: kept as a record, shown greyed out */
+  .booking-card.is-cancelled { border-left-color: #94a3b8; background: #f8fafc; opacity: 0.8; }
+  /* The table has been held for 2 hours or more, so the admin should check it */
+  .booking-card.is-late { border-left-color: #ef4444; background: #fffafa; }
   .booking-card:hover {
     transform: translateX(4px);
     box-shadow: 0 8px 22px rgba(0,0,0,0.1);
@@ -135,7 +143,7 @@
     flex-shrink: 0;
   }
 
-  .booking-main { flex: 1; min-width: 0; }
+  .booking-main { flex: 1; min-width: 200px; }
   .booking-main .name-row {
     display: flex;
     align-items: center;
@@ -200,30 +208,85 @@
   }
   .hold-badge.active   { background: #ffe5e5; color: #d63031; }
   .hold-badge.upcoming { background: #eaf4ff; color: #3498db; }
-  .hold-badge.completed{ background: #f0f0f3; color: #888; }
+  .hold-badge.overdue  { background: #fff1e0; color: #c2570c; }
+  .hold-badge.notable  { background: #f0f0f3; color: #666; }
   .hold-badge.opened   { background: #e3f9ec; color: #1e8e4e; }
   .hold-badge.pending  { background: #fef3c7; color: #92400e; animation: blink 1.6s ease-in-out infinite; }
   .hold-badge.rejected { background: #fee2e2; color: #b91c1c; }
+  .hold-badge.cancelled { background: #e5e7eb; color: #4b5563; }
   @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
   .table-pill { background: #eef2ff; color: #4f46e5; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+
+  /* How long the table has been held since the booked time (filled by the script below) */
+  .held-elapsed {
+    display: inline-block; margin-top: 8px;
+    font-size: 12.5px; font-weight: 700; color: #4f46e5; background: #eef2ff;
+    border-radius: 20px; padding: 3px 12px;
+  }
+  .held-elapsed[hidden] { display: none; }
+  .booking-card.is-late .held-elapsed { color: #b91c1c; background: #fee2e2; animation: blink 1.6s ease-in-out infinite; }
+
   .open-form { margin: 0; }
+  /* Bigger button so it is easy to click */
   .open-btn {
-    border: none; cursor: pointer; font-size: 12px; font-weight: 800; padding: 8px 14px;
-    border-radius: 8px; color: #fff; background: linear-gradient(135deg, #2ecc71, #27ae60);
+    border: none; cursor: pointer; font-size: 14px; font-weight: 800; padding: 12px 22px;
+    border-radius: 10px; color: #fff; background: linear-gradient(135deg, #2ecc71, #27ae60);
     box-shadow: 0 4px 12px rgba(46,204,113,0.3); white-space: nowrap;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .open-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(46,204,113,0.4); }
+  .booking-card.is-late .open-btn { animation: openPulse 1.6s ease-in-out infinite; }
+  @keyframes openPulse {
+    0%,100% { box-shadow: 0 4px 12px rgba(46,204,113,0.3); }
+    50% { box-shadow: 0 4px 12px rgba(46,204,113,0.3), 0 0 0 4px rgba(46,204,113,0.35); }
   }
 
   /* approve / reject */
   .decide-box { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
-  .btn-approve, .btn-reject {
+  .btn-approve, .btn-reject, .btn-cancel {
     border: none; cursor: pointer; font-size: 12.5px; font-weight: 800; padding: 9px 16px;
     border-radius: 8px; white-space: nowrap; transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   .btn-approve { color: #fff; background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 4px 12px rgba(34,197,94,0.35); }
   .btn-reject  { color: #b91c1c; background: #fee2e2; }
+  .btn-cancel  { color: #555; background: #eee; }
   .btn-approve:hover, .btn-reject:hover { transform: translateY(-2px); }
   .btn-reject:hover { background: #b91c1c; color: #fff; }
-  .btn-approve:disabled, .btn-reject:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .btn-approve:disabled, .btn-reject:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* table picker (opens under the card when Approve is clicked) */
+  .approve-panel {
+    flex-basis: 100%;
+    border-top: 1px dashed #e4d9a8;
+    padding-top: 14px;
+    margin: 0;
+  }
+  .approve-panel[hidden] { display: none; }
+  .panel-title { font-size: 13.5px; font-weight: 800; color: #1a1a2e; margin-bottom: 4px; }
+  .panel-sub { font-size: 12.5px; color: #888; margin-bottom: 12px; }
+  .table-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .tbl-chip {
+    position: relative; display: flex; flex-direction: column; gap: 2px;
+    border: 1.5px solid #e6e6ee; background: #fff; border-radius: 10px;
+    padding: 8px 14px 8px 36px; cursor: pointer; min-width: 120px;
+    font-size: 13px; font-weight: 700; color: #1a1a2e; transition: all 0.15s ease;
+  }
+  .tbl-chip input { position: absolute; left: 12px; top: 11px; width: 16px; height: 16px; accent-color: #16a34a; cursor: pointer; }
+  .tbl-chip small { font-weight: 600; color: #888; font-size: 11.5px; }
+  .tbl-chip em { font-style: normal; font-size: 11px; font-weight: 700; color: #c2570c; max-width: 170px; }
+  .tbl-chip:hover { border-color: #22c55e; }
+  .tbl-chip.checked { border-color: #16a34a; background: #f0fdf4; }
+  .tbl-chip.is-held { border-color: #fdba74; background: #fff7ed; }
+  .tbl-chip.is-held.checked { border-color: #ea580c; background: #ffedd5; }
+  .seat-summary { font-size: 13px; font-weight: 700; color: #16a34a; margin-bottom: 10px; }
+  .seat-summary.short { color: #b91c1c; }
+  .force-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 8px 12px;
+    font-size: 12.5px; font-weight: 700; color: #9a3412;
+  }
+  .force-row[hidden] { display: none; }
+  .panel-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
   .empty-state {
     text-align: center;
@@ -235,75 +298,137 @@
   }
   .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
   .empty-state p { font-size: 14.5px; }
-  #filterEmpty { display: none; margin-top: 14px; }
 
-  /* toast */
-  #bkToast {
-    position: fixed; top: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;
+  /* pagination */
+  .pager { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 22px; flex-wrap: wrap; }
+  .pager a, .pager span.cur {
+    padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none;
+    border: 1.5px solid #e6e6ee; background: #fff; color: #555;
   }
-  .bk-toast {
-    background: #1a1a2e; color: #fff; padding: 14px 18px; border-radius: 12px; font-size: 13.5px; font-weight: 600;
-    border-left: 4px solid #22c55e; box-shadow: 0 10px 28px rgba(0,0,0,0.3); max-width: 340px;
-    animation: bkIn 0.3s ease;
+  .pager a:hover { border-color: #9b59b6; color: #9b59b6; }
+  .pager span.cur { background: #1a1a2e; border-color: #1a1a2e; color: #fff; }
+
+  /* ---- Reject reason popup (quick-select reasons) ---- */
+  .rj-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(15, 15, 30, 0.6);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
   }
-  .bk-toast.err { border-left-color: #ef4444; }
-  @keyframes bkIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+  .rj-overlay[hidden] { display: none; }
+  .rj-modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 560px;
+    max-height: 90vh; overflow-y: auto;
+    padding: 22px 22px 18px; box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    animation: rjPop 0.2s ease;
+  }
+  @keyframes rjPop {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .rj-title { font-size: 18px; font-weight: 800; color: #1a1a2e; margin-bottom: 4px; }
+  .rj-sub { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .rj-sub b { color: #1a1a2e; }
+  .rj-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .rj-chip {
+    border: 1.5px solid #e6e6ee; background: #fff; color: #444;
+    font-size: 13px; font-weight: 700; padding: 9px 14px; border-radius: 22px;
+    cursor: pointer; transition: all 0.15s ease; text-align: left;
+  }
+  .rj-chip:hover { border-color: #ef4444; color: #b91c1c; }
+  .rj-chip.selected { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+  .rj-other {
+    width: 100%; min-height: 80px; resize: vertical; margin-bottom: 14px;
+    border: 1.5px solid #e6e6ee; border-radius: 10px; padding: 10px 12px;
+    font-size: 14px; font-family: inherit;
+  }
+  .rj-other:focus { outline: none; border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239,68,68,0.1); }
+  .rj-other[hidden] { display: none; }
+  .rj-note { font-size: 12px; color: #999; margin-bottom: 14px; }
+  .rj-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+  .rj-confirm {
+    border: none; cursor: pointer; font-size: 13.5px; font-weight: 800; padding: 10px 20px;
+    border-radius: 8px; color: #fff; background: #dc2626;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .rj-confirm:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(220,38,38,0.35); }
+  .rj-confirm:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
   @media (max-width: 700px) {
     .booking-card { flex-wrap: wrap; }
     .booking-time-badge, .guests-badge { margin-left: auto; }
     .decide-box { flex-direction: row; width: 100%; }
     .decide-box button { flex: 1; }
+    .open-form { width: 100%; }
+    .open-btn { width: 100%; }
   }
 </style>
-
-<div id="bkToast"></div>
 
 <div class="page-header">
   <div>
     <h2>📅 Table Bookings</h2>
-    <p>Customers book a table, then you approve or reject it here</p>
+    <p>Customers send a booking request. You choose the table(s), then approve or reject it here</p>
   </div>
 </div>
 
 <div class="stats-strip">
   <div class="mini-stat">
     <div class="emoji">📅</div>
-    <div><div class="num">{{ bookings|length }}</div><div class="lbl">Total Bookings</div></div>
+    <div><div class="num">{{ status_counts.all }}</div><div class="lbl">Total Bookings</div></div>
   </div>
-  <div class="mini-stat s-pending" id="statPending">
+  <div class="mini-stat s-pending {% if status_counts.pending %}has-pending{% endif %}">
     <div class="emoji">⏳</div>
-    <div><div class="num" id="numPending">0</div><div class="lbl">Waiting</div></div>
+    <div><div class="num">{{ status_counts.pending }}</div><div class="lbl">Waiting</div></div>
   </div>
   <div class="mini-stat s-approved">
     <div class="emoji">✅</div>
-    <div><div class="num" id="numApproved">0</div><div class="lbl">Approved</div></div>
+    <div><div class="num">{{ status_counts.approved }}</div><div class="lbl">Approved</div></div>
   </div>
   <div class="mini-stat s-rejected">
     <div class="emoji">❌</div>
-    <div><div class="num" id="numRejected">0</div><div class="lbl">Rejected</div></div>
+    <div><div class="num">{{ status_counts.rejected }}</div><div class="lbl">Rejected</div></div>
+  </div>
+  <div class="mini-stat s-cancelled">
+    <div class="emoji">🚫</div>
+    <div><div class="num">{{ status_counts.cancelled }}</div><div class="lbl">Cancelled</div></div>
   </div>
 </div>
 
-<div class="toolbar">
+<form method="get" class="toolbar">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
   <div class="search-box">
-    <input type="text" id="bookingSearch" placeholder="Search by name or phone...">
+    <input type="text" name="q" value="{{ q }}" placeholder="Search by name or phone... (press Enter)">
   </div>
+</form>
+
+<!-- Tabs: all / upcoming / past (counts follow the status filter and search) -->
+<div class="filter-tabs">
+  <a class="filter-tab {% if tab == 'all' %}active{% endif %}"
+     href="?tab=all{% if status %}&status={{ status }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}">All <span class="c">{{ counts.all }}</span></a>
+  <a class="filter-tab {% if tab == 'upcoming' %}active{% endif %}"
+     href="?tab=upcoming{% if status %}&status={{ status }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}">📆 Upcoming <span class="c">{{ counts.upcoming }}</span></a>
+  <a class="filter-tab {% if tab == 'past' %}active{% endif %}"
+     href="?tab=past{% if status %}&status={{ status }}{% endif %}{% if q %}&q={{ q|urlencode }}{% endif %}">🕘 Past <span class="c">{{ counts.past }}</span></a>
 </div>
 
-<div class="filter-tabs" id="filterTabs">
-  <button type="button" class="filter-tab active" data-filter="all">All <span class="c" id="cAll">0</span></button>
-  <button type="button" class="filter-tab" data-filter="pending">⏳ Waiting <span class="c" id="cPending">0</span></button>
-  <button type="button" class="filter-tab" data-filter="approved">✅ Approved <span class="c" id="cApproved">0</span></button>
-  <button type="button" class="filter-tab" data-filter="rejected">❌ Rejected <span class="c" id="cRejected">0</span></button>
+<!-- Status chips -->
+<div class="filter-tabs status-row">
+  <a class="filter-tab {% if not status %}active{% endif %}"
+     href="?tab={{ tab }}{% if q %}&q={{ q|urlencode }}{% endif %}">Any status <span class="c">{{ status_counts.all }}</span></a>
+  <a class="filter-tab {% if status == 'pending' %}active{% endif %}"
+     href="?tab={{ tab }}&status=pending{% if q %}&q={{ q|urlencode }}{% endif %}">⏳ Waiting <span class="c">{{ status_counts.pending }}</span></a>
+  <a class="filter-tab {% if status == 'approved' %}active{% endif %}"
+     href="?tab={{ tab }}&status=approved{% if q %}&q={{ q|urlencode }}{% endif %}">✅ Approved <span class="c">{{ status_counts.approved }}</span></a>
+  <a class="filter-tab {% if status == 'rejected' %}active{% endif %}"
+     href="?tab={{ tab }}&status=rejected{% if q %}&q={{ q|urlencode }}{% endif %}">❌ Rejected <span class="c">{{ status_counts.rejected }}</span></a>
+  <a class="filter-tab {% if status == 'cancelled' %}active{% endif %}"
+     href="?tab={{ tab }}&status=cancelled{% if q %}&q={{ q|urlencode }}{% endif %}">🚫 Cancelled <span class="c">{{ status_counts.cancelled }}</span></a>
 </div>
 
 <div class="bookings-list" id="bookingsList">
   {% for booking in bookings %}
-  <div class="booking-card is-{{ booking.status }}"
-       data-name="{{ booking.name|lower }}"
-       data-phone="{{ booking.phone }}"
-       data-status="{{ booking.status }}">
+  <div class="booking-card is-{{ booking.status }}">
     <div class="occasion-icon">
       {% if booking.occasion == 'birthday' %}🎂
       {% elif booking.occasion == 'anniversary' %}💍
@@ -322,28 +447,38 @@
           <span class="occasion-tag">{{ booking.get_occasion_display }}</span>
         {% endif %}
 
-        {% if booking.status == 'pending' %}
+        {% if booking.hold_state == 'pending' %}
           <span class="hold-badge pending">⏳ Waiting for approval</span>
-        {% elif booking.status == 'rejected' %}
+        {% elif booking.hold_state == 'rejected' %}
           <span class="hold-badge rejected">❌ Rejected</span>
+        {% elif booking.hold_state == 'cancelled' %}
+          <span class="hold-badge cancelled">🚫 Cancelled by customer</span>
         {% elif booking.hold_state == 'active' %}
-          <span class="hold-badge active">🔒 Table held until {{ booking.hold_end|time:"g:i A" }}</span>
+          <span class="hold-badge active">🔒 Table held · until you open it</span>
+        {% elif booking.hold_state == 'overdue' %}
+          <span class="hold-badge overdue">⚠️ Still held · time passed</span>
         {% elif booking.hold_state == 'upcoming' %}
           <span class="hold-badge upcoming">✅ Approved · Upcoming</span>
         {% elif booking.hold_state == 'opened' %}
           <span class="hold-badge opened">🔓 Opened by admin</span>
         {% else %}
-          <span class="hold-badge completed">✔ Table open again</span>
+          <span class="hold-badge notable">⚠️ No table chosen</span>
         {% endif %}
       </div>
       <div class="meta">
-        {% if booking.table and booking.status != 'rejected' %}<span class="table-pill">🪑 Table {{ booking.table.number }}</span>{% endif %}
+        {% if booking.ui_tables and booking.status != 'rejected' and booking.status != 'cancelled' %}
+          <span class="table-pill">🪑 {{ booking.ui_table_text }} · {{ booking.ui_seats }} seats</span>
+        {% endif %}
         <span>📞 {{ booking.phone }}</span>
         <span>🗓️ Requested {{ booking.created_at|date:"d M, g:i A" }}</span>
         {% if booking.special_request %}
           <span>📝 Has notes</span>
         {% endif %}
       </div>
+      {# Time since the booked time while the table is still held. Hidden until the booked time arrives. #}
+      {% if booking.status == 'approved' and booking.ui_tables and booking.hold_state == 'active' or booking.status == 'approved' and booking.ui_tables and booking.hold_state == 'overdue' %}
+        <div class="held-elapsed" hidden data-since="{{ booking.booking_date|date:'Y-m-d' }}T{{ booking.booking_time|time:'H:i' }}:00"></div>
+      {% endif %}
       {% if booking.special_request %}
         <div class="note">"{{ booking.special_request|truncatechars:80 }}"</div>
       {% endif %}
@@ -355,19 +490,18 @@
     <div class="guests-badge">👥 {{ booking.guests }}</div>
 
     {% if booking.status == 'pending' %}
-    <div class="decide-box"
-         data-approve-url="{% url 'dashboard:approve_booking' booking.pk %}"
-         data-reject-url="{% url 'dashboard:reject_booking' booking.pk %}">
-      <button type="button" class="btn-approve">✅ Approve</button>
-      <button type="button" class="btn-reject">❌ Reject</button>
+    <div class="decide-box">
+      <button type="button" class="btn-approve btn-open-panel" data-panel="panel-{{ booking.pk }}">✅ Approve</button>
+      <button type="button" class="btn-reject" data-form="reject-{{ booking.pk }}" data-name="{{ booking.name }}">❌ Reject</button>
     </div>
     {% endif %}
 
-    {% if booking.status == 'approved' and booking.hold_state == 'active' and booking.table %}
-    <form method="post" action="{% url 'dashboard:open_table' booking.table.pk %}" class="open-form">
+    {% if booking.status == 'approved' and booking.ui_tables and booking.hold_state == 'active' or booking.status == 'approved' and booking.ui_tables and booking.hold_state == 'overdue' %}
+    {# Opening one table opens the whole booking (all its tables) #}
+    <form method="post" action="{% url 'dashboard:open_table' booking.ui_tables.0.pk %}" class="open-form">
       {% csrf_token %}
       <input type="hidden" name="next" value="manage_bookings">
-      <button type="submit" class="open-btn" onclick="return confirm('Open Table {{ booking.table.number }} now?')">🔓 Open Table</button>
+      <button type="submit" class="open-btn" onclick="return confirm('Open {{ booking.ui_table_text|escapejs }} now?')">🔓 Open Table</button>
     </form>
     {% endif %}
 
@@ -375,116 +509,259 @@
       <div class="date">{{ booking.booking_date|date:"d M" }}</div>
       <div class="time">{{ booking.booking_time|time:"g:i A" }}</div>
     </div>
+
+    {% if booking.status == 'pending' %}
+    <!-- Reject: a plain form, the reason is filled in by the reason popup -->
+    <form id="reject-{{ booking.pk }}" method="post" action="{% url 'dashboard:reject_booking' booking.pk %}" hidden>
+      {% csrf_token %}
+      <input type="hidden" name="reason" value="">
+    </form>
+
+    <!-- Approve: the admin chooses the table(s) here -->
+    <form id="panel-{{ booking.pk }}" class="approve-panel" method="post"
+          action="{% url 'dashboard:approve_booking' booking.pk %}"
+          data-guests="{{ booking.guests }}" hidden>
+      {% csrf_token %}
+      <div class="panel-title">Choose table(s) for {{ booking.name }}</div>
+      {# The rule is only about SEATS (no fixed "6 seats per table" text). #}
+      <div class="panel-sub">
+        {{ booking.guests }} guest{{ booking.guests|pluralize }} · the chosen tables must have at least {{ booking.guests }} seats in total.
+        The ticked tables are a suggestion, you can change them.
+      </div>
+      <div class="table-grid">
+        {% for o in booking.ui_options %}
+        <label class="tbl-chip {% if o.conflict %}is-held{% endif %}" {% if o.conflict %}title="{{ o.conflict }}"{% endif %}>
+          <input type="checkbox" name="tables" value="{{ o.id }}"
+                 data-cap="{{ o.capacity }}" {% if o.conflict %}data-held="1"{% endif %}
+                 {% if o.selected %}checked{% endif %}>
+          <span>🪑 Table {{ o.number }}</span>
+          <small>{{ o.capacity }} seats</small>
+          {% if o.conflict %}<em>⚠️ {{ o.conflict }}</em>{% endif %}
+        </label>
+        {% empty %}
+        <div class="panel-sub">No tables added yet. Add tables first in Manage Tables.</div>
+        {% endfor %}
+      </div>
+      {# seat-note tells how many seats are still missing (filled by the script below) #}
+      <div class="seat-summary">Selected <span class="sel-seats">0</span> seats · guests {{ booking.guests }} <span class="seat-note"></span></div>
+      {# the conflict can be a table still held OR a table reserved for a later booking #}
+      <label class="force-row" hidden>
+        <input type="checkbox" name="force" value="1">
+        A chosen table is still held or reserved for another booking. Approve anyway
+      </label>
+      <div class="panel-actions">
+        <button type="submit" class="btn-approve btn-confirm">✅ Confirm &amp; approve</button>
+        <button type="button" class="btn-cancel btn-close-panel">Cancel</button>
+      </div>
+    </form>
+    {% endif %}
   </div>
   {% empty %}
   <div class="empty-state">
-    <div class="big-emoji">📅</div>
-    <p>No bookings yet. Once customers reserve tables, they'll show up here.</p>
+    <div class="big-emoji">{% if q or status or tab != 'all' %}🔍{% else %}📅{% endif %}</div>
+    {% if q or status or tab != 'all' %}
+      <p>No bookings match this filter.</p>
+    {% else %}
+      <p>No bookings yet. Once customers reserve tables, they'll show up here.</p>
+    {% endif %}
   </div>
   {% endfor %}
 </div>
 
-<div class="empty-state" id="filterEmpty">
-  <div class="big-emoji">🔍</div>
-  <p>No bookings match this filter.</p>
+{% if page_obj.has_other_pages %}
+<div class="pager">
+  {% if page_obj.has_previous %}
+    <a href="?{{ querystring }}page={{ page_obj.previous_page_number }}">← Previous</a>
+  {% endif %}
+  <span class="cur">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+    <a href="?{{ querystring }}page={{ page_obj.next_page_number }}">Next →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Reject reason popup: pick a quick reason, or choose "Other" and type your own -->
+<div class="rj-overlay" id="rejectModal" hidden>
+  <div class="rj-modal" role="dialog" aria-modal="true" aria-labelledby="rjTitle">
+    <div class="rj-title" id="rjTitle">❌ Reject this booking</div>
+    <div class="rj-sub">Booking: <b id="rjName"></b>. Choose a reason, the customer will see it.</div>
+
+    <div class="rj-grid" id="rjGrid">
+      <button type="button" class="rj-chip" data-reason="Table not available">Table not available</button>
+      <button type="button" class="rj-chip" data-reason="Fully booked for that time">Fully booked for that time</button>
+      <button type="button" class="rj-chip" data-reason="Restaurant closed that day">Restaurant closed that day</button>
+      <button type="button" class="rj-chip" data-reason="Private event / reserved">Private event / reserved</button>
+      <button type="button" class="rj-chip" data-reason="Requested time is outside working hours">Outside working hours</button>
+      <button type="button" class="rj-chip" data-reason="Party size too large for our seating">Party size too large</button>
+      <button type="button" class="rj-chip" data-reason="Not enough notice, please book earlier">Not enough notice</button>
+      <button type="button" class="rj-chip" data-reason="Special occasion setup not possible">Special occasion setup not possible</button>
+      <button type="button" class="rj-chip" data-reason="Maintenance / renovation work">Maintenance / renovation work</button>
+      <button type="button" class="rj-chip" data-reason="__other__">✍️ Other (type your own)</button>
+    </div>
+
+    <textarea class="rj-other" id="rjOther" maxlength="200" placeholder="Type your reason here..." hidden></textarea>
+    <div class="rj-note">Reason is optional. You can reject without selecting any reason.</div>
+
+    <div class="rj-actions">
+      <button type="button" class="btn-cancel" id="rjCancel">Cancel</button>
+      <button type="button" class="rj-confirm" id="rjConfirm">❌ Confirm Reject</button>
+    </div>
+  </div>
 </div>
 
 <script>
-  const CSRF_TOKEN = '{{ csrf_token }}';
-  const searchInput = document.getElementById('bookingSearch');
-  const cards = document.querySelectorAll('#bookingsList .booking-card');
-  const tabs = document.querySelectorAll('.filter-tab');
-  const filterEmpty = document.getElementById('filterEmpty');
-  let activeFilter = 'all';
+  // ---- How long a table has been held since the booked time ----
+  // After this many minutes the card turns red and the Open Table button pulses,
+  // so the admin remembers to check the table and open it.
+  var LATE_MINUTES = 120;
 
-  // ---- counts ----
-  (function () {
-    const c = { pending: 0, approved: 0, rejected: 0 };
-    cards.forEach(card => { const s = card.dataset.status; if (c.hasOwnProperty(s)) c[s]++; });
-    document.getElementById('numPending').textContent = c.pending;
-    document.getElementById('numApproved').textContent = c.approved;
-    document.getElementById('numRejected').textContent = c.rejected;
-    document.getElementById('cAll').textContent = cards.length;
-    document.getElementById('cPending').textContent = c.pending;
-    document.getElementById('cApproved').textContent = c.approved;
-    document.getElementById('cRejected').textContent = c.rejected;
-    if (c.pending > 0) document.getElementById('statPending').classList.add('has-pending');
-  })();
-
-  // ---- search + filter together ----
-  function applyFilters() {
-    const q = searchInput ? searchInput.value.toLowerCase() : '';
-    let shown = 0;
-    cards.forEach(card => {
-      const matchText = card.dataset.name.includes(q) || card.dataset.phone.includes(q);
-      const matchStatus = activeFilter === 'all' || card.dataset.status === activeFilter;
-      const show = matchText && matchStatus;
-      card.style.display = show ? '' : 'none';
-      if (show) shown++;
+  function updateHeld() {
+    document.querySelectorAll('.held-elapsed').forEach(function (el) {
+      var start = new Date(el.dataset.since);
+      if (isNaN(start.getTime())) return;
+      var mins = Math.floor((Date.now() - start.getTime()) / 60000);
+      var card = el.closest('.booking-card');
+      if (mins < 0) {            // the booked time has not come yet
+        el.hidden = true;
+        if (card) card.classList.remove('is-late');
+        return;
+      }
+      var h = Math.floor(mins / 60);
+      var m = mins % 60;
+      el.textContent = '⏱️ Table held for ' + (h ? h + 'h ' : '') + m + 'm since booked time';
+      el.hidden = false;
+      if (card) card.classList.toggle('is-late', mins >= LATE_MINUTES);
     });
-    if (filterEmpty) filterEmpty.style.display = (cards.length > 0 && shown === 0) ? 'block' : 'none';
+  }
+  updateHeld();
+  setInterval(updateHeld, 30000);
+
+  // ---- open / close the table picker ----
+  function updatePanel(panel) {
+    const guests = parseInt(panel.dataset.guests, 10) || 0;
+    let seats = 0, held = false;
+    panel.querySelectorAll('input[name="tables"]').forEach(function (cb) {
+      cb.closest('.tbl-chip').classList.toggle('checked', cb.checked);
+      if (cb.checked) {
+        seats += parseInt(cb.dataset.cap, 10) || 0;
+        if (cb.dataset.held) held = true;
+      }
+    });
+    panel.querySelector('.sel-seats').textContent = seats;
+    const summary = panel.querySelector('.seat-summary');
+    const short = seats < guests;
+    summary.classList.toggle('short', short);
+    // say how many seats are missing, or that the seats are enough
+    const note = panel.querySelector('.seat-note');
+    if (note) {
+      note.textContent = short
+        ? '· need ' + (guests - seats) + ' more seat' + ((guests - seats) === 1 ? '' : 's')
+        : '· enough seats';
+    }
+    panel.querySelector('.btn-confirm').disabled = short;
+
+    // the "approve anyway" box only appears when a held / reserved table is ticked
+    const force = panel.querySelector('.force-row');
+    force.hidden = !held;
+    if (!held) force.querySelector('input').checked = false;
   }
 
-  if (searchInput) searchInput.addEventListener('input', applyFilters);
-  tabs.forEach(t => t.addEventListener('click', function () {
-    tabs.forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
-    activeFilter = t.dataset.filter;
-    applyFilters();
-  }));
+  document.querySelectorAll('.approve-panel').forEach(function (panel) {
+    panel.addEventListener('change', function () { updatePanel(panel); });
+    panel.addEventListener('submit', function (e) {
+      const held = panel.querySelector('input[data-held="1"]:checked');
+      const force = panel.querySelector('input[name="force"]');
+      if (held && !force.checked) {
+        e.preventDefault();
+        alert('A chosen table is still held or reserved for another booking. Tick "Approve anyway" or choose another table.');
+        return;
+      }
+      panel.querySelector('.btn-confirm').disabled = true;   // no double click
+    });
+    updatePanel(panel);
+  });
 
-  // ---- toast ----
-  function toast(msg, isError) {
-    const box = document.getElementById('bkToast');
-    const el = document.createElement('div');
-    el.className = 'bk-toast' + (isError ? ' err' : '');
-    el.textContent = msg;
-    box.appendChild(el);
-    setTimeout(() => el.remove(), 5000);
+  // ---- Reject reason popup ----
+  const rjModal   = document.getElementById('rejectModal');
+  const rjName    = document.getElementById('rjName');
+  const rjGrid    = document.getElementById('rjGrid');
+  const rjOther   = document.getElementById('rjOther');
+  const rjConfirm = document.getElementById('rjConfirm');
+  let rjForm = null;          // the hidden reject form of the booking being rejected
+  let rjReason = '';          // the chosen quick reason ('__other__' means type your own)
+
+  function openRejectModal(formId, name) {
+    rjForm = document.getElementById(formId);
+    rjReason = '';
+    rjName.textContent = name || '';
+    rjOther.value = '';
+    rjOther.hidden = true;
+    rjConfirm.disabled = false;
+    rjGrid.querySelectorAll('.rj-chip').forEach(function (c) { c.classList.remove('selected'); });
+    rjModal.hidden = false;
   }
 
-  // ---- approve / reject ----
-  function decide(url, params, btnBox) {
-    const buttons = btnBox.querySelectorAll('button');
-    buttons.forEach(b => b.disabled = true);
-    return fetch(url, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'X-CSRFToken': CSRF_TOKEN, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
-    })
-      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
-      .then(res => {
-        if (!res.ok || !res.data.ok) {
-          buttons.forEach(b => b.disabled = false);
-          toast((res.data && res.data.error) || 'Something went wrong', true);
-          return;
-        }
-        toast(res.data.message || 'Done');
-        setTimeout(() => window.location.reload(), 700);
-      })
-      .catch(() => {
-        buttons.forEach(b => b.disabled = false);
-        toast('Network error. Please try again.', true);
-      });
+  function closeRejectModal() {
+    rjModal.hidden = true;
+    rjForm = null;
   }
+
+  rjGrid.addEventListener('click', function (e) {
+    const chip = e.target.closest('.rj-chip');
+    if (!chip) return;
+    // click the same chip again to un-select it (reason is optional)
+    if (chip.classList.contains('selected')) {
+      chip.classList.remove('selected');
+      rjReason = '';
+      rjOther.hidden = true;
+      return;
+    }
+    rjGrid.querySelectorAll('.rj-chip').forEach(function (c) { c.classList.remove('selected'); });
+    chip.classList.add('selected');
+    rjReason = chip.dataset.reason;
+    rjOther.hidden = (rjReason !== '__other__');
+    if (!rjOther.hidden) rjOther.focus();
+  });
+
+  rjConfirm.addEventListener('click', function () {
+    if (!rjForm) return;
+    let reason = '';
+    if (rjReason === '__other__') {
+      reason = rjOther.value.trim();
+    } else {
+      reason = rjReason;
+    }
+    rjForm.querySelector('input[name="reason"]').value = reason;
+    rjConfirm.disabled = true;     // no double click
+    rjForm.submit();
+  });
+
+  document.getElementById('rjCancel').addEventListener('click', closeRejectModal);
+  // click on the dark background closes the popup
+  rjModal.addEventListener('click', function (e) {
+    if (e.target === rjModal) closeRejectModal();
+  });
+  // Esc key closes the popup
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && !rjModal.hidden) closeRejectModal();
+  });
 
   document.addEventListener('click', function (e) {
-    const approve = e.target.closest('.btn-approve');
+    const open = e.target.closest('.btn-open-panel');
+    if (open) {
+      const panel = document.getElementById(open.dataset.panel);
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) updatePanel(panel);
+      return;
+    }
+    const close = e.target.closest('.btn-close-panel');
+    if (close) {
+      close.closest('.approve-panel').hidden = true;
+      return;
+    }
     const reject = e.target.closest('.btn-reject');
-    if (!approve && !reject) return;
-    const box = e.target.closest('.decide-box');
-    if (!box) return;
-
-    if (approve) {
-      if (!confirm('Approve this booking? The customer will get an email.')) return;
-      decide(box.dataset.approveUrl, new URLSearchParams(), box);
-    } else {
-      const reason = prompt('Reason for rejecting (optional, the customer will see it):');
-      if (reason === null) return;
-      const p = new URLSearchParams();
-      p.set('reason', reason);
-      decide(box.dataset.rejectUrl, p, box);
+    if (reject) {
+      openRejectModal(reject.dataset.form, reject.dataset.name);
     }
   });
 </script>

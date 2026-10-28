@@ -196,7 +196,7 @@
     }
 
     .help-text li::before {
-        content: "•";
+        content: "\2022";
         position: absolute;
         left: 4px;
         color: #ff6b35;
@@ -296,7 +296,7 @@
     <div class="auth-form">
         <div class="auth-icon">🧾</div>
         <h1>Create Account</h1>
-        <p class="auth-subtitle">Sign up to start ordering from My Restaurant</p>
+        <p class="auth-subtitle">Just your name, phone number and a password</p>
 
         <form method="post" id="signupForm">
             {% csrf_token %}
@@ -319,13 +319,15 @@
                 </div>
             {% endfor %}
 
+            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
             <button type="submit" class="btn btn-primary" id="signupBtn">
                 <span class="spinner" id="signupSpinner"></span>
                 <span id="signupBtnText">Sign Up</span>
             </button>
         </form>
 
-        <p>Already have an account? <a href="{% url 'accounts:login' %}">Login</a></p>
+        <p>Already have an account? <a href="{% url 'accounts:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Login</a></p>
     </div>
 </div>
 

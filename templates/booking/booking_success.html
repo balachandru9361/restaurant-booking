@@ -149,8 +149,10 @@
 
 <div class="bs-wrap">
 {% if booking %}
+  {# data-tables holds the table text ("Tables 1, 2, 5"). The live check below reloads the page when it changes. #}
   <div class="bs-root st-{{ booking.status }}" id="bsRoot"
        data-status="{{ booking.status }}"
+       data-tables="{{ booking.table_numbers }}"
        data-date="{{ booking.booking_date|date:'Y-m-d' }}"
        data-time="{{ booking.booking_time|time:'H:i' }}"
        data-id="{{ booking.id }}"
@@ -178,14 +180,15 @@
 
       {% if booking.status == 'approved' %}
         <h1 class="bs-title">Booking Confirmed! &#127881;</h1>
-        <p class="bs-sub">Wonderful news, {{ booking.name }}! Your table is locked in. Sit back, we will have everything ready for you.</p>
+        <p class="bs-sub">Wonderful news, {{ booking.name }}! Your booking is confirmed and your table is ready for you. Sit back, we will have everything ready.</p>
       {% elif booking.status == 'rejected' %}
         <h1 class="bs-title">Booking Not Accepted</h1>
-        <p class="bs-sub">Sorry {{ booking.name }}, we could not accept this request. Please try another time or table.</p>
+        <p class="bs-sub">Sorry {{ booking.name }}, we could not accept this request. Please try another date or time.</p>
         {% if booking.reject_reason %}<div class="bs-reason"><b>Reason:</b> {{ booking.reject_reason }}</div>{% endif %}
       {% else %}
+        {# A pending request holds no table. The admin picks the table(s) when approving. #}
         <h1 class="bs-title">Request Received!</h1>
-        <p class="bs-sub">Thanks {{ booking.name }}! Your table is on hold while our team reviews it. This page turns green by itself the moment it is approved.</p>
+        <p class="bs-sub">Thanks {{ booking.name }}! Our team will check your request and choose your table(s). This page turns green by itself the moment it is approved.</p>
       {% endif %}
 
       <div class="bs-steps">
@@ -204,7 +207,7 @@
 
       {% if booking.status != 'rejected' %}
       <div class="bs-count">
-        <h3>Your table is waiting in</h3>
+        <h3>Your booking time is in</h3>
         <div class="bs-count-row">
           <div class="bs-cbox"><b id="cdDays">0</b><span>Days</span></div>
           <div class="bs-cbox"><b id="cdHours">0</b><span>Hours</span></div>
@@ -232,7 +235,16 @@
               <div class="tk-for">Reserved for <b>{{ booking.name }}</b></div>
               <div class="tk-chips">
                 <span class="tk-chip">&#128101; {{ booking.guests }} guest{{ booking.guests|pluralize }}</span>
-                <span class="tk-chip">&#129681; {{ booking.all_tables|length }} table{{ booking.all_tables|length|pluralize }}</span>
+                {# No table yet while the request is pending. A single table is not shown as a chip, the "Table N" chip below is enough. #}
+                {% if booking.all_tables %}
+                  {% if booking.all_tables|length > 1 %}
+                    <span class="tk-chip">&#129681; {{ booking.all_tables|length }} tables</span>
+                  {% endif %}
+                {% elif booking.status == 'pending' %}
+                  <span class="tk-chip">&#129681; Table assigned on approval</span>
+                {% else %}
+                  <span class="tk-chip">&#129681; No table</span>
+                {% endif %}
                 <span class="tk-chip">&#127881; {{ booking.get_occasion_display }}</span>
               </div>
             </div>
@@ -249,16 +261,20 @@
               <div class="tk-lab">Your table{{ booking.all_tables|length|pluralize }}</div>
               <div class="tk-val">
                 {% if booking.all_tables %}
+                  {# the real seats come from the tables (seats_summary), no hardcoded "6 seats per table". #}
                   {% if booking.all_tables|length > 1 %}
-                    Big group, {{ booking.all_tables|length }} tables <small>&middot; 6 seats per table &middot; held for 2 hours</small>
+                    Big group, {{ booking.all_tables|length }} tables <small>&middot; {{ booking.seats_summary }} &middot; reserved for you from your booked time</small>
                   {% else %}
-                    Held for 2 hours from your booked time
+                    {{ booking.seats_summary }} <small>&middot; reserved for you from your booked time</small>
                   {% endif %}
                   <div class="tk-tables">
-                    {% for t in booking.all_tables %}<span class="tk-tchip" style="animation-delay: {{ forloop.counter0 }}00ms; animation-delay: calc(1.3s + {{ forloop.counter0 }} * .12s)">Table {{ t.number }}</span>{% endfor %}
+                    {# all_tables is sorted by table number: Table 1, Table 2, Table 5 #}
+                    {% for t in booking.all_tables %}<span class="tk-tchip" style="animation-delay: calc(1.3s + {{ forloop.counter0 }} * .12s)">Table {{ t.number }}</span>{% endfor %}
                   </div>
+                {% elif booking.status == 'pending' %}
+                  Will be chosen by our team when your request is approved
                 {% else %}
-                  Not assigned yet
+                  Not assigned
                 {% endif %}
               </div>
             </div>
@@ -424,17 +440,43 @@
       else ctx.clearRect(0, 0, c.width, c.height);
     })(start);
   }
-  if (status === 'approved' && !reduce) { setTimeout(confetti, 500); }
 
-  // ---------- Live status check (while waiting for the admin) ----------
-  if (status === 'pending') {
+  // Confetti shows only ONE time per booking in this browser tab (sessionStorage flag).
+  // Reloads (manual, or the live check below) will not show it again.
+  var confettiKey = 'bsConfetti_' + root.dataset.id;
+  var confettiSeen = false;
+  try { confettiSeen = sessionStorage.getItem(confettiKey) === '1'; } catch (e) {}
+  function playConfettiOnce() {
+    try { sessionStorage.setItem(confettiKey, '1'); } catch (e) {}
+    setTimeout(confetti, 500);
+  }
+  if (status === 'approved' && !reduce && !confettiSeen) {
+    if (document.visibilityState === 'visible') {
+      playConfettiOnce();
+    } else {
+      // the tab is in the background: wait until the customer actually looks at it
+      document.addEventListener('visibilitychange', function onShow() {
+        if (document.visibilityState === 'visible') {
+          document.removeEventListener('visibilitychange', onShow);
+          playConfettiOnce();
+        }
+      });
+    }
+  }
+
+  // ---------- Live check ----------
+  // Runs while the booking is pending (waiting for the admin) AND after it is approved,
+  // so when the admin changes the status or the table(s), this page updates by itself.
+  if (status === 'pending' || status === 'approved') {
     setInterval(function () {
       fetch(window.location.href, { cache: 'no-store', credentials: 'same-origin' })
         .then(function (r) { return r.text(); })
         .then(function (html) {
           var doc = new DOMParser().parseFromString(html, 'text/html');
           var fresh = doc.getElementById('bsRoot');
-          if (fresh && fresh.dataset.status !== 'pending') { window.location.reload(); }
+          if (fresh && (fresh.dataset.status !== status || fresh.dataset.tables !== root.dataset.tables)) {
+            window.location.reload();
+          }
         })
         .catch(function () {});
     }, 8000);
@@ -447,6 +489,7 @@
       function p(n) { return String(n).padStart(2, '0'); }
       return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + 'T' + p(d.getHours()) + p(d.getMinutes()) + '00';
     }
+    // A calendar event needs an end time: 2 hours is only a default for the calendar entry (the table is not timed)
     var end = new Date(when.getTime() + 2 * 3600 * 1000);
     var ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Chandru Restaurant//Booking//EN', 'BEGIN:VEVENT',
       'UID:booking-' + root.dataset.id + '@chandru-restaurant',

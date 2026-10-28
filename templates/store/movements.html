@@ -1,28 +1,285 @@
 {% extends 'store/store_base.html' %}
 {% block title %}Stock History{% endblock %}
 {% block content %}
-<h1>Stock History</h1>
-<form method="get" class="toolbar">
-  <select name="item">
-    <option value="">All items</option>
-    {% for i in items %}<option value="{{ i.pk }}" {% if selected == i.pk|stringformat:"s" %}selected{% endif %}>{{ i.name }}</option>{% endfor %}
-  </select>
-  <button class="btn" type="submit">Filter</button>
-</form>
-<div class="card table-wrap">
-  <table>
-    <tr><th>When</th><th>Item</th><th>Type</th><th>Change</th><th>Stock after</th><th>Note</th><th>By</th></tr>
-    {% for m in movements %}
-    <tr>
-      <td>{{ m.created_at|date:"d M Y, h:i A" }}</td>
-      <td>{{ m.item.name }}</td>
-      <td>{{ m.get_movement_type_display }}</td>
-      <td class="{% if m.change >= 0 %}in{% else %}outq{% endif %}">{% if m.change > 0 %}+{% endif %}{{ m.change|floatformat:"-3" }} {{ m.item.unit }}</td>
-      <td>{{ m.stock_after|floatformat:"-3" }}</td>
-      <td>{{ m.note|default:"—" }}</td>
-      <td>{{ m.created_by.username|default:"—" }}</td>
-    </tr>
-    {% empty %}<tr><td colspan="7" class="muted">No stock activity yet.</td></tr>{% endfor %}
-  </table>
+<style>
+.mv{--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;--bg:#f7f8fb;--in:#16a34a;--in-bg:#e8f7ee;--out:#e8590c;--out-bg:#fff0e6;--dmg:#d97706;--dmg-bg:#fff4db;--exp:#7c3aed;--exp-bg:#f1eafe;--adj:#2563eb;--adj-bg:#e7efff;--brand:#ff6b6b;color:var(--ink)}
+.mv *{box-sizing:border-box}
+.mv-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.mv-head h1{margin:0;font-size:26px;line-height:1.1}
+.mv-head p{margin:4px 0 0;color:var(--mut);font-size:13px}
+.mv-actions{display:flex;gap:8px;flex-wrap:wrap}
+.mv-btn{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:9px 14px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.mv-btn:hover{border-color:#cfd3de}
+.mv-btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.mv-btn:focus-visible,.mv-chip:focus-visible,.mv select:focus-visible,.mv input:focus-visible{outline:2px solid var(--adj);outline-offset:2px}
+
+.mv-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.mv-kpi{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:14px 16px;border-left-width:4px}
+.mv-kpi b{display:block;font-size:26px;line-height:1.1;font-variant-numeric:tabular-nums}
+.mv-kpi span{font-size:12.5px;color:var(--mut)}
+.mv-kpi.k-all{border-left-color:var(--ink)}
+.mv-kpi.k-in{border-left-color:var(--in)}
+.mv-kpi.k-out{border-left-color:var(--out)}
+.mv-kpi.k-loss{border-left-color:var(--dmg)}
+
+.mv-tools{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.mv-search{flex:1 1 220px;position:relative}
+.mv-search input{width:100%;padding:10px 12px 10px 34px;border:1px solid var(--bd);border-radius:10px;font-size:14px;background:var(--bg)}
+.mv-search svg{position:absolute;left:11px;top:50%;translate:0 -50%;width:16px;height:16px;color:var(--mut)}
+.mv-tools select{padding:10px 12px;border:1px solid var(--bd);border-radius:10px;font-size:14px;background:#fff;max-width:100%}
+.mv-chips{display:flex;gap:6px;flex-wrap:wrap;width:100%}
+.mv-chip{border:1px solid var(--bd);background:#fff;color:var(--mut);padding:6px 12px;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer}
+.mv-chip .n{margin-left:6px;font-variant-numeric:tabular-nums;opacity:.8}
+.mv-chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+
+.mv-card{background:#fff;border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+.mv-scroll{overflow-x:auto}
+.mv table{width:100%;border-collapse:collapse;font-size:14px}
+.mv thead th{position:sticky;top:0;background:var(--bg);text-align:left;font-size:12.5px;color:var(--mut);font-weight:600;padding:11px 14px;border-bottom:1px solid var(--bd);white-space:nowrap}
+.mv th.num,.mv td.num{text-align:right}
+.mv td{padding:12px 14px;border-bottom:1px solid var(--bd);vertical-align:middle}
+.mv tbody tr.row:hover td{background:#fbfbfd}
+.mv tr.day td{background:var(--bg);font-size:12.5px;font-weight:700;color:var(--mut);padding:8px 14px}
+.mv td.when b{display:block;font-weight:600}
+.mv td.when small{color:var(--mut)}
+.mv td.item{font-weight:600}
+.mv .who{display:flex;align-items:center;gap:10px}
+.mv .th{width:40px;height:40px;border-radius:10px;overflow:hidden;background:var(--bg);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:var(--mut);flex:none}
+.mv .th img{width:100%;height:100%;object-fit:cover;display:block}
+.mv .th.emo{font-size:22px;background:#fff7ed;border-color:#fde3c8}
+.mv-type{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:700}
+.t-in{background:var(--in-bg);color:var(--in)}
+.t-out{background:var(--out-bg);color:var(--out)}
+.t-damage{background:var(--dmg-bg);color:var(--dmg)}
+.t-expiry{background:var(--exp-bg);color:var(--exp)}
+.t-other{background:var(--adj-bg);color:var(--adj)}
+.mv-chg{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mv-chg.pos{color:var(--in)}
+.mv-chg.neg{color:var(--out)}
+.mv-after{font-variant-numeric:tabular-nums;white-space:nowrap}
+.mv-after small{color:var(--mut)}
+.mv-note{color:var(--mut);max-width:240px}
+.mv-by{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.mv-by i{width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-style:normal;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.mv-empty{padding:34px 16px;text-align:center;color:var(--mut)}
+.mv-empty b{display:block;color:var(--ink);margin-bottom:4px;font-size:15px}
+#mvNone{display:none}
+.mv-foot{padding:10px 14px;color:var(--mut);font-size:12.5px;border-top:1px solid var(--bd);background:var(--bg)}
+
+@media (max-width:900px){.mv-kpis{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:720px){
+  .mv thead{display:none}
+  .mv table,.mv tbody{display:block}
+  .mv tr.row{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:12px 14px;border-bottom:1px solid var(--bd)}
+  .mv tr.row td{display:block;padding:0;border:0}
+  .mv tr.row td.item{grid-column:1;grid-row:1;font-size:15px}
+  .mv tr.row td.chg{grid-column:2;grid-row:1;text-align:right}
+  .mv tr.row td.type{grid-column:1;grid-row:2;margin-top:4px}
+  .mv tr.row td.after{grid-column:2;grid-row:2;text-align:right;margin-top:4px}
+  .mv tr.row td.when{grid-column:1 / -1;grid-row:3;margin-top:6px;font-size:12.5px}
+  .mv tr.row td.when b,.mv tr.row td.when small{display:inline;margin-right:6px}
+  .mv tr.row td.note{grid-column:1 / -1;grid-row:4;margin-top:4px;max-width:none}
+  .mv tr.row td.by{grid-column:1 / -1;grid-row:5;margin-top:6px}
+  .mv tr.day{display:block}
+  .mv tr.day td{display:block}
+}
+@media (prefers-reduced-motion:reduce){.mv *{transition:none!important;animation:none!important}}
+</style>
+
+<div class="mv">
+  <div class="mv-head">
+    <div>
+      <h1>Stock History</h1>
+      <p>Every stock in, stock out, damage and expiry entry. Latest 200 shown.</p>
+    </div>
+    <div class="mv-actions">
+      <button type="button" class="mv-btn" id="mvCsv">Download CSV</button>
+      <a class="mv-btn primary" href="{% url 'store:stock_in_add' %}">+ Stock In</a>
+    </div>
+  </div>
+
+  <div class="mv-kpis">
+    <div class="mv-kpi k-all"><b id="kAll">0</b><span>Entries shown</span></div>
+    <div class="mv-kpi k-in"><b id="kIn">0</b><span>Stock in</span></div>
+    <div class="mv-kpi k-out"><b id="kOut">0</b><span>Stock out</span></div>
+    <div class="mv-kpi k-loss"><b id="kLoss">0</b><span>Damaged or expired</span></div>
+  </div>
+
+  <div class="mv-tools">
+    <div class="mv-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="mvQ" placeholder="Search item, note or person" aria-label="Search stock history" autocomplete="off">
+    </div>
+    <form method="get" id="mvForm">
+      <select name="item" aria-label="Filter by item" onchange="this.form.submit()">
+        <option value="">All items</option>
+        {% for i in items %}<option value="{{ i.pk }}" {% if selected == i.pk|stringformat:"s" %}selected{% endif %}>{{ i.name }}</option>{% endfor %}
+      </select>
+      <noscript><button class="mv-btn" type="submit">Filter</button></noscript>
+    </form>
+    {% if selected %}<a class="mv-btn" href="{% url 'store:movements' %}">Clear item filter</a>{% endif %}
+
+    <div class="mv-chips" id="mvChips" role="group" aria-label="Filter by type">
+      <button type="button" class="mv-chip on" data-f="all">All<span class="n" id="cAll"></span></button>
+      <button type="button" class="mv-chip" data-f="in">Stock in<span class="n" id="cIn"></span></button>
+      <button type="button" class="mv-chip" data-f="out">Stock out<span class="n" id="cOut"></span></button>
+      <button type="button" class="mv-chip" data-f="damage">Damaged<span class="n" id="cDamage"></span></button>
+      <button type="button" class="mv-chip" data-f="expiry">Expired<span class="n" id="cExpiry"></span></button>
+    </div>
+  </div>
+
+  <div class="mv-card">
+    <div class="mv-scroll">
+      <table id="mvTable">
+        <thead>
+          <tr><th>When</th><th>Item</th><th>Type</th><th class="num">Change</th><th class="num">Stock after</th><th>Note</th><th>By</th></tr>
+        </thead>
+        <tbody>
+        {% for m in movements %}
+          {% ifchanged m.created_at|date:"Y-m-d" %}
+          <tr class="day"><td colspan="7">{{ m.created_at|date:"l, d M Y" }}</td></tr>
+          {% endifchanged %}
+          <tr class="row" data-type="{{ m.movement_type|lower }}" data-q="{{ m.item.name|lower }} {{ m.note|lower }} {{ m.created_by.username|lower }}">
+            <td class="when"><b>{{ m.created_at|date:"h:i A" }}</b><small>{{ m.created_at|date:"d M Y" }}</small></td>
+            <td class="item">
+              <div class="who">
+                <span class="th{% if m.item.image %} has-img{% endif %}" data-n="{{ m.item.name|lower }}">{% if m.item.image %}<img src="{{ m.item.image.url }}" alt="{{ m.item.name }}" loading="lazy">{% else %}{{ m.item.name|slice:":1"|upper }}{% endif %}</span>
+                <span>{{ m.item.name }}</span>
+              </div>
+            </td>
+            <td class="type"><span class="mv-type t-{% if m.movement_type|lower == 'in' or m.movement_type|lower == 'out' or m.movement_type|lower == 'damage' or m.movement_type|lower == 'expiry' %}{{ m.movement_type|lower }}{% else %}other{% endif %}">{{ m.get_movement_type_display }}</span></td>
+            <td class="num chg"><span class="mv-chg {% if m.change >= 0 %}pos{% else %}neg{% endif %}">{% if m.change > 0 %}+{% endif %}{{ m.change|floatformat:"-3" }} {{ m.item.unit }}</span></td>
+            <td class="num after"><span class="mv-after">{{ m.stock_after|floatformat:"-3" }} <small>{{ m.item.unit }}</small></span></td>
+            <td class="note mv-note">{{ m.note|default:"—" }}</td>
+            <td class="by">{% if m.created_by %}<span class="mv-by"><i>{{ m.created_by.username|slice:":1"|upper }}</i>{{ m.created_by.username }}</span>{% else %}—{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if not movements %}
+    <div class="mv-empty"><b>No stock activity yet</b>Add your first stock in to start the history.</div>
+    {% endif %}
+    <div class="mv-empty" id="mvNone"><b>Nothing matches</b>Try a different search or choose All.</div>
+    <div class="mv-foot" id="mvFoot"></div>
+  </div>
 </div>
+
+<script>
+(function () {
+  // Picture for items with no uploaded photo, matched on the item name
+  var BY_NAME = [
+    ['banana leaf','🍃'],['curry leaf','🌿'],['coriander','🌿'],['mint','🌿'],['bay leaf','🍃'],
+    ['chicken','🍗'],['mutton','🥩'],['lamb','🥩'],['beef','🥩'],['egg','🥚'],
+    ['prawn','🦐'],['shrimp','🦐'],['crab','🦀'],['squid','🦑'],['anchovy','🐟'],['fish','🐟'],['seer','🐟'],['tuna','🐟'],['sardine','🐟'],
+    ['basmati','🍚'],['rice','🍚'],['atta','🌾'],['maida','🌾'],['flour','🌾'],['rava','🌾'],['semolina','🌾'],
+    ['oil','🛢️'],['ghee','🧈'],['butter','🧈'],['curd','🥛'],['milk','🥛'],['paneer','🧀'],['cheese','🧀'],['cream','🥛'],
+    ['salt','🧂'],['sugar','🍬'],['jaggery','🍯'],['honey','🍯'],
+    ['onion','🧅'],['garlic','🧄'],['ginger','🫚'],['tomato','🍅'],['potato','🥔'],['carrot','🥕'],['brinjal','🍆'],['capsicum','🫑'],['beans','🫘'],['peas','🫛'],['cabbage','🥬'],['cauliflower','🥦'],['mushroom','🍄'],['corn','🌽'],['cucumber','🥒'],
+    ['chilli','🌶️'],['chili','🌶️'],['pepper','🌶️'],['masala','🌶️'],['turmeric','🧡'],['cumin','🌿'],['cardamom','🌿'],['clove','🌿'],['cinnamon','🪵'],['star anise','⭐'],
+    ['apple','🍎'],['banana','🍌'],['lemon','🍋'],['lime','🍋'],['orange','🍊'],['mango','🥭'],['grape','🍇'],['pineapple','🍍'],['watermelon','🍉'],['strawberry','🍓'],['blueberry','🫐'],['coconut','🥥'],
+    ['dal','🫘'],['lentil','🫘'],['chickpea','🫘'],['gram','🫘'],
+    ['tea','🍵'],['coffee','☕'],['juice','🧃'],['soda','🥤'],['water','💧'],['mojito','🍹'],
+    ['bread','🍞'],['bun','🍞'],['noodle','🍜'],['pasta','🍝'],['sauce','🥫'],['vinegar','🍶'],
+    ['lpg','🔥'],['cylinder','🔥'],['container','📦'],['box','📦'],['tissue','🧻'],['glove','🧤'],['cover','🛍️'],['bag','🛍️']
+  ];
+  document.querySelectorAll('.mv .th:not(.has-img)').forEach(function (t) {
+    var n = t.dataset.n || '';
+    for (var k = 0; k < BY_NAME.length; k++) {
+      if (n.indexOf(BY_NAME[k][0]) !== -1) { t.textContent = BY_NAME[k][1]; t.classList.add('emo'); break; }
+    }
+  });
+
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#mvTable tr.row'));
+  var days = Array.prototype.slice.call(document.querySelectorAll('#mvTable tr.day'));
+  var q = document.getElementById('mvQ');
+  var chips = document.querySelectorAll('#mvChips .mv-chip');
+  var none = document.getElementById('mvNone');
+  var foot = document.getElementById('mvFoot');
+  var filter = 'all';
+
+  function count(type) {
+    return rows.filter(function (r) { return r.dataset.type === type; }).length;
+  }
+  document.getElementById('cAll').textContent = rows.length;
+  ['in', 'out', 'damage', 'expiry'].forEach(function (t) {
+    document.getElementById('c' + t.charAt(0).toUpperCase() + t.slice(1)).textContent = count(t);
+  });
+
+  function apply() {
+    var term = q.value.toLowerCase().trim();
+    var shown = 0, nIn = 0, nOut = 0, nLoss = 0;
+
+    rows.forEach(function (r) {
+      var okType = filter === 'all' || r.dataset.type === filter;
+      var okText = !term || r.dataset.q.indexOf(term) !== -1;
+      var show = okType && okText;
+      r.style.display = show ? '' : 'none';
+      if (show) {
+        shown++;
+        if (r.dataset.type === 'in') nIn++;
+        else if (r.dataset.type === 'out') nOut++;
+        else if (r.dataset.type === 'damage' || r.dataset.type === 'expiry') nLoss++;
+      }
+    });
+
+    // hide a day heading when none of its rows are visible
+    days.forEach(function (d) {
+      var el = d.nextElementSibling, any = false;
+      while (el && !el.classList.contains('day')) {
+        if (el.style.display !== 'none') { any = true; break; }
+        el = el.nextElementSibling;
+      }
+      d.style.display = any ? '' : 'none';
+    });
+
+    document.getElementById('kAll').textContent = shown;
+    document.getElementById('kIn').textContent = nIn;
+    document.getElementById('kOut').textContent = nOut;
+    document.getElementById('kLoss').textContent = nLoss;
+    none.style.display = (rows.length && !shown) ? 'block' : 'none';
+    foot.textContent = rows.length ? ('Showing ' + shown + ' of ' + rows.length + ' entries') : '';
+    foot.style.display = rows.length ? '' : 'none';
+  }
+
+  chips.forEach(function (c) {
+    c.addEventListener('click', function () {
+      chips.forEach(function (x) { x.classList.remove('on'); });
+      c.classList.add('on');
+      filter = c.dataset.f;
+      apply();
+    });
+  });
+  q.addEventListener('input', apply);
+
+  document.getElementById('mvCsv').addEventListener('click', function () {
+    var out = [['When', 'Item', 'Type', 'Change', 'Stock after', 'Note', 'By']];
+    rows.forEach(function (r) {
+      if (r.style.display === 'none') return;
+      var t = r.children;
+      out.push([
+        t[0].textContent.replace(/\s+/g, ' ').trim(),
+        (t[1].querySelector('.who > span:last-child') || t[1]).textContent.trim(),
+        t[2].textContent.trim(),
+        t[3].textContent.trim(),
+        t[4].textContent.replace(/\s+/g, ' ').trim(),
+        t[5].textContent.trim(),
+        t[6].textContent.trim()
+      ]);
+    });
+    var csv = out.map(function (row) {
+      return row.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+    }).join('\n');
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'stock-history.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  apply();
+})();
+</script>
 {% endblock %}

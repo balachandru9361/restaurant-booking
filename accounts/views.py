@@ -2,7 +2,19 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.utils.http import url_has_allowed_host_and_scheme
+
+from store.permissions import home_url_for, is_store_staff
 from .forms import SignupForm, LoginForm
+
+
+def _safe_next(request):
+    """Return the ?next= URL if it points to this site, otherwise None."""
+    next_url = request.POST.get('next') or request.GET.get('next', '')
+    if next_url and url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={request.get_host()}):
+        return next_url
+    return None
 
 
 def signup_view(request):
@@ -14,17 +26,22 @@ def signup_view(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            messages.success(request, 'Account created successfully!')
+            messages.success(
+                request, f'Welcome, {user.first_name}! Your account is ready.')
+            # New customer always lands on the home page (View Menu is one tap from there)
             return redirect('home')
     else:
         form = SignupForm()
 
-    return render(request, 'accounts/signup.html', {'form': form})
+    return render(request, 'accounts/signup.html', {
+        'form': form,
+        'next': request.GET.get('next', ''),
+    })
 
 
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect('home')
+        return redirect(home_url_for(request.user))
 
     if request.method == 'POST':
         form = LoginForm(request.POST)
@@ -34,31 +51,30 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
-                messages.success(request, f'Welcome back, {user.username}!')
+                messages.success(
+                    request, f'Welcome back, {user.first_name or user.username}!')
 
-                # Superuser -> full Admin Dashboard
-                if user.is_superuser:
-                    return redirect('dashboard:admin_home')
+                # Every role goes to its OWN dashboard (next param is ignored):
+                #   superuser    -> dashboard:admin_home
+                #   store staff  -> store dashboard
+                #   server role  -> dashboard:server_dashboard
+                #   other staff  -> dashboard:kitchen_dashboard
+                if user.is_superuser or user.is_staff or is_store_staff(user):
+                    return redirect(home_url_for(user))
 
-                # Staff (non-superuser) -> role decides where they land
-                if user.is_staff:
-                    profile = getattr(user, 'profile', None)
-                    role = profile.role if profile else None
-                    if role == 'server':
-                        return redirect('dashboard:server_dashboard')
-                    if role == 'store':
-                        return redirect('dashboard:manage_grocery')   # NEW
-                    return redirect('dashboard:kitchen_dashboard')
-
-                # Normal users -> next param irundha adhukku, illana home
-                next_url = request.GET.get('next', 'home')
-                return redirect(next_url)
+                # Normal customers always land on the home page (the ?next= link is ignored,
+                # so a customer is never thrown straight into the menu or another page)
+                return redirect('home')
             else:
-                messages.error(request, 'Invalid username or password.')
+                messages.error(
+                    request, 'Invalid phone number or password.')
     else:
         form = LoginForm()
 
-    return render(request, 'accounts/login.html', {'form': form})
+    return render(request, 'accounts/login.html', {
+        'form': form,
+        'next': request.GET.get('next', ''),
+    })
 
 
 def logout_view(request):

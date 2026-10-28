@@ -20,3 +20,20 @@ class FoodItemAdmin(admin.ModelAdmin):
     search_fields = ('name', 'description')
     list_editable = ('is_veg', 'is_available')
     inlines = [FoodItemImageInline]    
+
+# ---- Dish options (Choose Your Side, Add-ons, Customise) ----
+from django.contrib import admin
+from .models import OptionGroup, Option
+
+
+class OptionInline(admin.TabularInline):
+    model = Option
+    extra = 2
+
+
+@admin.register(OptionGroup)
+class OptionGroupAdmin(admin.ModelAdmin):
+    list_display = ("title", "food_item", "group_type", "is_required", "order")
+    list_filter = ("group_type", "is_required")
+    search_fields = ("title", "food_item__name")
+    inlines = [OptionInline]

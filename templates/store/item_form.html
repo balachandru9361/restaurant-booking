@@ -1,21 +1,217 @@
 {% extends 'store/store_base.html' %}
 {% block title %}{{ title }}{% endblock %}
 {% block content %}
-<h1>{{ title }}</h1>
-<div class="card" style="max-width:640px">
-  <form method="post">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
-    {% for f in form %}
-      <div class="field">
-        <label for="{{ f.id_for_label }}">{{ f.label }}</label>
-        {{ f }}
-        {% if f.help_text %}<div class="help">{{ f.help_text }}</div>{% endif %}
-        {{ f.errors }}
+<style>
+.if{--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;--bg:#f7f8fb;--ok:#16a34a;--out:#dc2626;--out-bg:#fde8e8;--adj:#2563eb;color:var(--ink);max-width:860px}
+.if *{box-sizing:border-box}
+.if-back{display:inline-block;margin-bottom:10px;color:var(--mut);text-decoration:none;font-size:13px;font-weight:600}
+.if-back:hover{color:var(--ink)}
+.if h1{margin:0 0 16px;font-size:26px;line-height:1.1}
+
+.if-prev{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid var(--bd);border-radius:16px;padding:16px;margin-bottom:16px}
+.if-th{width:72px;height:72px;border-radius:18px;overflow:hidden;background:var(--bg);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:28px;color:var(--mut);flex:none}
+.if-th img{width:100%;height:100%;object-fit:cover;display:block}
+.if-th.emo{font-size:40px;background:#fff7ed;border-color:#fde3c8}
+.if-pi{flex:1;min-width:0}
+.if-pi b{display:block;font-size:20px;overflow-wrap:anywhere}
+.if-pi small{color:var(--mut);display:block;margin-top:2px}
+.if-stats{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--mut)}
+.if-stats span b{display:inline;font-size:14px;color:var(--ink)}
+
+.if-card{background:#fff;border:1px solid var(--bd);border-radius:16px;padding:20px}
+.if-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 18px}
+.if-f{min-width:0}
+.if-f.full{grid-column:1 / -1}
+.if-f > label{display:block;font-weight:700;margin-bottom:6px;font-size:14px}
+.if-f input:not([type=checkbox]):not([type=radio]):not([type=file]),.if-f select,.if-f textarea{width:100%;padding:12px 13px;border:1px solid var(--bd);border-radius:12px;font-size:15px;background:#fff;font-family:inherit}
+.if-f input[type=checkbox],.if-f input[type=radio]{width:auto;margin-right:8px}
+.if-f input[type=file]{width:100%;padding:10px;border:1px dashed #cfd3de;border-radius:12px;background:var(--bg);font-family:inherit}
+.if-f textarea{min-height:90px;resize:vertical}
+.if-help{color:var(--mut);font-size:13px;margin-top:6px}
+.if-err{color:var(--out);font-size:13px;margin-top:6px}
+.if-err ul{list-style:none;margin:0;padding:0}
+.if-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.if-chip{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:5px 11px;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.if-chip:hover{border-color:#cfd3de;background:var(--bg)}
+.if input:focus-visible,.if select:focus-visible,.if textarea:focus-visible,.if button:focus-visible,.if a:focus-visible{outline:2px solid var(--adj);outline-offset:2px}
+.if-nerr{background:var(--out-bg);color:var(--out);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:14px}
+.if-nerr ul{list-style:none;margin:0;padding:0}
+
+.if-act{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px;padding-top:18px;border-top:1px solid var(--bd)}
+.if-btn{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:12px 24px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-family:inherit;width:auto}
+.if-btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+
+@media (max-width:640px){
+  .if-grid{grid-template-columns:1fr}
+  .if-prev{flex-wrap:wrap}
+  .if-act .if-btn{flex:1}
+}
+@media (prefers-reduced-motion:reduce){.if *{transition:none!important}}
+</style>
+
+<div class="if">
+  <a class="if-back" href="{% url 'store:item_list' %}">Back to groceries</a>
+  <h1>{{ title }}</h1>
+
+  <div class="if-prev" aria-label="Preview">
+    <span class="if-th" id="ifTile">?</span>
+    <div class="if-pi">
+      <b id="ifName">New item</b>
+      <small id="ifSub">Fill in the details below</small>
+      <div class="if-stats">
+        <span>Reorder at <b id="ifReorder">&mdash;</b></span>
+        <span>Cost <b id="ifCost">&mdash;</b></span>
+        <span id="ifValWrap" style="display:none">Opening value <b id="ifVal">&mdash;</b></span>
       </div>
-    {% endfor %}
-    <button class="btn" type="submit">Save</button>
-    <a class="btn light" href="{% url 'store:item_list' %}">Cancel</a>
-  </form>
+    </div>
+  </div>
+
+  <div class="if-card">
+    <form method="post" enctype="multipart/form-data" id="ifForm">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="if-nerr">{{ form.non_field_errors }}</div>{% endif %}
+
+      <div class="if-grid">
+        {% for f in form %}
+        <div class="if-f{% if f.name == 'name' or f.name == 'supplier' or f.name == 'image' or f.name == 'notes' or f.name == 'note' %} full{% endif %}" data-f="{{ f.name }}">
+          <label for="{{ f.id_for_label }}">{{ f.label }}</label>
+          {{ f }}
+          {% if f.name == 'unit' %}
+          <div class="if-chips" id="ifUnits">
+            <button type="button" class="if-chip">kg</button>
+            <button type="button" class="if-chip">g</button>
+            <button type="button" class="if-chip">L</button>
+            <button type="button" class="if-chip">ml</button>
+            <button type="button" class="if-chip">pcs</button>
+            <button type="button" class="if-chip">pack</button>
+          </div>
+          {% endif %}
+          {% if f.help_text %}<div class="if-help">{{ f.help_text }}</div>{% endif %}
+          {% if f.errors %}<div class="if-err">{{ f.errors }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="if-act">
+        <button class="if-btn primary" type="submit">Save</button>
+        <a class="if-btn" href="{% url 'store:item_list' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
 </div>
+
+<script>
+(function () {
+  var BY_NAME = [
+    ['banana leaf','🍃'],['curry leaf','🌿'],['coriander','🌿'],['mint','🌿'],['bay leaf','🍃'],
+    ['chicken','🍗'],['mutton','🥩'],['lamb','🥩'],['beef','🥩'],['egg','🥚'],
+    ['prawn','🦐'],['shrimp','🦐'],['crab','🦀'],['squid','🦑'],['anchovy','🐟'],['fish','🐟'],['seer','🐟'],['tuna','🐟'],['sardine','🐟'],
+    ['basmati','🍚'],['rice','🍚'],['atta','🌾'],['maida','🌾'],['flour','🌾'],['rava','🌾'],['semolina','🌾'],
+    ['oil','🛢️'],['ghee','🧈'],['butter','🧈'],['curd','🥛'],['milk','🥛'],['paneer','🧀'],['cheese','🧀'],['cream','🥛'],
+    ['salt','🧂'],['sugar','🍬'],['jaggery','🍯'],['honey','🍯'],
+    ['onion','🧅'],['garlic','🧄'],['ginger','🫚'],['tomato','🍅'],['potato','🥔'],['carrot','🥕'],['brinjal','🍆'],['capsicum','🫑'],['beans','🫘'],['peas','🫛'],['cabbage','🥬'],['cauliflower','🥦'],['mushroom','🍄'],['corn','🌽'],['cucumber','🥒'],
+    ['chilli','🌶️'],['chili','🌶️'],['pepper','🌶️'],['masala','🌶️'],['turmeric','🧡'],['cumin','🌿'],['cardamom','🌿'],['clove','🌿'],['cinnamon','🪵'],['star anise','⭐'],
+    ['apple','🍎'],['banana','🍌'],['lemon','🍋'],['lime','🍋'],['orange','🍊'],['mango','🥭'],['grape','🍇'],['pineapple','🍍'],['watermelon','🍉'],['strawberry','🍓'],['blueberry','🫐'],['coconut','🥥'],
+    ['dal','🫘'],['lentil','🫘'],['chickpea','🫘'],['gram','🫘'],
+    ['tea','🍵'],['coffee','☕'],['juice','🧃'],['soda','🥤'],['water','💧'],['mojito','🍹'],
+    ['bread','🍞'],['bun','🍞'],['noodle','🍜'],['pasta','🍝'],['sauce','🥫'],['vinegar','🍶'],
+    ['lpg','🔥'],['cylinder','🔥'],['container','📦'],['box','📦'],['tissue','🧻'],['glove','🧤'],['cover','🛍️'],['bag','🛍️']
+  ];
+  var BY_CAT = [
+    ['meat','🥩'],['seafood','🐟'],['vegetable','🥬'],['herb','🌿'],['spice','🌶️'],['rice','🍚'],['flour','🌾'],
+    ['drink','🍹'],['fruit','🍎'],['dairy','🥛'],['oil','🛢️'],['bakery','🍞'],['packag','📦'],['clean','🧴']
+  ];
+  function pick(list, text) {
+    for (var k = 0; k < list.length; k++) if (text.indexOf(list[k][0]) !== -1) return list[k][1];
+    return '';
+  }
+  function $(id) { return document.getElementById(id); }
+  function fmt(n) { return (Math.round(n * 1000) / 1000).toString(); }
+  function money(n) { return '\u20b9' + (Math.round(n * 100) / 100).toLocaleString('en-IN'); }
+
+  var name = $('id_name'), cat = $('id_category'), unit = $('id_unit');
+  var reorder = $('id_reorder_level'), cost = $('id_cost_per_unit'), opening = $('id_opening_stock');
+  var img = $('id_image');
+  var photoURL = '';
+
+  function catText() {
+    if (!cat) return '';
+    if (cat.tagName === 'SELECT') {
+      var o = cat.options[cat.selectedIndex];
+      return o && o.value ? o.text : '';
+    }
+    return cat.value || '';
+  }
+  function unitText() { return unit ? (unit.tagName === 'SELECT' ? (unit.options[unit.selectedIndex] || {}).text || '' : unit.value) : ''; }
+
+  function render() {
+    var n = name ? name.value.trim() : '';
+    var c = catText();
+    var u = unitText().trim();
+    $('ifName').textContent = n || 'New item';
+    $('ifSub').textContent = [c, u ? 'Counted in ' + u : ''].filter(Boolean).join(' \u00b7 ') || 'Fill in the details below';
+
+    var tile = $('ifTile');
+    tile.className = 'if-th';
+    if (photoURL) {
+      tile.innerHTML = '';
+      var im = document.createElement('img');
+      im.src = photoURL; im.alt = '';
+      tile.appendChild(im);
+    } else {
+      var e = pick(BY_NAME, n.toLowerCase()) || pick(BY_CAT, c.toLowerCase());
+      tile.textContent = e || (n ? n.charAt(0).toUpperCase() : '?');
+      if (e) tile.classList.add('emo');
+    }
+
+    var rv = reorder ? parseFloat(reorder.value) : NaN;
+    var cv = cost ? parseFloat(cost.value) : NaN;
+    var ov = opening ? parseFloat(opening.value) : NaN;
+    $('ifReorder').textContent = isNaN(rv) ? '\u2014' : fmt(rv) + (u ? ' ' + u : '');
+    $('ifCost').textContent = isNaN(cv) ? '\u2014' : money(cv) + (u ? ' / ' + u : '');
+    var vw = $('ifValWrap');
+    if (!isNaN(ov) && !isNaN(cv) && ov > 0) { vw.style.display = ''; $('ifVal').textContent = money(ov * cv); }
+    else vw.style.display = 'none';
+  }
+
+  ['input', 'change'].forEach(function (ev) {
+    document.getElementById('ifForm').addEventListener(ev, render);
+  });
+
+  // unit chips fill a text box, or pick the matching option in a dropdown
+  var chips = $('ifUnits');
+  if (chips && unit) {
+    chips.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      var v = b.textContent.trim();
+      if (unit.tagName === 'SELECT') {
+        for (var k = 0; k < unit.options.length; k++) {
+          var o = unit.options[k];
+          if (o.value.toLowerCase() === v.toLowerCase() || o.text.toLowerCase() === v.toLowerCase()) { unit.selectedIndex = k; break; }
+        }
+      } else {
+        unit.value = v;
+      }
+      render();
+    });
+  } else if (chips) {
+    chips.style.display = 'none';
+  }
+
+  // photo preview, if the form has a photo field
+  if (img) {
+    var existing = img.closest('.if-f') && img.closest('.if-f').querySelector('a[href]');
+    if (existing) photoURL = existing.getAttribute('href');
+    img.addEventListener('change', function () {
+      var f = img.files && img.files[0];
+      if (photoURL && photoURL.indexOf('blob:') === 0) URL.revokeObjectURL(photoURL);
+      photoURL = f ? URL.createObjectURL(f) : '';
+      render();
+    });
+  }
+
+  render();
+})();
+</script>
 {% endblock %}

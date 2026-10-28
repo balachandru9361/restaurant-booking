@@ -5,6 +5,8 @@
 
 {% block content %}
 
+
+
 <style>
 /* ===== HERO ===== */
 .home-hero {
@@ -271,12 +273,6 @@
     </div>
 </div>
 
-<div class="home-cta">
-    <h2>Hungry already?</h2>
-    <p>Explore our full menu and get your favorite dish delivered.</p>
-    <a href="{% url 'menu_list' %}" class="btn">Order Now</a>
-</div>
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     // Hero image slideshow
@@ -290,14 +286,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     if (slides.length > 1) {
-        setInterval(showNextSlide, 1000); // 1 second-ku maarum
+        setInterval(showNextSlide, 1000); // changes slide every 1 second
     }
 
-    // ===== Footer social icons -> click panna open aagum =====
-    const waUrl = 'https://wa.me/919876543210?text=' +
+    // ===== Footer social icons: open the link on click =====
+    const waUrl = 'https://wa.me/9361941312?text=' +
         encodeURIComponent('Hi Chandru Restaurant, I want to book a table');
 
-    // Unga real Instagram username inga podunga
+    // Put the real Instagram username here
     const igUrl = 'https://www.instagram.com/your_handle/';
 
     function linkFooterIcon(selector, url) {
@@ -327,7 +323,7 @@ document.addEventListener('DOMContentLoaded', function () {
         igUrl
     );
 
-    // Footer-la "Fast Delivery" badge-ah remove pannum
+    // Remove the "Fast Delivery" badge from the footer
     document.querySelectorAll('footer *').forEach(function (el) {
         const text = el.textContent.trim();
         if (/fast\s*delivery/i.test(text) && !/secure/i.test(text) && text.length < 30) {
@@ -336,5 +332,180 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
+
+
+
+
+
+{% if user.is_authenticated %}
+<!-- ================= LOGIN WELCOME ANIMATION (1.5 sec total) ================= -->
+<style>
+#welcome {
+  position: fixed; inset: 0; z-index: 5000; overflow: hidden;
+  display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  background: radial-gradient(circle at 50% 40%, #243247 0%, #0f172a 65%);
+  color: #fff; transition: transform .4s cubic-bezier(.7,0,.2,1), border-radius .4s;
+  cursor: pointer;
+}
+#welcome.show { display: flex; }
+#welcome.leave { transform: translateY(-105%); border-radius: 0 0 50% 50% / 0 0 18% 18%; }
+
+#welcome canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* floating food */
+#welcome .float-food { position: absolute; bottom: -60px; font-size: 34px; opacity: 0; animation: wRise linear forwards; filter: drop-shadow(0 4px 8px rgba(0,0,0,.4)); }
+@keyframes wRise {
+  0%   { transform: translateY(0) rotate(0); opacity: 0; }
+  10%  { opacity: .9; }
+  100% { transform: translateY(-115vh) rotate(360deg); opacity: 0; }
+}
+
+/* logo with ripples */
+.w-logo-wrap { position: relative; width: 170px; height: 170px; display: grid; place-items: center; margin-bottom: 26px; }
+.w-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid #d9a441; opacity: 0; animation: wRipple 1s ease-out infinite; }
+.w-ring:nth-child(2) { animation-delay: .3s; }
+.w-ring:nth-child(3) { animation-delay: .6s; }
+@keyframes wRipple { 0% { transform: scale(.7); opacity: .9; } 100% { transform: scale(2.3); opacity: 0; } }
+#wLogo {
+  position: relative; width: 150px; height: 150px; border-radius: 50%; background: #fff; padding: 4px;
+  object-fit: contain; box-shadow: 0 0 0 4px #d9a441, 0 0 60px rgba(217,164,65,.65);
+  animation: wPop .4s cubic-bezier(.2,1.6,.3,1) both, wFloat 1.2s ease-in-out .4s infinite;
+}
+@keyframes wPop { 0% { transform: scale(0) rotate(-200deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes wFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+/* text */
+.w-hello { font-size: 1.15rem; letter-spacing: 6px; color: #9ca3af; opacity: 0; animation: wFade .3s .2s forwards; text-transform: uppercase; }
+.w-name { font-family: "Playfair Display", Georgia, serif; font-size: clamp(2.2rem, 7vw, 4.2rem); font-weight: 700; margin: 6px 20px 10px; line-height: 1.1;
+  background: linear-gradient(90deg, #f5c451, #ff6b6b, #f5c451); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: wShine 1.2s linear infinite; }
+.w-name span { display: inline-block; opacity: 0; transform: translateY(40px) scale(.6); animation: wLetter .3s cubic-bezier(.2,1.5,.4,1) forwards; }
+@keyframes wLetter { to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes wShine { to { background-position: 200% center; } }
+.w-sub { font-size: 1.1rem; color: #e5e7eb; opacity: 0; animation: wFade .3s .7s forwards; }
+@keyframes wFade { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+.w-skip { position: absolute; bottom: 26px; font-size: .8rem; color: #6b7280; letter-spacing: 2px; }
+.w-bar { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: linear-gradient(90deg, #d9a441, #ff6b6b); animation: wBar 1.1s linear forwards; }
+@keyframes wBar { to { width: 100%; } }
+
+/* page content entrance after welcome */
+body.play-intro .home-hero .hero-content > * { opacity: 0; animation: wUp .5s cubic-bezier(.2,.8,.2,1) forwards; }
+body.play-intro .home-hero .hero-content > *:nth-child(1) { animation-delay: .05s; }
+body.play-intro .home-hero .hero-content > *:nth-child(2) { animation-delay: .12s; }
+body.play-intro .home-hero .hero-content > *:nth-child(3) { animation-delay: .2s; }
+body.play-intro .home-hero .hero-content > *:nth-child(4) { animation-delay: .28s; }
+body.play-intro .site-header { animation: wDrop .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes wUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes wDrop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  #welcome *, body.play-intro * { animation-duration: .01s !important; animation-delay: 0s !important; }
+}
+</style>
+
+<div id="welcome" aria-live="polite">
+  <canvas id="wConfetti"></canvas>
+  <div class="w-logo-wrap">
+    <span class="w-ring"></span><span class="w-ring"></span><span class="w-ring"></span>
+    <img id="wLogo" alt="Chandru Restaurant">
+  </div>
+  <div class="w-hello">Welcome back</div>
+  <div class="w-name" id="wName"></div>
+  <div class="w-sub">Hungry? Let's find something delicious 🍽️</div>
+  <div class="w-skip">TAP TO SKIP</div>
+  <div class="w-bar"></div>
+</div>
+
+<script>
+(function () {
+  var USER = "{{ user.username|escapejs }}";
+  var KEY = "welcomeShown:" + USER;
+  var el = document.getElementById('welcome');
+  if (!el) return;
+
+  // Logging out clears the flag, so the animation plays again on the next login
+  document.querySelectorAll('a[href*="logout"]').forEach(function (a) {
+    a.addEventListener('click', function () { try { sessionStorage.removeItem(KEY); } catch (e) {} });
+  });
+
+  var seen = false;
+  try { seen = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
+  if (seen) return;
+  try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+
+  // Take the logo from the header
+  var hl = document.querySelector('.brand .logo-img');
+  if (hl) document.getElementById('wLogo').src = hl.src;
+
+  // username letters
+  var nameBox = document.getElementById('wName');
+  USER.split('').forEach(function (ch, i) {
+    var sp = document.createElement('span');
+    sp.textContent = ch === ' ' ? '\u00A0' : ch;
+    sp.style.animationDelay = (0.35 + i * 0.03) + 's';
+    nameBox.appendChild(sp);
+  });
+
+  // floating food emojis
+  var foods = ['🍕','🍔','🍛','🍗','🥘','🍰','🍜','🥗','🍟','🍤'];
+  for (var i = 0; i < 16; i++) {
+    var f = document.createElement('div');
+    f.className = 'float-food';
+    f.textContent = foods[i % foods.length];
+    f.style.left = (Math.random() * 94) + '%';
+    f.style.fontSize = (24 + Math.random() * 26) + 'px';
+    f.style.animationDuration = (1.2 + Math.random() * 0.8) + 's';
+    f.style.animationDelay = (Math.random() * 0.4) + 's';
+    el.appendChild(f);
+  }
+
+  // confetti burst
+  var cv = document.getElementById('wConfetti'), ctx = cv.getContext('2d');
+  function size() { cv.width = innerWidth; cv.height = innerHeight; }
+  size(); addEventListener('resize', size);
+  var colors = ['#f5c451', '#ff6b6b', '#ffffff', '#d9a441', '#34d399'];
+  var parts = [];
+  function burst(n) {
+    for (var k = 0; k < n; k++) {
+      var a = Math.random() * Math.PI * 2, sp = 6 + Math.random() * 9;
+      parts.push({ x: cv.width / 2, y: cv.height * 0.38, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 4,
+        w: 6 + Math.random() * 6, h: 3 + Math.random() * 5, r: Math.random() * 6, vr: (Math.random() - .5) * .4,
+        c: colors[(Math.random() * colors.length) | 0], life: 1 });
+    }
+  }
+  var raf;
+  function tick() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    parts.forEach(function (p) {
+      p.vy += .22; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= .02;
+      ctx.save(); ctx.globalAlpha = Math.max(p.life, 0); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+      ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
+    });
+    parts = parts.filter(function (p) { return p.life > 0 && p.y < cv.height + 30; });
+    raf = requestAnimationFrame(tick);
+  }
+
+  el.classList.add('show');
+  document.body.style.overflow = 'hidden';
+  tick();
+  setTimeout(function () { burst(110); }, 250);   // after the logo pops
+  setTimeout(function () { burst(80); }, 650);    // after the name appears
+
+  var closed = false;
+  function close() {
+    if (closed) return; closed = true;
+    el.classList.add('leave');
+    setTimeout(function () {
+      el.remove(); cancelAnimationFrame(raf);
+      document.body.style.overflow = '';
+      document.body.classList.add('play-intro');
+    }, 400);
+  }
+  el.addEventListener('click', close);
+  setTimeout(close, 1100);   // 1.1s show + 0.4s slide-up = 1.5s total
+})();
+</script>
+{% endif %}
 
 {% endblock %}

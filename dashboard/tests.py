@@ -86,8 +86,15 @@ class KitchenToServerToAdminFlowTests(TestCase):
         url = reverse('dashboard:update_order_status', args=[self.order.pk, 'preparing'])
         self.client.force_login(self.chef)
         self.assertEqual(self.client.get(url).status_code, 405)
+
+        # logged-in customer (no staff role) is refused with 403
         self.client.force_login(self.customer)
-        self.assertEqual(self.client.post(url).status_code, 302)  # sent to login
+        self.assertEqual(self.client.post(url).status_code, 403)
+
+        # not logged in at all -> sent to the login page
+        self.client.logout()
+        self.assertEqual(self.client.post(url).status_code, 302)
+
         self.order.refresh_from_db(); self.assertEqual(self.order.status, 'confirmed')
 
     def test_invalid_status_is_rejected(self):
@@ -121,6 +128,7 @@ class KitchenToServerToAdminFlowTests(TestCase):
         self.client.force_login(self.admin)
         url = reverse('dashboard:api_order_status', args=[self.order.pk])
         r = self.client.post(url, '{"status": "preparing"}', content_type='application/json')
-        self.assertEqual(r.json(), {'ok': True, 'status': 'preparing'})
+        # confirmed -> preparing never needs a stock deduction, so stock_used is False
+        self.assertEqual(r.json(), {'ok': True, 'status': 'preparing', 'stock_used': False})
         r = self.client.post(url, '{"status": "nope"}', content_type='application/json')
         self.assertEqual(r.status_code, 400)

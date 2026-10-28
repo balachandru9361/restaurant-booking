@@ -1,0 +1,127 @@
+{% extends 'store/store_base.html' %}
+{% block title %}Recipe - {{ food.name }}{% endblock %}
+{% block content %}
+<style>
+.re{--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;--bg:#f7f8fb;--ok:#16a34a;--ok-bg:#e8f7ee;--low:#d97706;--low-bg:#fff4db;--out:#dc2626;--out-bg:#fde8e8;--brand:#ff6b6b;--adj:#2563eb;color:var(--ink)}
+.re *{box-sizing:border-box}
+.re-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.re-head h1{margin:0;font-size:26px;line-height:1.1}
+.re-head p{margin:4px 0 0;color:var(--mut);font-size:13px}
+.re-btn{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:9px 14px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.re-btn:hover{border-color:#cfd3de}
+.re-btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.re-btn.sm{padding:6px 11px;font-size:12.5px;border-radius:8px}
+.re-btn.danger{color:var(--out);border-color:#f6c9c9}
+.re-btn.danger:hover{background:var(--out-bg)}
+.re-btn:focus-visible,.re input:focus-visible,.re select:focus-visible{outline:2px solid var(--adj);outline-offset:2px}
+
+.re-grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;align-items:start}
+.re-card{background:#fff;border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+.re-card h2{margin:0;padding:14px 16px;font-size:15px;border-bottom:1px solid var(--bd);background:var(--bg)}
+.re-scroll{overflow-x:auto}
+.re table{width:100%;border-collapse:collapse;font-size:14px}
+.re thead th{text-align:left;font-size:12.5px;color:var(--mut);font-weight:600;padding:10px 14px;border-bottom:1px solid var(--bd);white-space:nowrap}
+.re th.num,.re td.num{text-align:right}
+.re td{padding:12px 14px;border-bottom:1px solid var(--bd);vertical-align:middle}
+.re td b{font-size:15px}
+.re .mut{color:var(--mut)}
+.re .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:700}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.out{background:var(--out-bg);color:var(--out)}
+.re .acts{display:flex;justify-content:flex-end}
+.re .acts form{margin:0}
+.re-empty{padding:30px 16px;text-align:center;color:var(--mut)}
+.re-empty b{display:block;color:var(--ink);margin-bottom:6px;font-size:15px}
+
+.re-form{padding:16px;display:grid;gap:14px}
+.re-field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.re-field select,.re-field input{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:10px;font-size:14px;background:#fff;font-family:inherit}
+.re-field small{display:block;margin-top:6px;color:var(--mut);font-size:12.5px;line-height:1.4}
+.re-qty{display:flex;align-items:center;gap:8px}
+.re-qty input{flex:1}
+.re-qty span{min-width:34px;color:var(--mut);font-weight:600}
+
+@media (max-width:900px){.re-grid{grid-template-columns:1fr}}
+</style>
+
+<div class="re">
+  <div class="re-head">
+    <div>
+      <h1>{{ food.name }}</h1>
+      <p>{% if food.category %}{{ food.category.name }} &middot; {% endif %}Recipe for 1 portion</p>
+    </div>
+    <a class="re-btn" href="{% url 'store:recipes' %}">&larr; All recipes</a>
+  </div>
+
+  <div class="re-grid">
+    <div class="re-card">
+      <h2>Ingredients ({{ lines|length }})</h2>
+      {% if lines %}
+      <div class="re-scroll">
+        <table>
+          <thead>
+            <tr><th>Ingredient</th><th class="num">Per portion</th><th class="num">In stock</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody>
+          {% for l in lines %}
+            <tr>
+              <td><b>{{ l.ingredient.name }}</b></td>
+              <td class="num">{{ l.quantity|floatformat:"-3" }} {{ l.ingredient.unit }}</td>
+              <td class="num">{{ l.ingredient.current_stock|floatformat:"-3" }} {{ l.ingredient.unit }}</td>
+              <td>{% if l.ingredient.blocks_dishes %}<span class="pill out">At limit - dish hidden</span>{% else %}<span class="pill ok">OK</span>{% endif %}</td>
+              <td>
+                <div class="acts">
+                  <form method="post" action="{% url 'store:recipe_line_delete' l.pk %}" onsubmit="return confirm('Remove {{ l.ingredient.name|escapejs }} from this recipe?')">
+                    {% csrf_token %}<button class="re-btn sm danger" type="submit">Remove</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="re-empty">
+        <b>No ingredients yet</b>
+        Add the first ingredient using the form. Until then, this dish is not linked to any store stock.
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="re-card">
+      <h2>Add or update ingredient</h2>
+      <form method="post" class="re-form">
+        {% csrf_token %}
+        <div class="re-field">
+          <label for="reIng">Ingredient</label>
+          <select name="ingredient" id="reIng" required>
+            <option value="">Choose an ingredient</option>
+            {% for i in ingredients %}<option value="{{ i.pk }}" data-unit="{{ i.unit }}">{{ i.name }} ({{ i.unit }})</option>{% endfor %}
+          </select>
+        </div>
+        <div class="re-field">
+          <label for="reQty">Quantity per portion</label>
+          <div class="re-qty">
+            <input type="number" name="quantity" id="reQty" step="0.001" min="0.001" placeholder="0.250" inputmode="decimal" required>
+            <span id="reUnit">unit</span>
+          </div>
+          <small>Use the ingredient's own unit. For a kg item, 250 g = 0.25. Choosing an ingredient already in the recipe updates its quantity.</small>
+        </div>
+        <button class="re-btn primary" type="submit">Save ingredient</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var sel = document.getElementById('reIng');
+  var unit = document.getElementById('reUnit');
+  sel.addEventListener('change', function () {
+    var o = sel.options[sel.selectedIndex];
+    unit.textContent = (o && o.dataset.unit) ? o.dataset.unit : 'unit';
+  });
+})();
+</script>
+{% endblock %}

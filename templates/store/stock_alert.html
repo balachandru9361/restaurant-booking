@@ -1,40 +1,166 @@
-{% extends 'store/store_base.html' %}
+{% extends "store/store_base.html" %}
 {% block title %}Stock Alert{% endblock %}
+
 {% block content %}
-<h1>Stock Alert</h1>
+<style>
+.sa{--ink:#0f172a;--muted:#64748b;--line:#e5e9f0}
+.sa-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.sa-head h1{font-size:28px;margin:0;color:var(--ink)}
+.sa-head p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.sa-actions{display:flex;gap:8px;flex-wrap:wrap}
+.sa-btn{display:inline-flex;align-items:center;padding:9px 16px;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:600;font-size:14px;cursor:pointer;text-decoration:none}
+.sa-btn.wa{background:#22c55e;border-color:#22c55e;color:#fff}
+.sa-btn.pri{background:#ff6b6b;border-color:#ff6b6b;color:#fff}
+.sa-btn.sm{padding:6px 12px;font-size:13px;border-radius:8px}
+.sa-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.sa-card{background:#fff;border-radius:12px;padding:16px 18px;border-left:4px solid var(--ink)}
+.sa-card.k{border-left-color:#7c3aed}
+.sa-card.o{border-left-color:#ef4444}
+.sa-card.l{border-left-color:#d97706}
+.sa-num{font-size:28px;font-weight:800;color:var(--ink)}
+.sa-lbl{font-size:13px;color:var(--muted)}
+.sa-search{background:#fff;border-radius:12px;padding:12px;margin-bottom:20px}
+.sa-search input{width:100%;border:1px solid var(--line);background:#f8fafc;border-radius:8px;padding:11px 14px;font-size:15px;outline:0}
+.sa-h{display:flex;align-items:center;gap:10px;margin:22px 0 10px;font-size:20px;color:var(--ink)}
+.sa-pill{font-size:13px;font-weight:700;padding:2px 10px;border-radius:999px;background:#fee2e2;color:#b91c1c}
+.sa-pill.amber{background:#fef3c7;color:#92400e}
+.sa-pill.violet{background:#ede9fe;color:#5b21b6}
+.sa-box{background:#fff;border-radius:12px;overflow-x:auto}
+.sa-box table{width:100%;border-collapse:collapse}
+.sa-box th{text-align:left;font-size:12px;text-transform:uppercase;color:var(--muted);padding:12px 16px;background:#f8fafc}
+.sa-box td{padding:12px 16px;border-top:1px solid #f1f5f9;font-size:14px;color:var(--ink)}
+.sa-sub{font-size:12px;color:var(--muted)}
+.sa-empty{padding:26px;text-align:center;color:var(--muted)}
+.sa-acts{display:flex;gap:6px;flex-wrap:wrap}
+.sa-acts form{margin:0}
+.sa-red{color:#ef4444;font-weight:700}
+@media(max-width:900px){.sa-cards{grid-template-columns:repeat(2,1fr)}}
+</style>
 
-<h3>Out of stock ({{ out_items|length }})</h3>
-<div class="card table-wrap">
-  <table>
-    <tr><th>Item</th><th>Category</th><th>Stock</th><th></th></tr>
-    {% for i in out_items %}
-    <tr>
-      <td>{{ i.name }}</td>
-      <td>{{ i.category.name|default:"-" }}</td>
-      <td>{{ i.current_stock|floatformat:"-3" }} {{ i.unit }}</td>
-      <td><a class="btn small" href="{% url 'store:stock_in_add' %}?item={{ i.pk }}">Add Stock In</a></td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="4" class="muted">Nothing is out of stock.</td></tr>
-    {% endfor %}
-  </table>
+<div class="sa">
+  <div class="sa-head">
+    <div><h1>Stock Alert</h1><p>Items that are finished or about to finish. Order these first.</p></div>
+    <div class="sa-actions">
+      <button type="button" class="sa-btn" id="saCopy">Copy reorder list</button>
+      <a class="sa-btn wa" id="saWa" href="#" target="_blank" rel="noopener">Send on WhatsApp</a>
+      <a class="sa-btn pri" href="{% url 'store:stock_in_add' %}">+ Stock In</a>
+    </div>
+  </div>
+
+  <div class="sa-cards">
+    <div class="sa-card k"><div class="sa-num">{{ kitchen_reports|length }}</div><div class="sa-lbl">Reported by kitchen</div></div>
+    <div class="sa-card o"><div class="sa-num">{{ out_items|length }}</div><div class="sa-lbl">Out of stock</div></div>
+    <div class="sa-card l"><div class="sa-num">{{ low_items|length }}</div><div class="sa-lbl">Running low</div></div>
+    <div class="sa-card"><div class="sa-num">&#8377;{{ total_cost|floatformat:0 }}</div><div class="sa-lbl">Approx. cost to restock</div></div>
+  </div>
+
+  <div class="sa-search"><input type="text" id="saSearch" placeholder="Search item, category or supplier"></div>
+
+  <h2 class="sa-h">Reported by kitchen <span class="sa-pill violet">{{ kitchen_reports|length }}</span></h2>
+  <div class="sa-box">
+    {% if kitchen_reports %}
+    <table>
+      <thead><tr><th>Item</th><th>Kitchen stock</th><th>Store stock</th><th>Reported by</th><th>Action</th></tr></thead>
+      <tbody>
+      {% for r in kitchen_reports %}
+        <tr data-name="{{ r.item.name|lower }}" data-line="{{ r.item.name }} - kitchen reported out of stock">
+          <td><b>{{ r.item.name }}</b>{% if r.note %}<div class="sa-sub">{{ r.note }}</div>{% endif %}</td>
+          <td>{{ r.item.quantity|floatformat:"-2" }} {{ r.item.unit }}</td>
+          <td>{% if r.store_match %}{{ r.store_match.current_stock|floatformat:"-2" }} {{ r.store_match.unit }}{% else %}<span class="sa-sub">Not in store list</span> <a class="sa-sub" style="font-weight:700;color:#ff6b6b" href="{% url 'store:item_add' %}?name={{ r.item.name|urlencode }}&unit={{ r.item.unit|urlencode }}&then=stock_in">+ Add</a>{% endif %}</td>
+          <td>{{ r.requested_by.get_username|default:"Kitchen" }}<div class="sa-sub">{{ r.created_at|timesince }} ago</div></td>
+          <td><div class="sa-acts">
+            {% if r.store_match %}<a class="sa-btn sm pri" href="{% url 'store:stock_in_add' %}?item={{ r.store_match.pk }}">Stock In</a>{% else %}<a class="sa-btn sm pri" href="{% url 'store:item_add' %}?name={{ r.item.name|urlencode }}&unit={{ r.item.unit|urlencode }}&then=stock_in" title="Not in the store list yet. Add it first, then Stock In.">Stock In</a>{% endif %}
+            <form method="post" action="{% url 'store:kitchen_report_done' r.pk %}">{% csrf_token %}<button type="submit" class="sa-btn sm">Mark restocked</button></form>
+          </div></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="sa-empty">No kitchen reports. The kitchen has not reported anything.</div>
+    {% endif %}
+  </div>
+
+  <h2 class="sa-h">Out of stock <span class="sa-pill">{{ out_items|length }}</span></h2>
+  <div class="sa-box">
+    {% if out_items %}
+    <table>
+      <thead><tr><th>Item</th><th>Category</th><th>Stock</th><th>Needed</th><th></th></tr></thead>
+      <tbody>
+      {% for i in out_items %}
+        <tr data-name="{{ i.name|lower }} {{ i.category.name|lower }} {{ i.supplier|lower }}" data-line="{{ i.name }} - need {{ i.needed|floatformat:'-2' }} {{ i.unit }}">
+          <td><b>{{ i.name }}</b>{% if i.supplier %}<div class="sa-sub">{{ i.supplier }}</div>{% endif %}</td>
+          <td>{{ i.category.name|default:"-" }}</td>
+          <td class="sa-red">{{ i.current_stock|floatformat:"-2" }} {{ i.unit }}</td>
+          <td>{{ i.needed|floatformat:"-2" }} {{ i.unit }}</td>
+          <td><a class="sa-btn sm pri" href="{% url 'store:stock_in_add' %}?item={{ i.pk }}">Stock In</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="sa-empty">Nothing is out of stock. Every item has at least some stock.</div>
+    {% endif %}
+  </div>
+
+  <h2 class="sa-h">Running low <span class="sa-pill amber">{{ low_items|length }}</span></h2>
+  <div class="sa-box">
+    {% if low_items %}
+    <table>
+      <thead><tr><th>Item</th><th>Category</th><th>Stock</th><th>Needed</th><th></th></tr></thead>
+      <tbody>
+      {% for i in low_items %}
+        <tr data-name="{{ i.name|lower }} {{ i.category.name|lower }} {{ i.supplier|lower }}" data-line="{{ i.name }} - need {{ i.needed|floatformat:'-2' }} {{ i.unit }}">
+          <td><b>{{ i.name }}</b>{% if i.supplier %}<div class="sa-sub">{{ i.supplier }}</div>{% endif %}</td>
+          <td>{{ i.category.name|default:"-" }}</td>
+          <td>{{ i.current_stock|floatformat:"-2" }} {{ i.unit }} <span class="sa-sub">(level {{ i.reorder_level|floatformat:"-2" }})</span></td>
+          <td>{{ i.needed|floatformat:"-2" }} {{ i.unit }}</td>
+          <td><a class="sa-btn sm pri" href="{% url 'store:stock_in_add' %}?item={{ i.pk }}">Stock In</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="sa-empty">No low stock items. Nothing is close to its reorder level.</div>
+    {% endif %}
+  </div>
 </div>
 
-<h3 style="margin-top:24px">Low stock ({{ low_items|length }})</h3>
-<div class="card table-wrap">
-  <table>
-    <tr><th>Item</th><th>Category</th><th>Stock</th><th>Reorder at</th><th></th></tr>
-    {% for i in low_items %}
-    <tr>
-      <td>{{ i.name }}</td>
-      <td>{{ i.category.name|default:"-" }}</td>
-      <td>{{ i.current_stock|floatformat:"-3" }} {{ i.unit }}</td>
-      <td>{{ i.reorder_level|floatformat:"-3" }} {{ i.unit }}</td>
-      <td><a class="btn small" href="{% url 'store:stock_in_add' %}?item={{ i.pk }}">Add Stock In</a></td>
-    </tr>
-    {% empty %}
-    <tr><td colspan="5" class="muted">No low stock items.</td></tr>
-    {% endfor %}
-  </table>
-</div>
+<script>
+(function () {
+  var rows = document.querySelectorAll("tr[data-line]");
+  var search = document.getElementById("saSearch");
+  var copyBtn = document.getElementById("saCopy");
+  var waBtn = document.getElementById("saWa");
+
+  function buildText() {
+    var seen = {};
+    var lines = [];
+    rows.forEach(function (r) {
+      var l = r.getAttribute("data-line");
+      if (l && !seen[l]) { seen[l] = true; lines.push(lines.length + 1 + ". " + l); }
+    });
+    return lines.length ? "Reorder list\n" + lines.join("\n") : "Nothing to reorder.";
+  }
+
+  waBtn.addEventListener("click", function () {
+    waBtn.href = "https://wa.me/?text=" + encodeURIComponent(buildText());
+  });
+
+  copyBtn.addEventListener("click", function () {
+    navigator.clipboard.writeText(buildText()).then(function () {
+      copyBtn.textContent = "Copied";
+      setTimeout(function () { copyBtn.textContent = "Copy reorder list"; }, 1500);
+    });
+  });
+
+  search.addEventListener("input", function () {
+    var q = search.value.trim().toLowerCase();
+    rows.forEach(function (r) {
+      var hay = r.getAttribute("data-name") || "";
+      r.style.display = (!q || hay.indexOf(q) !== -1) ? "" : "none";
+    });
+  });
+})();
+</script>
 {% endblock %}

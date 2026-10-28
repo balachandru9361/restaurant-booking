@@ -1,0 +1,242 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bill - {% if table %}Table {{ table.number }}{% else %}Order #{{ order.id }}{% endif %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #0d1b2a;
+    --navy2: #16283d;
+    --gold: #d4af37;
+    --gold2: #f0cd6b;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --green: #15803d;
+    --red: #b91c1c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 16px 40px; min-height: 100vh;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif; color: var(--ink);
+    background: radial-gradient(circle at 20% 0%, #1b3350 0%, var(--navy) 55%);
+  }
+
+  .bill-wrap { max-width: 430px; margin: 0 auto; filter: drop-shadow(0 18px 30px rgba(0,0,0,.45)); }
+
+  /* ---------- header ---------- */
+  .bill-head {
+    background: linear-gradient(135deg, var(--navy), var(--navy2));
+    color: #fff; text-align: center; padding: 26px 20px 22px;
+    border-radius: 20px 20px 0 0; position: relative;
+    border-bottom: 3px solid var(--gold);
+  }
+  .logo {
+    width: 54px; height: 54px; margin: 0 auto 10px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 26px;
+    background: linear-gradient(135deg, var(--gold), var(--gold2));
+    box-shadow: 0 0 0 4px rgba(212,175,55,.25);
+  }
+  .bill-head h1 { margin: 0; font-family: 'Sora', sans-serif; font-size: 21px; letter-spacing: 1.5px; color: var(--gold2); }
+  .bill-head .tag { margin-top: 4px; font-size: 12px; color: #cbd5e1; letter-spacing: .5px; }
+  .bill-head .addr { margin-top: 2px; font-size: 11.5px; color: #94a3b8; }
+
+  /* ---------- body ---------- */
+  .bill-body { background: #fff; padding: 20px 22px 8px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .chip-table {
+    font-family: 'Sora', sans-serif; font-weight: 800; font-size: 14px; color: var(--navy);
+    background: linear-gradient(135deg, #fff4d6, #ffe8a3); border: 1px solid var(--gold);
+    padding: 6px 14px; border-radius: 999px;
+  }
+  .chip-date { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .order-ids { font-size: 12px; color: var(--muted); margin: 6px 0 2px; }
+  .order-ids b { color: var(--navy); }
+
+  .section-title {
+    margin: 18px 0 8px; font-size: 11px; font-weight: 700; letter-spacing: 1.6px; color: var(--muted);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  .item { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px dashed var(--line); }
+  .item:last-child { border-bottom: 0; }
+  .qty {
+    min-width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-family: 'Sora', sans-serif; font-weight: 700; font-size: 13px; color: var(--navy);
+    background: #fdf6dc; border: 1px solid #f0dc9a;
+  }
+  .item .info { flex: 1; min-width: 0; }
+  .item .nm { font-weight: 600; font-size: 14.5px; color: var(--navy); overflow-wrap: anywhere; }
+  .item .rate { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .item .amt { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 14.5px; color: var(--navy); white-space: nowrap; }
+
+  /* ---------- totals ---------- */
+  .totals { margin-top: 6px; padding: 14px 0 4px; border-top: 2px solid var(--navy); }
+  .t-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13.5px; color: var(--muted); }
+  .t-row.sub span:last-child { color: var(--ink); font-weight: 600; }
+  .grand {
+    display: flex; justify-content: space-between; align-items: center;
+    margin: 10px 0 4px; padding: 14px 16px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--navy), var(--navy2)); color: #fff;
+  }
+  .grand span:first-child { font-size: 13px; letter-spacing: 1.5px; color: #cbd5e1; font-weight: 600; }
+  .grand span:last-child { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 24px; color: var(--gold2); }
+
+  .status { text-align: center; margin: 16px 0 6px; }
+  .stamp {
+    display: inline-block; transform: rotate(-4deg);
+    font-family: 'Sora', sans-serif; font-weight: 800; letter-spacing: 6px; font-size: 22px;
+    color: var(--green); border: 3px solid var(--green); border-radius: 10px; padding: 6px 22px 6px 28px;
+    background: rgba(21,128,61,.06);
+  }
+  .due-banner {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #fef2f2; border: 1.5px solid #fca5a5; color: var(--red);
+    border-radius: 14px; padding: 12px 16px; font-weight: 700;
+  }
+  .due-banner .amt { font-family: 'Sora', sans-serif; font-size: 20px; }
+
+  .thanks { text-align: center; padding: 16px 0 6px; }
+  .thanks .big { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 16px; color: var(--navy); }
+  .thanks .small { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+  /* torn receipt edge */
+  .tear {
+    height: 14px; background: #fff;
+    -webkit-mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 20px 100%;
+            mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 20px 100%;
+  }
+
+  /* ---------- buttons ---------- */
+  .actions { max-width: 430px; margin: 22px auto 0; display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    flex: 1; min-width: 130px; text-align: center; padding: 14px 16px; border-radius: 12px; border: 0;
+    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none;
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn-cash { background: linear-gradient(135deg, #16a34a, #22c55e); color: #fff; box-shadow: 0 6px 16px rgba(34,197,94,.35); }
+  .btn-print { background: linear-gradient(135deg, var(--gold), var(--gold2)); color: var(--navy); box-shadow: 0 6px 16px rgba(212,175,55,.4); }
+  .btn-back { background: rgba(255,255,255,.1); color: #e2e8f0; border: 1px solid rgba(255,255,255,.25); }
+
+  @media (max-width: 480px) {
+    body { padding: 14px 10px 30px; }
+    .bill-body { padding: 16px 16px 6px; }
+  }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .bill-wrap { filter: none; max-width: 100%; }
+    .actions { display: none; }
+  }
+</style>
+</head>
+<body>
+
+{# screen view of the bill. The paper (thermal) print itself comes from printThermal() below #}
+<div class="bill-wrap">
+  <div class="bill-head">
+    <div class="logo">🍽️</div>
+    <h1>CHANDRU RESTAURANT</h1>
+    <div class="tag">Fresh Food. Happy Moments.</div>
+    <div class="addr">Musiri, Trichy, Tamil Nadu</div>
+  </div>
+
+  <div class="bill-body">
+    <div class="chips">
+      <span class="chip-table">{% if table %}🪑 Table {{ table.number }}{% else %}🥡 Takeaway{% endif %}</span>
+      <span class="chip-date">🕒 {{ now|date:"d M Y, h:i A" }}</span>
+    </div>
+    <div class="order-ids">
+      {% if orders|length > 1 %}Orders{% else %}Order{% endif %}:
+      <b>{% for o in orders %}#{{ o.id }}{% if not forloop.last %}, {% endif %}{% endfor %}</b>
+    </div>
+
+    <div class="section-title">YOUR ORDER</div>
+    {% for l in lines %}
+    <div class="item">
+      <div class="qty">{{ l.qty }}×</div>
+      <div class="info">
+        <div class="nm">{{ l.name }}</div>
+        <div class="rate">₹{{ l.unit|floatformat:2 }} each</div>
+      </div>
+      <div class="amt">₹{{ l.amount|floatformat:2 }}</div>
+    </div>
+    {% endfor %}
+
+    <div class="totals">
+      {% if adjustment %}
+      <div class="t-row sub"><span>Items total</span><span>₹{{ items_total|floatformat:2 }}</span></div>
+      <div class="t-row"><span>Discount / adjustment</span><span>₹{{ adjustment|floatformat:2 }}</span></div>
+      {% endif %}
+      <div class="grand"><span>GRAND TOTAL</span><span>₹{{ grand_total|floatformat:2 }}</span></div>
+      {% if paid_total and due_total > 0 %}
+      <div class="t-row"><span>Already paid</span><span>₹{{ paid_total|floatformat:2 }}</span></div>
+      {% endif %}
+    </div>
+
+    <div class="status">
+      {% if due_total > 0 %}
+        <div class="due-banner"><span>Amount Due</span><span class="amt">₹{{ due_total|floatformat:2 }}</span></div>
+      {% else %}
+        <span class="stamp">PAID</span>
+      {% endif %}
+    </div>
+
+    <div class="thanks">
+      <div class="big">Thank you! 🙏</div>
+      <div class="small">We hope you enjoyed your meal. Visit again!</div>
+    </div>
+  </div>
+  <div class="tear"></div>
+</div>
+
+<div class="actions">
+  {% if can_collect %}
+  <form method="post" action="{% url 'dashboard:server_table_cash_received' order.id %}" style="flex:1 1 100%; display:flex;">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-cash" style="width:100%;">✅ Cash Received ₹{{ due_total|floatformat:2 }}</button>
+  </form>
+  {% endif %}
+  <button type="button" class="btn btn-print" id="printBtn">🖨 Print Bill</button>
+  <a class="btn btn-back" href="{% url 'dashboard:server_dashboard' %}">← Back</a>
+</div>
+
+{# your existing thermal printer helper (paper size 58/80, restaurant name, etc. are set inside it) #}
+{% include "includes/thermal_print.html" %}
+
+<script>
+  function printThisBill() {
+    var itemsTotal = parseFloat('{{ items_total|floatformat:"2u" }}') || 0;
+    var grandTotal = parseFloat('{{ grand_total|floatformat:"2u" }}') || 0;
+    var discount = itemsTotal - grandTotal;   // only a real discount (coupon) is shown
+
+    printThermal({
+      type: 'bill',
+      orderId: '{% for o in orders %}{{ o.id }}{% if not forloop.last %}, {% endif %}{% endfor %}',
+      target: '{% if table %}TABLE {{ table.number }}{% else %}TAKEAWAY{% endif %}',
+      items: [
+        {% for l in lines %}{ name: '{{ l.name|escapejs }}', qty: {{ l.qty }}, price: '{{ l.unit|floatformat:"2u" }}' }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ],
+      total: grandTotal.toFixed(2),
+      discount: discount > 0.004 ? discount.toFixed(2) : '',
+      payment: {% if due_total > 0 %}'DUE Rs.{{ due_total|floatformat:"2u" }}'{% else %}'PAID'{% endif %}
+    });
+  }
+
+  document.getElementById('printBtn').addEventListener('click', printThisBill);
+
+  // open this page with ?print=1 to print straight away
+  if (new URLSearchParams(window.location.search).get('print') === '1') {
+    window.addEventListener('load', function () { setTimeout(printThisBill, 300); });
+  }
+</script>
+
+</body>
+</html>

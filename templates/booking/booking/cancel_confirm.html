@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  .cc-wrap { min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 40px 16px; }
+  .cc-card {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 460px; overflow: hidden;
+    box-shadow: 0 12px 36px rgba(13, 27, 42, 0.12); font-family: 'Inter', sans-serif;
+    animation: ccRise 0.4s ease both;
+  }
+  @keyframes ccRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .cc-head { background: #0d1b2a; color: #d4af37; padding: 18px 22px; }
+  .cc-head h2 { font-family: 'Sora', sans-serif; font-size: 20px; margin: 0; }
+  .cc-body { padding: 22px; }
+  .cc-warn { color: #374151; font-size: 14.5px; margin-bottom: 16px; }
+  .cc-details { background: #f4f6f9; border-radius: 12px; padding: 14px 16px; margin-bottom: 20px; }
+  .cc-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 14px; }
+  .cc-row span:first-child { color: #6b7280; }
+  .cc-row span:last-child { color: #0d1b2a; font-weight: 700; }
+  .cc-actions { display: flex; gap: 10px; }
+  .cc-actions form { flex: 1; display: flex; margin: 0; }
+  .btn-cc-yes, .btn-cc-no {
+    flex: 1; border: 0; cursor: pointer; padding: 12px; border-radius: 10px;
+    font-size: 14px; font-weight: 700; text-align: center; text-decoration: none; transition: all 0.2s ease;
+  }
+  .btn-cc-yes { background: #fee2e2; color: #b91c1c; }
+  .btn-cc-yes:hover { background: #b91c1c; color: #fff; }
+  .btn-cc-no { background: #eef1f5; color: #0d1b2a; }
+  .btn-cc-no:hover { background: #0d1b2a; color: #fff; }
+</style>
+
+<div class="cc-wrap">
+  <div class="cc-card">
+    <div class="cc-head">
+      <h2>Cancel Booking</h2>
+    </div>
+    <div class="cc-body">
+      <p class="cc-warn">Are you sure you want to cancel this table booking? This cannot be undone.</p>
+
+      <div class="cc-details">
+        <div class="cc-row"><span>Booking</span><span>#{{ booking.pk }}</span></div>
+        {% if booking.table %}
+        <div class="cc-row"><span>Table</span><span>{{ booking.table.number }}</span></div>
+        {% endif %}
+        <div class="cc-row"><span>Date</span><span>{{ booking.booking_date|date:"d M Y" }}</span></div>
+        <div class="cc-row"><span>Time</span><span>{{ booking.booking_time|time:"g:i A" }}</span></div>
+        {% if booking.guests %}
+        <div class="cc-row"><span>Guests</span><span>{{ booking.guests }}</span></div>
+        {% endif %}
+      </div>
+
+      <div class="cc-actions">
+        <a href="javascript:history.back()" class="btn-cc-no">Keep Booking</a>
+        <form method="post" action="">
+          {% csrf_token %}
+          <button type="submit" class="btn-cc-yes">Yes, Cancel</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

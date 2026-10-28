@@ -1,35 +1,285 @@
 {% extends 'store/store_base.html' %}
 {% block title %}Update Stock - {{ item.name }}{% endblock %}
 {% block content %}
-<h1>Update Stock: {{ item.name }}</h1>
-<div class="card" style="max-width:560px">
-  <p style="margin-top:0">Current stock: <strong style="font-size:1.3rem">{{ item.current_stock|floatformat:"-3" }} {{ item.unit }}</strong>
-    {% if item.is_out %}<span class="badge out">Out</span>{% elif item.is_low %}<span class="badge low">Low</span>{% endif %}</p>
+<style>
+.su{--ink:#1c2333;--mut:#6b7488;--bd:#eceef3;--bg:#f7f8fb;--ok:#16a34a;--ok-bg:#e8f7ee;--low:#d97706;--low-bg:#fff4db;--out:#dc2626;--out-bg:#fde8e8;--brand:#ff6b6b;--adj:#2563eb;--adj-bg:#e7efff;color:var(--ink);max-width:720px}
+.su *{box-sizing:border-box}
+.su-back{display:inline-block;margin-bottom:10px;color:var(--mut);text-decoration:none;font-size:13px;font-weight:600}
+.su-back:hover{color:var(--ink)}
+.su h1{margin:0 0 16px;font-size:26px;line-height:1.1}
 
-  <form method="post">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
-    <div class="field">
-      <label>What happened?</label>
-      <div class="radio-row">
-        {% for value, text in form.fields.movement_type.choices %}
-          <label><input type="radio" name="movement_type" value="{{ value }}" {% if form.movement_type.value == value or not form.movement_type.value and forloop.first %}checked{% endif %}> {{ text }}</label>
-        {% endfor %}
+.su-item{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid var(--bd);border-radius:16px;padding:16px;margin-bottom:16px}
+.su .th{width:68px;height:68px;border-radius:16px;overflow:hidden;background:var(--bg);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:26px;color:var(--mut);flex:none}
+.su .th img{width:100%;height:100%;object-fit:cover;display:block}
+.su .th.emo{font-size:38px;background:#fff7ed;border-color:#fde3c8}
+.su-info{flex:1;min-width:0}
+.su-info small{color:var(--mut);display:block}
+.su-info .big{font-size:30px;font-weight:800;line-height:1.15;font-variant-numeric:tabular-nums}
+.su-info .big span{font-size:15px;font-weight:600;color:var(--mut)}
+.su .bar{height:7px;background:var(--bd);border-radius:99px;margin-top:8px;overflow:hidden}
+.su .bar i{display:block;height:100%;border-radius:99px;width:0;background:var(--ok)}
+.su .bar i.low{background:var(--low)}
+.su .bar i.out{background:var(--out)}
+.su .pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12.5px;font-weight:700;margin-left:8px;vertical-align:middle}
+.su .pill.ok{background:var(--ok-bg);color:var(--ok)}
+.su .pill.low{background:var(--low-bg);color:var(--low)}
+.su .pill.out{background:var(--out-bg);color:var(--out)}
+
+.su-card{background:#fff;border:1px solid var(--bd);border-radius:16px;padding:20px}
+.su-sec{margin-bottom:22px}
+.su-sec > label,.su-sec > .lbl{display:block;font-weight:700;margin-bottom:8px}
+.su-err{color:var(--out);font-size:13px;margin-top:6px}
+.su-err ul{list-style:none;margin:0;padding:0}
+.su-help{color:var(--mut);font-size:13px;margin-top:6px}
+
+.su-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.su-opt{position:relative;display:block;cursor:pointer;margin:0}
+.su-opt input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+.su-opt .box{display:flex;align-items:center;gap:10px;padding:14px;border:2px solid var(--bd);border-radius:14px;background:#fff;font-weight:700;transition:border-color .15s,background .15s}
+.su-opt .box em{font-style:normal;font-size:24px;line-height:1}
+.su-opt .box small{display:block;font-weight:500;color:var(--mut);font-size:12px}
+.su-opt:hover .box{border-color:#cfd3de}
+.su-opt input:checked + .box{border-color:var(--ink);background:var(--bg)}
+.su-opt input:focus-visible + .box{outline:2px solid var(--adj);outline-offset:2px}
+.su-opt[data-mode="add"] input:checked + .box{border-color:var(--ok);background:var(--ok-bg)}
+.su-opt[data-mode="sub"] input:checked + .box{border-color:var(--out);background:var(--out-bg)}
+.su-opt[data-mode="set"] input:checked + .box{border-color:var(--adj);background:var(--adj-bg)}
+
+.su-qty{display:flex;gap:8px;align-items:stretch}
+.su-qty button{width:52px;border:1px solid var(--bd);background:#fff;border-radius:12px;font-size:22px;font-weight:700;cursor:pointer;color:var(--ink);font-family:inherit}
+.su-qty button:hover{border-color:#cfd3de;background:var(--bg)}
+.su-qty .inp{flex:1;position:relative}
+.su-qty input{width:100%;padding:14px 56px 14px 14px;border:1px solid var(--bd);border-radius:12px;font-size:22px;font-weight:700;font-family:inherit;font-variant-numeric:tabular-nums}
+.su-qty .unit{position:absolute;right:14px;top:50%;translate:0 -50%;color:var(--mut);font-weight:600;pointer-events:none}
+.su-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.su-chip{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:6px 12px;border-radius:99px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.su-chip:hover{border-color:#cfd3de;background:var(--bg)}
+.su-note input{width:100%;padding:12px 14px;border:1px solid var(--bd);border-radius:12px;font-size:14px;font-family:inherit}
+.su input:focus-visible,.su button:focus-visible,.su a:focus-visible{outline:2px solid var(--adj);outline-offset:2px}
+
+.su-prev{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;background:var(--bg);border:1px dashed #cfd3de;margin-bottom:20px;font-size:15px}
+.su-prev b{font-size:22px;font-variant-numeric:tabular-nums}
+.su-prev .arrow{color:var(--mut)}
+.su-prev.bad{background:var(--out-bg);border-color:#f3b4b4;color:var(--out)}
+.su-prev.good{background:var(--ok-bg);border-color:#b7e4c7}
+.su-prev.dn{background:var(--low-bg);border-color:#f1d79a}
+
+.su-act{display:flex;gap:10px;flex-wrap:wrap}
+.su-btn{border:1px solid var(--bd);background:#fff;color:var(--ink);padding:12px 20px;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-family:inherit;width:auto}
+.su-btn.primary{background:var(--ink);border-color:var(--ink);color:#fff}
+.su-btn.primary:disabled{opacity:.45;cursor:not-allowed}
+
+@media (max-width:520px){
+  .su-item{flex-wrap:wrap}
+  .su-act .su-btn{flex:1}
+}
+@media (prefers-reduced-motion:reduce){.su *{transition:none!important}}
+</style>
+
+<div class="su">
+  <a class="su-back" href="{% url 'store:item_list' %}">Back to groceries</a>
+  <h1>Update stock</h1>
+
+  <div class="su-item">
+    <span class="th{% if item.image %} has-img{% endif %}" id="suTile" data-n="{{ item.name|lower }}" data-c="{{ item.category.name|lower }}">{% if item.image %}<img src="{{ item.image.url }}" alt="{{ item.name }}">{% else %}{{ item.name|slice:":1"|upper }}{% endif %}</span>
+    <div class="su-info">
+      <small>{{ item.name }}{% if item.category %} &middot; {{ item.category.name }}{% endif %}</small>
+      <div class="big">{{ item.current_stock|floatformat:"-3" }} <span>{{ item.unit }}</span>
+        {% if item.is_out %}<span class="pill out">Out of stock</span>{% elif item.is_low %}<span class="pill low">Running low</span>{% else %}<span class="pill ok">In stock</span>{% endif %}
       </div>
-      {{ form.movement_type.errors }}
+      <div class="bar"><i id="suBar" class="{% if item.is_out %}out{% elif item.is_low %}low{% endif %}"></i></div>
+      <small style="margin-top:6px">Reorder at {{ item.reorder_level|floatformat:"-3" }} {{ item.unit }}</small>
     </div>
-    <div class="field">
-      <label for="id_quantity">Quantity ({{ item.unit }})</label>
-      <input type="number" step="0.001" min="0" name="quantity" id="id_quantity" value="{{ form.quantity.value|default_if_none:'' }}" required>
-      <div class="help">For "Correction", enter the exact quantity you counted on the shelf.</div>
-      {{ form.quantity.errors }}
-    </div>
-    <div class="field">
-      <label for="id_note">Note (optional)</label>
-      <input type="text" name="note" id="id_note" maxlength="200" value="{{ form.note.value|default_if_none:'' }}" placeholder="e.g. Bought from Ravi Traders / Spoiled / Monthly count">
-    </div>
-    <button class="btn" type="submit">Save</button>
-    <a class="btn light" href="{% url 'store:item_list' %}">Cancel</a>
-  </form>
+  </div>
+
+  <div class="su-card">
+    <form method="post" id="suForm">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="su-err" style="margin-bottom:14px">{{ form.non_field_errors }}</div>{% endif %}
+
+      <div class="su-sec">
+        <span class="lbl">What happened?</span>
+        <div class="su-opts" role="radiogroup" aria-label="What happened?">
+          {% for value, text in form.fields.movement_type.choices %}
+          <label class="su-opt" data-v="{{ value }}">
+            <input type="radio" name="movement_type" value="{{ value }}" {% if form.movement_type.value == value or not form.movement_type.value and forloop.first %}checked{% endif %}>
+            <span class="box"><em class="ic"></em><span>{{ text }}</span></span>
+          </label>
+          {% endfor %}
+        </div>
+        {% if form.movement_type.errors %}<div class="su-err">{{ form.movement_type.errors }}</div>{% endif %}
+      </div>
+
+      <div class="su-sec">
+        <label for="id_quantity">Quantity</label>
+        <div class="su-qty">
+          <button type="button" id="suMinus" aria-label="Decrease quantity">&minus;</button>
+          <div class="inp">
+            <input type="number" step="0.001" min="0" name="quantity" id="id_quantity" inputmode="decimal" value="{{ form.quantity.value|default_if_none:'' }}" placeholder="0" required>
+            <span class="unit">{{ item.unit }}</span>
+          </div>
+          <button type="button" id="suPlus" aria-label="Increase quantity">+</button>
+        </div>
+        <div class="su-chips" id="suChips">
+          <button type="button" class="su-chip" data-add="1">+1</button>
+          <button type="button" class="su-chip" data-add="5">+5</button>
+          <button type="button" class="su-chip" data-add="10">+10</button>
+          <button type="button" class="su-chip" data-add="25">+25</button>
+          <button type="button" class="su-chip" data-add="50">+50</button>
+          <button type="button" class="su-chip" data-clear="1">Clear</button>
+        </div>
+        <div class="su-help" id="suHelp"></div>
+        {% if form.quantity.errors %}<div class="su-err">{{ form.quantity.errors }}</div>{% endif %}
+      </div>
+
+      <div class="su-prev" id="suPrev" aria-live="polite">
+        <span>New stock</span><b id="suNew">&mdash;</b><span class="arrow" id="suDelta"></span>
+      </div>
+
+      <div class="su-sec su-note">
+        <label for="id_note">Note <span style="font-weight:500;color:var(--mut)">(optional)</span></label>
+        <input type="text" name="note" id="id_note" maxlength="200" value="{{ form.note.value|default_if_none:'' }}" placeholder="e.g. Bought from Ravi Traders / Spoiled / Monthly count">
+        <div class="su-chips" id="suNotes">
+          <button type="button" class="su-chip">Bought from supplier</button>
+          <button type="button" class="su-chip">Used in kitchen</button>
+          <button type="button" class="su-chip">Spoiled</button>
+          <button type="button" class="su-chip">Monthly count</button>
+        </div>
+      </div>
+
+      <div class="su-act">
+        <button class="su-btn primary" type="submit" id="suSave">Save</button>
+        <a class="su-btn" href="{% url 'store:item_list' %}">Cancel</a>
+      </div>
+    </form>
+  </div>
 </div>
+
+<script>
+(function () {
+  var CUR = parseFloat('{{ item.current_stock|stringformat:"f" }}') || 0;
+  var LVL = parseFloat('{{ item.reorder_level|stringformat:"f" }}') || 0;
+  var UNIT = '{{ item.unit|escapejs }}';
+
+  function fmt(n) { return (Math.round(n * 1000) / 1000).toString(); }
+
+  // stock bar
+  var bar = document.getElementById('suBar');
+  bar.style.width = (LVL > 0 ? Math.max(CUR > 0 ? 6 : 0, Math.min(100, (CUR / (LVL * 2)) * 100)) : (CUR > 0 ? 100 : 0)) + '%';
+
+  // picture for items with no photo
+  var BY_NAME = [
+    ['banana leaf','🍃'],['curry leaf','🌿'],['coriander','🌿'],['mint','🌿'],['bay leaf','🍃'],
+    ['chicken','🍗'],['mutton','🥩'],['lamb','🥩'],['beef','🥩'],['egg','🥚'],
+    ['prawn','🦐'],['shrimp','🦐'],['crab','🦀'],['squid','🦑'],['anchovy','🐟'],['fish','🐟'],['seer','🐟'],['tuna','🐟'],['sardine','🐟'],
+    ['basmati','🍚'],['rice','🍚'],['atta','🌾'],['maida','🌾'],['flour','🌾'],['rava','🌾'],['semolina','🌾'],
+    ['oil','🛢️'],['ghee','🧈'],['butter','🧈'],['curd','🥛'],['milk','🥛'],['paneer','🧀'],['cheese','🧀'],['cream','🥛'],
+    ['salt','🧂'],['sugar','🍬'],['jaggery','🍯'],['honey','🍯'],
+    ['onion','🧅'],['garlic','🧄'],['ginger','🫚'],['tomato','🍅'],['potato','🥔'],['carrot','🥕'],['brinjal','🍆'],['capsicum','🫑'],['beans','🫘'],['peas','🫛'],['cabbage','🥬'],['cauliflower','🥦'],['mushroom','🍄'],['corn','🌽'],['cucumber','🥒'],
+    ['chilli','🌶️'],['chili','🌶️'],['pepper','🌶️'],['masala','🌶️'],['turmeric','🧡'],['cumin','🌿'],['cardamom','🌿'],['clove','🌿'],['cinnamon','🪵'],['star anise','⭐'],
+    ['apple','🍎'],['banana','🍌'],['lemon','🍋'],['lime','🍋'],['orange','🍊'],['mango','🥭'],['grape','🍇'],['pineapple','🍍'],['watermelon','🍉'],['strawberry','🍓'],['blueberry','🫐'],['coconut','🥥'],
+    ['dal','🫘'],['lentil','🫘'],['chickpea','🫘'],['gram','🫘'],
+    ['tea','🍵'],['coffee','☕'],['juice','🧃'],['soda','🥤'],['water','💧'],['mojito','🍹'],
+    ['bread','🍞'],['bun','🍞'],['noodle','🍜'],['pasta','🍝'],['sauce','🥫'],['vinegar','🍶'],
+    ['lpg','🔥'],['cylinder','🔥'],['container','📦'],['box','📦'],['tissue','🧻'],['glove','🧤'],['cover','🛍️'],['bag','🛍️']
+  ];
+  var BY_CAT = [
+    ['meat','🥩'],['seafood','🐟'],['vegetable','🥬'],['herb','🌿'],['spice','🌶️'],['rice','🍚'],['flour','🌾'],
+    ['drink','🍹'],['fruit','🍎'],['dairy','🥛'],['oil','🛢️'],['bakery','🍞'],['packag','📦'],['clean','🧴']
+  ];
+  function pick(list, text) {
+    for (var k = 0; k < list.length; k++) if (text.indexOf(list[k][0]) !== -1) return list[k][1];
+    return '';
+  }
+  var tile = document.getElementById('suTile');
+  if (!tile.classList.contains('has-img')) {
+    var e = pick(BY_NAME, tile.dataset.n || '') || pick(BY_CAT, tile.dataset.c || '');
+    if (e) { tile.textContent = e; tile.classList.add('emo'); }
+  }
+
+  // option cards: icon + how each choice changes stock (in = add, out = subtract, anything else = set)
+  function modeOf(v) {
+    v = String(v).toLowerCase();
+    return v === 'in' ? 'add' : (v === 'out' ? 'sub' : 'set');
+  }
+  var ICON = { add: '📥', sub: '📤', set: '🔧' };
+  document.querySelectorAll('.su-opt').forEach(function (o) {
+    var m = modeOf(o.dataset.v);
+    o.dataset.mode = m;
+    o.querySelector('.ic').textContent = ICON[m];
+  });
+
+  var qty = document.getElementById('id_quantity');
+  var prev = document.getElementById('suPrev');
+  var newEl = document.getElementById('suNew');
+  var deltaEl = document.getElementById('suDelta');
+  var help = document.getElementById('suHelp');
+  var save = document.getElementById('suSave');
+
+  function mode() {
+    var c = document.querySelector('input[name="movement_type"]:checked');
+    return c ? modeOf(c.value) : 'add';
+  }
+
+  function update() {
+    var m = mode();
+    var raw = qty.value.trim();
+    var q = parseFloat(raw);
+    var has = raw !== '' && !isNaN(q) && q >= 0;
+
+    help.textContent = m === 'set'
+      ? 'Enter the exact quantity you counted on the shelf. Stock will be set to this number.'
+      : (m === 'add' ? 'How much arrived?' : 'How much was used or thrown away?');
+
+    prev.className = 'su-prev';
+    save.disabled = false;
+    if (!has) {
+      newEl.textContent = '\u2014';
+      deltaEl.textContent = 'Enter a quantity to see the new stock';
+      return;
+    }
+    var next = m === 'add' ? CUR + q : (m === 'sub' ? CUR - q : q);
+    var diff = next - CUR;
+    if (next < 0) {
+      newEl.textContent = fmt(next) + ' ' + UNIT;
+      deltaEl.textContent = 'Only ' + fmt(CUR) + ' ' + UNIT + ' in stock';
+      prev.className = 'su-prev bad';
+      save.disabled = true;
+      return;
+    }
+    newEl.textContent = fmt(next) + ' ' + UNIT;
+    deltaEl.textContent = diff === 0 ? 'No change' : ((diff > 0 ? '+' : '\u2212') + fmt(Math.abs(diff)) + ' ' + UNIT);
+    prev.className = 'su-prev ' + (diff > 0 ? 'good' : (diff < 0 ? 'dn' : ''));
+  }
+
+  document.querySelectorAll('input[name="movement_type"]').forEach(function (r) { r.addEventListener('change', update); });
+  qty.addEventListener('input', update);
+
+  function bump(n) {
+    var v = parseFloat(qty.value) || 0;
+    v = Math.max(0, v + n);
+    qty.value = fmt(v);
+    update();
+    qty.focus();
+  }
+  document.getElementById('suPlus').addEventListener('click', function () { bump(1); });
+  document.getElementById('suMinus').addEventListener('click', function () { bump(-1); });
+  document.getElementById('suChips').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.clear) { qty.value = ''; update(); qty.focus(); }
+    else bump(parseFloat(b.dataset.add));
+  });
+
+  var note = document.getElementById('id_note');
+  document.getElementById('suNotes').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    note.value = b.textContent.trim();
+    note.focus();
+  });
+
+  update();
+})();
+</script>
 {% endblock %}

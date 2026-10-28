@@ -192,6 +192,8 @@
 .guest-stepper button:hover { background: #e7e9ee; }
 .guest-stepper input { border: none !important; background: transparent !important; text-align: center; flex: 1; box-shadow: none !important; }
 
+.guest-hint { font-size: 0.72rem; color: #9aa0ab; margin-top: 6px; line-height: 1.4; }
+
 .char-count { text-align: right; font-size: 0.68rem; color: #b3b8c2; margin-top: 4px; }
 
 .preview-card {
@@ -420,9 +422,11 @@
                                         <label>Guests</label>
                                         <div class="guest-stepper">
                                             <button type="button" id="decreaseGuests">&minus;</button>
-                                            <input type="number" name="guests" id="guestsInput" min="1" max="25" value="1" required>
+                                            <input type="number" name="guests" id="guestsInput" min="1" max="30" value="1" required>
                                             <button type="button" id="increaseGuests">&plus;</button>
                                         </div>
+                                        {# CHANGED: one table seats 6, bigger groups get more tables (max 30 guests) #}
+                                        <div class="guest-hint" id="guestHint">One table seats 6 guests. Bigger groups get more than one table.</div>
                                     </div>
                                     <div>
                                         <label>Occasion</label>
@@ -490,11 +494,12 @@
                 </div>
 
                 <div class="submit-area">
+                    {# CHANGED: the booking is a request, the admin confirms it #}
                     <button type="submit" form="bookingForm" class="submit-btn" id="submitBtn">
                         <span class="spinner"></span>
-                        <span id="submitLabel">Confirm Booking</span>
+                        <span id="submitLabel">Send Booking Request</span>
                     </button>
-                    <p class="booking-note">No payment required now</p>
+                    <p class="booking-note">No payment required now. We will confirm your table by email.</p>
                 </div>
             </div>
 
@@ -509,7 +514,7 @@
                     <span class="cap-total" id="sidebarTotal">—</span>
                 </div>
                 <div class="cap-row">
-                    <span>Held (2 hrs)</span>
+                    <span>Held</span>
                     <span class="cap-booked" id="sidebarBooked">—</span>
                 </div>
                 <div class="cap-row">
@@ -528,10 +533,13 @@
 </div>
 
 <script>
+    const MAX_GUESTS = 30;        // same as MAX_GUESTS in booking/forms.py
+    const SEATS_PER_TABLE = 6;    // same as SEATS_PER_TABLE in booking/forms.py
+
     const guestsInput = document.getElementById('guestsInput');
     document.getElementById('increaseGuests').addEventListener('click', () => {
         const current = parseInt(guestsInput.value || 1);
-        if (current < 25) guestsInput.value = current + 1;
+        if (current < MAX_GUESTS) guestsInput.value = current + 1;
         updateSummary('rowGuests');
     });
     document.getElementById('decreaseGuests').addEventListener('click', () => {
@@ -630,6 +638,12 @@
         document.getElementById('sumZone').textContent = zoneLabels[zoneInput.value] || 'Indoor';
         document.getElementById('sumOccasion').textContent = occSelect.value === 'none' ? '—' : occSelect.options[occSelect.selectedIndex].text;
 
+        // CHANGED: tell the customer how many tables the group needs
+        const tablesNeeded = Math.ceil(g / SEATS_PER_TABLE);
+        document.getElementById('guestHint').textContent = tablesNeeded > 1
+            ? `${g} guests need ${tablesNeeded} tables (one table seats ${SEATS_PER_TABLE}).`
+            : `One table seats ${SEATS_PER_TABLE} guests. Bigger groups get more than one table.`;
+
         document.getElementById('stepGuestsNum').textContent = name ? '✓' : '1';
         document.getElementById('stepParty').textContent = g;
         document.getElementById('stepDate').textContent = formatDateShort(date);
@@ -691,7 +705,7 @@
             return;
         }
         submitBtn.classList.add('loading');
-        document.getElementById('submitLabel').textContent = 'Confirming…';
+        document.getElementById('submitLabel').textContent = 'Sending…';
     });
 
     function loadBookingsForDate(date) {
@@ -731,9 +745,10 @@
                     return;
                 }
 
+                // CHANGED: there is no end time any more (no 2-hour timer), so only the start time is shown
                 listBox.innerHTML = data.bookings.map(b => `
                     <div class="sidebar-booking-item">
-                        <span class="sidebar-booking-time">${b.time} – ${b.until}</span>
+                        <span class="sidebar-booking-time">${b.time} ${b.status === 'pending' ? '⏳' : '✅'}</span>
                         <span class="sidebar-booking-guests">${b.guests} 👥</span>
                     </div>
                 `).join('');
