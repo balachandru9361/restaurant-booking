@@ -6,4 +6,5 @@ urlpatterns = [
     path('menu/', views.menu_list, name='menu_list'),
     path('search/suggest/', views.search_suggest, name='search_suggest'),
     path('menu/<int:item_id>/', views.item_detail, name='item_detail'),
+    path('welcome/', views.qr_welcome, name='qr_welcome'),
 ]

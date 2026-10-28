@@ -6,6 +6,7 @@ app_name = 'orders'
 urlpatterns = [
     path('options/<int:item_id>/', views.item_options, name='item_options'),
     path('cart/', views.view_cart, name='view_cart'),
+    path('cart/options/save/', views.save_cart_options, name='save_cart_options'),
     path('add/<int:item_id>/', views.add_to_cart, name='add_to_cart'),
     path('add-order/<int:item_id>/', views.add_to_order, name='add_to_order'),
     path('bulk-add/', views.bulk_add_to_cart, name='bulk_add_to_cart'),
@@ -19,6 +20,6 @@ urlpatterns = [
     path('history/', views.order_history, name='order_history'),
     path('status-poll/', views.order_status_poll, name='order_status_poll'),
     path('table/<int:table_id>/', views.select_table, name='select_table'),
-    path('table/clear/', views.clear_table, name='clear_table'),   # NEW
+    path('table/clear/', views.clear_table, name='clear_table'),
     path('cart/data/', views.cart_data, name='cart_data'),
 ]

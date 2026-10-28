@@ -2145,6 +2145,56 @@ def server_poll(request):
     })
 
 
+# ---- NEW: Admin live-update poll (used by base_admin.html on EVERY admin page) ----
+@admin_required
+def admin_poll(request):
+    """Polled by EVERY admin page (from base_admin.html). Returns one signature of all the data
+    the admin pages show. When it changes, the open page refreshes itself."""
+    today = timezone.localdate()
+
+    paid_total = (Order.objects.filter(status__in=PAID_STATUSES)
+                  .aggregate(s=Sum('total_amount'))['s'] or 0)
+
+    # Orders: today's, still holding a table, or waiting for approval (any date)
+    orders = list(
+        Order.objects
+        .filter(Q(created_at__date=today)
+                | Q(table__isnull=False, table_released=False)
+                | Q(status='pending'))
+        .order_by('id')
+        .values_list('id', 'status', 'payment_status', 'payment_method',
+                     'table_id', 'table_released', 'refunded', 'total_amount'))
+
+    # Bookings: pending ones + yesterday onwards
+    bookings = list(
+        TableBooking.objects
+        .filter(Q(booking_date__gte=today - timedelta(days=1)) | Q(status='pending'))
+        .order_by('id')
+        .values_list('id', 'status', 'released', 'table_id', 'booking_date', 'booking_time'))
+
+    users = User.objects.aggregate(
+        n=Count('id'),
+        active=Count('id', filter=Q(is_active=True)),
+        staff=Count('id', filter=Q(is_staff=True)),
+    )
+    menu = list(FoodItem.objects.order_by('id').values_list('id', 'is_available', 'price'))
+    tables = list(Table.objects.order_by('id').values_list('id', 'number', 'capacity'))
+
+    latest_note = Notification.objects.first()
+    _items, low = _store_stock_overview()
+
+    parts = [
+        Order.objects.count(), str(paid_total), orders,
+        TableBooking.objects.count(), bookings,
+        users, menu, tables,
+        latest_note.id if latest_note else 0,
+        Notification.objects.filter(is_read=False).count(),
+        [(g.id, g.is_out) for g in low],
+    ]
+    sig = hashlib.md5(repr(parts).encode('utf-8')).hexdigest()
+    return JsonResponse({'sig': sig})
+
+
 # ---- Admin notifications (served orders) ----
 @admin_required
 def notifications_poll(request):

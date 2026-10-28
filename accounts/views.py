@@ -12,14 +12,20 @@ def _safe_next(request):
     """Return the ?next= URL if it points to this site, otherwise None."""
     next_url = request.POST.get('next') or request.GET.get('next', '')
     if next_url and url_has_allowed_host_and_scheme(
-            next_url, allowed_hosts={request.get_host()}):
+            next_url,
+            allowed_hosts={request.get_host()},
+            require_https=request.is_secure()):
         return next_url
     return None
 
 
+def _is_staff_user(user):
+    return user.is_superuser or user.is_staff or is_store_staff(user)
+
+
 def signup_view(request):
     if request.user.is_authenticated:
-        return redirect('home')
+        return redirect(_safe_next(request) or 'home')
 
     if request.method == 'POST':
         form = SignupForm(request.POST)
@@ -28,20 +34,24 @@ def signup_view(request):
             login(request, user)
             messages.success(
                 request, f'Welcome, {user.first_name}! Your account is ready.')
-            # New customer always lands on the home page (View Menu is one tap from there)
-            return redirect('home')
+            # Continue where the customer left off (e.g. cart / confirm order)
+            return redirect(_safe_next(request) or 'home')
     else:
         form = SignupForm()
 
     return render(request, 'accounts/signup.html', {
         'form': form,
-        'next': request.GET.get('next', ''),
+        'next': _safe_next(request) or '',
     })
 
 
 def login_view(request):
+    next_url = _safe_next(request)
+
     if request.user.is_authenticated:
-        return redirect(home_url_for(request.user))
+        if _is_staff_user(request.user):
+            return redirect(home_url_for(request.user))
+        return redirect(next_url or 'home')
 
     if request.method == 'POST':
         form = LoginForm(request.POST)
@@ -54,17 +64,13 @@ def login_view(request):
                 messages.success(
                     request, f'Welcome back, {user.first_name or user.username}!')
 
-                # Every role goes to its OWN dashboard (next param is ignored):
-                #   superuser    -> dashboard:admin_home
-                #   store staff  -> store dashboard
-                #   server role  -> dashboard:server_dashboard
-                #   other staff  -> dashboard:kitchen_dashboard
-                if user.is_superuser or user.is_staff or is_store_staff(user):
+                # Staff / admin / kitchen / server -> their own dashboard
+                if _is_staff_user(user):
                     return redirect(home_url_for(user))
 
-                # Normal customers always land on the home page (the ?next= link is ignored,
-                # so a customer is never thrown straight into the menu or another page)
-                return redirect('home')
+                # Customers -> continue to where they were going
+                # (cart / confirm order), otherwise home page
+                return redirect(next_url or 'home')
             else:
                 messages.error(
                     request, 'Invalid phone number or password.')
@@ -73,7 +79,7 @@ def login_view(request):
 
     return render(request, 'accounts/login.html', {
         'form': form,
-        'next': request.GET.get('next', ''),
+        'next': next_url or '',
     })
 
 

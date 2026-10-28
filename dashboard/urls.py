@@ -43,6 +43,7 @@ urlpatterns = [
     path('server/mark-cash-received/<int:pk>/', views.server_mark_cash_received, name='server_mark_cash_received'),
     path('notifications/poll/', views.notifications_poll, name='notifications_poll'),
     path('notifications/read/', views.notifications_mark_read, name='notifications_mark_read'),
+    path('poll/admin/', views.admin_poll, name='admin_poll'),   # NEW: live update for all admin pages
     path('table-qr-codes/', views.table_qr_codes, name='table_qr_codes'),
     path('kitchen/stock/', views.kitchen_stock, name='kitchen_stock'),
     path('kitchen/stock/<int:pk>/request/', views.kitchen_request_stock, name='kitchen_request_stock'),

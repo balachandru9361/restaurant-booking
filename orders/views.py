@@ -2,14 +2,16 @@ import json
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
+from urllib.parse import quote
 from django.http import JsonResponse
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect, get_object_or_404, resolve_url
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
 from menu.models import FoodItem, Option
 from booking.models import Table
@@ -28,6 +30,27 @@ ALLOWED_TIPS = ('5', '10')
 def _is_ajax(request):
     """True when the request comes from fetch() with the X-Requested-With header."""
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
+def _redirect_to_login(request):
+    """Customer is not logged in. Send them to the login page and bring them
+    back to the CART afterwards (never to /orders/confirm/, because the tip /
+    order type / arrival time they chose would be lost).
+    The cart lives in the session, so it is still there after login.
+
+    The login page url comes from settings.LOGIN_URL, so no url namespace
+    is assumed here.
+
+    For fetch() calls this returns JSON (status 401) with the login url, so the
+    cart page JavaScript can redirect WITHOUT showing the 'Order sent' animation."""
+    login_url = resolve_url(settings.LOGIN_URL) + '?next=' + quote(reverse('orders:view_cart'))
+    if _is_ajax(request):
+        return JsonResponse(
+            {'success': False, 'login_required': True, 'login_url': login_url},
+            status=401,
+        )
+    messages.info(request, 'Please login to place your order. Your cart is saved.')
+    return redirect(login_url)
 
 
 def _safe_qty(raw, default=1):
@@ -143,8 +166,10 @@ def add_to_cart(request, item_id):
 
 
 @require_POST
-@login_required
 def add_to_order(request, item_id):
+    """'Order now' from a dish page. Adds the dish to the cart and opens the cart
+    page, where the customer picks tip / order type / arrival time and presses
+    Confirm. Login is asked only at Confirm time, so no login check is needed here."""
     quantity = _safe_qty(request.POST.get('quantity', 1))
 
     if not FoodItem.objects.filter(id=item_id, is_available=True).exists():
@@ -157,7 +182,7 @@ def add_to_order(request, item_id):
     request.session['cart'] = cart
     request.session.modified = True
 
-    return redirect('orders:confirm_order')
+    return redirect('orders:view_cart')
 
 
 @require_POST
@@ -210,7 +235,7 @@ def bulk_add_to_cart(request):
 
 def select_table(request, table_id):
     """QR code scan lands here. Stores the table in the session and
-    sends the customer to the menu to start ordering for that table."""
+    sends the customer to the HOME page (View Full Menu is one tap from there)."""
     table = get_object_or_404(Table, id=table_id)
 
     # If the table is held by someone else right now, don't attach it
@@ -221,15 +246,15 @@ def select_table(request, table_id):
         )
         request.session.pop('selected_table', None)
         request.session.modified = True
-        return redirect('menu_list')
+        return redirect('home')
 
     request.session['selected_table'] = table.id
     request.session.modified = True
-    messages.success(request, f'You are at Table #{table.number}. Add items and checkout!')
-    return redirect('menu_list')
+    messages.success(request, f'You are at Table #{table.number}. Tap "View Full Menu" to start ordering!')
+    return redirect('home')
 
 
-# NEW: "Change table" button on the cart page
+# "Change table" button on the cart page
 @require_POST
 def clear_table(request):
     """Customer taps 'Change table': forget the QR table so they can scan a new
@@ -394,6 +419,42 @@ def _calc_tip(total, tip_percent):
     return tip.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
+ARRIVAL_MODES = ('asap', '15', '30', '45', '60', 'custom')
+
+
+def _collect_cart_options(data):
+    """Reads the choices made on the cart page (order type, arrival, note, tip)
+    from a POST dict and returns a clean dict that is safe to keep in the session."""
+    order_type = data.get('order_type', 'dine_in')
+    if order_type not in ('dine_in', 'takeaway'):
+        order_type = 'dine_in'
+
+    arrival_mode = data.get('arrival_mode', 'asap')
+    if arrival_mode not in ARRIVAL_MODES:
+        arrival_mode = 'asap'
+
+    tip_percent = data.get('tip_percent', '0')
+    if tip_percent not in ALLOWED_TIPS:
+        tip_percent = '0'
+
+    return {
+        'order_type': order_type,
+        'arrival_mode': arrival_mode,
+        'arrival_custom': data.get('arrival_custom', '').strip()[:5],
+        'note': data.get('note', '').strip()[:255],
+        'tip_percent': tip_percent,
+    }
+
+
+@require_POST
+def save_cart_options(request):
+    """The cart page JavaScript calls this just before it sends a guest to the
+    login page, so the choices are still there when the customer comes back."""
+    request.session['cart_options'] = _collect_cart_options(request.POST)
+    request.session.modified = True
+    return JsonResponse({'success': True})
+
+
 def view_cart(request):
     cart_items, subtotal, total = _get_cart_totals(request)
 
@@ -403,7 +464,7 @@ def view_cart(request):
         FoodItem.objects.orderable().exclude(id__in=cart_ids).order_by('?')[:4]
     )
 
-    # NEW: table from the QR scan (None if the customer did not scan one)
+    # Table from the QR scan (None if the customer did not scan one)
     selected_table = None
     table_id = request.session.get('selected_table')
     if table_id:
@@ -414,7 +475,12 @@ def view_cart(request):
         'subtotal': subtotal,
         'total': total,
         'suggestions': suggestions,
-        'selected_table': selected_table,   # NEW
+        'selected_table': selected_table,
+        # Choices saved before login (order type, arrival, note, tip); {} if none
+        'saved_options': request.session.get('cart_options', {}),
+        # Used by the Confirm button JavaScript: a customer who is not logged in
+        # goes straight to login (no 'Order sent' animation) and returns to the cart
+        'login_url': resolve_url(settings.LOGIN_URL) + '?next=' + quote(reverse('orders:view_cart')),
     }
     return render(request, 'orders/cart.html', context)
 
@@ -513,10 +579,25 @@ def _parse_arrival(request):
     return None
 
 
-@login_required
 def confirm_order(request):
     """Creates the order as PENDING (payment_status 'pending') and sends the
-    user to the mock Razorpay checkout page."""
+    user to the mock Razorpay checkout page.
+
+    Not decorated with @login_required on purpose: a customer who is not logged in
+    goes to login and comes back to the CART (see _redirect_to_login), never to
+    this URL.
+
+    Only a POST from the cart page creates an order. A plain GET (browser refresh,
+    back button, link prefetch) never creates anything, it just opens the cart."""
+    if not request.user.is_authenticated:
+        if request.method == 'POST':
+            request.session['cart_options'] = _collect_cart_options(request.POST)
+            request.session.modified = True
+        return _redirect_to_login(request)
+
+    if request.method != 'POST':
+        return redirect('orders:view_cart')
+
     cart = request.session.get('cart', {})
 
     if not cart:
@@ -543,8 +624,7 @@ def confirm_order(request):
     tip_percent = request.POST.get('tip_percent', '0')
     total = Decimal(total) + _calc_tip(total, tip_percent)
 
-    # Order options from the cart page (a plain GET, e.g. "Order now" from a
-    # dish page, simply uses the defaults: dine-in, ASAP, no note, no tip)
+    # Order options from the cart page form
     order_type = request.POST.get('order_type', 'dine_in')
     if order_type not in ('dine_in', 'takeaway'):
         order_type = 'dine_in'
@@ -590,6 +670,7 @@ def confirm_order(request):
     request.session['cart'] = {}
     request.session.pop('selected_table', None)
     request.session.pop('coupon_code', None)
+    request.session.pop('cart_options', None)
     request.session.modified = True
 
     return redirect('orders:initiate_payment', order_id=order.id)

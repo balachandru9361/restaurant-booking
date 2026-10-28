@@ -351,16 +351,31 @@
     });
 
     var signupForm = document.getElementById('signupForm');
+    var signupBtn = document.getElementById('signupBtn');
+    var signupSpinner = document.getElementById('signupSpinner');
+    var signupBtnText = document.getElementById('signupBtnText');
+
+    function resetSignupBtn() {
+        signupBtn.disabled = false;
+        signupSpinner.style.display = 'none';
+        signupBtnText.textContent = 'Sign Up';
+    }
+
     if (signupForm) {
         signupForm.addEventListener('submit', function () {
-            var btn = document.getElementById('signupBtn');
-            var spinner = document.getElementById('signupSpinner');
-            var text = document.getElementById('signupBtnText');
-            btn.disabled = true;
-            spinner.style.display = 'inline-block';
-            text.textContent = 'Creating account...';
+            // let the form submit first, then disable the button
+            setTimeout(function () {
+                signupBtn.disabled = true;
+                signupSpinner.style.display = 'inline-block';
+                signupBtnText.textContent = 'Creating account...';
+            }, 0);
         });
     }
+
+    // Back button / bfcache: button stuck aagaama irukka
+    window.addEventListener('pageshow', function (e) {
+        if (e.persisted) resetSignupBtn();
+    });
 </script>
 
 {% endblock %}

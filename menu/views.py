@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 
+from booking.models import Table
 from store.models import sold_out_food_ids
 
 from .models import Category, FoodItem
@@ -12,6 +13,18 @@ from .models import Category, FoodItem
 
 def home(request):
     return render(request, 'menu/home.html')
+
+
+def qr_welcome(request):
+    # Customer scans the table QR -> orders.views.select_table saves the table in
+    # the session and sends them here -> short welcome animation -> home page.
+    table_no = None
+    table_id = request.session.get('selected_table')
+    if table_id:
+        table = Table.objects.filter(id=table_id).first()
+        if table:
+            table_no = table.number
+    return render(request, 'menu/qr_welcome.html', {'table_no': table_no})
 
 
 def menu_list(request):

@@ -385,16 +385,31 @@
     });
 
     var loginForm = document.getElementById('loginForm');
+    var loginBtn = document.getElementById('loginBtn');
+    var loginSpinner = document.getElementById('loginSpinner');
+    var loginBtnText = document.getElementById('loginBtnText');
+
+    function resetLoginBtn() {
+        loginBtn.disabled = false;
+        loginSpinner.style.display = 'none';
+        loginBtnText.textContent = 'Login';
+    }
+
     if (loginForm) {
         loginForm.addEventListener('submit', function () {
-            var btn = document.getElementById('loginBtn');
-            var spinner = document.getElementById('loginSpinner');
-            var text = document.getElementById('loginBtnText');
-            btn.disabled = true;
-            spinner.style.display = 'inline-block';
-            text.textContent = 'Logging in...';
+            // let the form submit first, then disable the button
+            setTimeout(function () {
+                loginBtn.disabled = true;
+                loginSpinner.style.display = 'inline-block';
+                loginBtnText.textContent = 'Logging in...';
+            }, 0);
         });
     }
+
+    // Back button / bfcache: button stuck aagaama irukka
+    window.addEventListener('pageshow', function (e) {
+        if (e.persisted) resetLoginBtn();
+    });
 </script>
 
 {% endblock %}

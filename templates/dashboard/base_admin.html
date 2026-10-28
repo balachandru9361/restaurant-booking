@@ -452,7 +452,7 @@
     const el = document.getElementById('liveRegion');
     if (!el) return;
     try {
-      const res = await fetch(location.href, { credentials: 'same-origin' });
+      const res = await fetch(location.href, { credentials: 'same-origin', cache: 'no-store' });
       const html = await res.text();
       const doc = new DOMParser().parseFromString(html, 'text/html');
       const fresh = doc.getElementById('liveRegion');
@@ -466,6 +466,12 @@
   (function () {
     // Kitchen and Server pages already have their own live logic, so they are skipped here.
     var SKIP = {% if request.resolver_match.url_name == 'kitchen_dashboard' or request.resolver_match.url_name == 'server_dashboard' %}true{% else %}false{% endif %};
+
+    // NEW: only the admin can call admin_poll. It returns a signature of all the data the admin
+    // pages show, so a page refreshes only when something really changed (orders, bookings,
+    // tables, menu, users, cash received, stock...). Works on PythonAnywhere (no WebSocket) too.
+    var POLL_URL = {% if request.user.is_superuser %}"{% url 'dashboard:admin_poll' %}"{% else %}""{% endif %};
+    var POLL_EVERY = 5000;   // 5 seconds
 
     var pill = document.getElementById('livePill');
     var pillText = document.getElementById('livePillText');
@@ -535,13 +541,35 @@
     }
 
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) requestRefresh(400);
+      if (!document.hidden) { requestRefresh(400); sigPoll(); }
     });
 
+    // ---- NEW: signature poll (the main live engine) ----
+    var lastSig = null;
+    var sigBusy = false;
+    function sigPoll() {
+      if (SKIP || !POLL_URL || document.hidden || sigBusy) return;
+      sigBusy = true;
+      fetch(POLL_URL, { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          if (!d || !d.sig) return;
+          if (lastSig === null) { lastSig = d.sig; return; }     // first run: just remember
+          if (d.sig !== lastSig) {
+            lastSig = d.sig;
+            requestRefresh(100);   // tryRefresh keeps retrying while a popup is open / someone is typing
+          }
+        })
+        .catch(function () { /* network hiccup: next tick retries */ })
+        .then(function () { sigBusy = false; });
+    }
+
     // ---- fallback when WebSockets are not available (for example on PythonAnywhere) ----
+    // CHANGED: the admin now uses sigPoll above (refresh only on a real change).
+    // Other roles keep the old 20 second refresh.
     var fallbackTimer = null;
     function startFallback() {
-      if (fallbackTimer || SKIP) return;
+      if (fallbackTimer || SKIP || POLL_URL) return;
       fallbackTimer = setInterval(function () { requestRefresh(100); }, 20000);
     }
     function stopFallback() {
@@ -557,7 +585,7 @@
       try {
         ws = new WebSocket(proto + location.host + '/ws/orders/');
       } catch (e) {
-        setState('poll', 'Auto refresh');
+        setState(POLL_URL ? 'live' : 'poll', POLL_URL ? 'Live' : 'Auto refresh');
         startFallback();
         return;
       }
@@ -575,7 +603,8 @@
       };
 
       ws.onclose = function (ev) {
-        setState('poll', 'Auto refresh');
+        // CHANGED: with sigPoll the admin is still live even without the WebSocket
+        setState(POLL_URL ? 'live' : 'poll', POLL_URL ? 'Live' : 'Auto refresh');
         startFallback();
         if (ev && ev.code === 4403) return;   // not allowed on the socket, do not retry
         tries += 1;
@@ -588,8 +617,12 @@
     }
 
     if (!SKIP) {
-      setState('poll', 'Connecting');
+      setState(POLL_URL ? 'live' : 'poll', POLL_URL ? 'Live' : 'Connecting');
       connect();
+      if (POLL_URL) {
+        sigPoll();
+        setInterval(sigPoll, POLL_EVERY);
+      }
     } else {
       setState('live', 'Live');
     }

@@ -7,7 +7,9 @@
 <title>{% block title %}Restaurant{% endblock %}</title>
 <link rel="stylesheet" href="{% static 'css/style.css' %}">
 
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 /* footer-match-header : style the footer like the header */
 .site-footer {
@@ -113,14 +115,15 @@
 </style>
 
 <style>
-/* fix-hscroll : stop sideways scroll caused by 100vw header */
-html, body { overflow-x: hidden; }
-</style>
-
-<style>
-/* fix-hscroll-v2 : clip sideways overflow from the 100vw header */
-html { overflow-x: hidden !important; }
-body { overflow-x: clip !important; max-width: 100%; }
+/* fix-hscroll : stop sideways scroll caused by the 100vw header.
+   "clip" hides the overflow WITHOUT turning html/body into scroll containers, so
+   sticky and fixed elements (header, side cart panel) keep working on phones.
+   Old browsers without "clip" fall back to "hidden" on html only. */
+html { overflow-x: hidden; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { max-width: 100%; }
+@supports (overflow: clip) {
+  html, body { overflow-x: clip; }
+}
 </style>
 
 <style>
@@ -324,8 +327,12 @@ a.footer-contact-item:hover svg { color: #f5c451; fill: #f5c451; }
 <div class="footer-col">
 <h4>Account</h4>
 <ul>
-<li><a href="{% url 'accounts:login' %}">Login</a></li>
-<li><a href="{% url 'accounts:signup' %}">Signup</a></li>
+{% if user.is_authenticated %}
+<li><a href="{% url 'accounts:profile' %}">My Profile</a></li>
+{% else %}
+<li><a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">Login</a></li>
+<li><a href="{% url 'accounts:signup' %}?next={{ request.path|urlencode }}">Signup</a></li>
+{% endif %}
 <li><a href="{% url 'booking_history' %}">My Bookings</a></li>
 <li><a href="{% url 'orders:order_history' %}">My Orders</a></li>
 </ul>

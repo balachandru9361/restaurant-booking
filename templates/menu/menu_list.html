@@ -2412,10 +2412,10 @@
     }
     .im-add:disabled { opacity: 0.6; cursor: not-allowed; }
     @media (max-width: 500px) {
-        .im-overlay { align-items: flex-end; padding: 0; }
-        .im-box { max-width: none; border-radius: 22px 22px 0 0; max-height: 94vh; }
-        .im-img { height: 200px; }
-    }
+    .im-overlay { align-items: center; padding: 14px; }
+    .im-box { max-width: 100%; border-radius: 22px; max-height: 88vh; }
+    .im-img { height: 170px; }
+}
 </style>
 
 <!-- ===== WELCOME SPLASH ===== -->
@@ -2989,6 +2989,33 @@
     }
 </style>
 
+<style id="cpMobileFix2">
+    /* Side cart panel: stretch from the navbar down to the visible bottom of the phone screen */
+    .cart-panel {
+        height: auto !important;
+        bottom: 0;
+        padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Floating buttons and toast move left of the panel instead of covering it */
+    body.has-cart-panel #backToTopBtn,
+    body.has-cart-panel .back-to-top,
+    body.has-cart-panel .scroll-to-bottom,
+    body.has-cart-panel .cart-toast {
+        right: calc(var(--cp-width) + 12px);
+    }
+
+    /* Phone: bulk-select bar stops before the panel */
+    @media (max-width: 500px) {
+        body.has-cart-panel .bulk-select-bar {
+            left: 12px;
+            right: calc(var(--cp-width) + 12px);
+        }
+    }
+</style>
+
 <div class="cart-toast" id="cartToast"></div>
 
 <div class="bulk-select-bar" id="bulkBar">
@@ -3167,7 +3194,8 @@
     function updateHeaderBadge(data) {
         var n = 0;
         if (data && data.success && data.items) {
-            // badge = number of DISTINCT items (not total quantity)
+            // badge = number of DIFFERENT dishes in the cart.
+            // Changing the quantity of a dish never changes this number.
             n = data.items.length;
         }
         document.querySelectorAll('.cart-count').forEach(function (el) {

@@ -265,6 +265,7 @@
 
 
 <style>
+.login-note { margin:18px 0 -8px; padding:10px 14px; border-radius:12px; background:rgba(255,183,3,.12); color:#fcd34d; font-size:.8rem; line-height:1.4; }
 .ci-opts { margin:3px 0 0; font-size:.8rem; color:#6b7280; line-height:1.35; word-break:break-word; }
 </style>
 
@@ -382,8 +383,14 @@
       <div class="mini"><span>Order type</span><b id="sumType">Dine-in</b></div>
       <div class="mini"><span>Arrival</span><b id="sumArrival">ASAP</b></div>
 
-      <button type="submit" form="checkoutForm" class="confirm-btn" id="confirmBtn">
-        <span class="cb-label">Confirm Order <span class="arrow">→</span></span>
+      {% if not user.is_authenticated %}
+      <p class="login-note">🔒 Login is needed only to place your order. Your cart and choices are saved.</p>
+      {% endif %}
+      {# data-auth / data-login-url: the click handler sends a logged-out customer to login BEFORE any animation #}
+      <button type="submit" form="checkoutForm" class="confirm-btn" id="confirmBtn"
+              data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}"
+              data-login-url="{{ login_url }}">
+        <span class="cb-label">{% if user.is_authenticated %}Confirm Order{% else %}Login to place order{% endif %} <span class="arrow">→</span></span>
         <span class="cb-spinner"></span>
         <svg class="cb-check" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
       </button>
@@ -426,6 +433,15 @@
 
   function $(sel) { return document.querySelector(sel); }
 
+  // ---- header cart badge: number of DIFFERENT dishes (quantity never changes it) ----
+  function setHeaderBadge(n) {
+    document.querySelectorAll('.cart-count').forEach(function (el) {
+      el.textContent = n;
+    });
+  }
+  // right on page load, so a wrong server-side number is corrected
+  setHeaderBadge({{ cart_items|length }});
+
   // ---- Indian number format: 1651859 -> 16,51,859.00 ----
   function inr(n) {
     n = parseFloat(String(n).replace(/,/g, ''));
@@ -434,11 +450,8 @@
   }
 
   // ---- animated numbers ----
-  // FIXED: the old version only saved el.dataset.value when the animation FINISHED,
-  // and never cancelled a running animation. Clicking +/- quickly started a new
-  // animation from a stale "from" value while the old one was still writing to the
-  // same element, so the Total jumped to wrong numbers. Now we cancel the running
-  // frame, save the current value on every frame, and always end on the exact value.
+  // Cancels a running animation before starting a new one and saves the current
+  // value on every frame, so quick +/- clicks never leave a wrong Total on screen.
   function countTo(el, to) {
     if (el._raf) { cancelAnimationFrame(el._raf); el._raf = null; }
     var from = parseFloat(el.dataset.value || '0');
@@ -465,6 +478,7 @@
   var totalEl = $('#sumTotal');
   var baseTotal = parseFloat(totalEl.dataset.base) || 0;   // subtotal (no tip)
   var TIP_KEY = 'cartTipPercent';
+  var FORM_KEY = 'cartFormState';
 
   function tipPercent() {
     var c = document.querySelector('input[name=tip_percent]:checked');
@@ -490,7 +504,7 @@
     }
   }
 
-  // restore the tip the customer picked before a reload
+  // restore the tip the customer picked before a reload (or before going to login)
   try {
     var saved = sessionStorage.getItem(TIP_KEY);
     if (saved === '5' || saved === '10') {
@@ -508,32 +522,41 @@
   renderTotals(true);
 
   // ---- quantity stepper (live, no page reload) ----
-  document.querySelectorAll('.qty-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var card = btn.closest('.cart-item');
-      if (card.classList.contains('busy')) return;
-      card.classList.add('busy');
-      fetch(btn.dataset.url, {
-        method: 'POST',
-        headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
-        body: new URLSearchParams({ action: btn.dataset.action, line: btn.dataset.line || '' })
+  // One click = one request. This handler runs first (capture phase) and stops the
+  // click there, so no other script on the page (base.html / side-cart JS) can
+  // handle the same click a second time and add the quantity twice.
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.cart-item .qty-btn');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    var card = btn.closest('.cart-item');
+    if (btn.disabled || card.classList.contains('busy')) return;
+    card.classList.add('busy');
+
+    fetch(btn.dataset.url, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+      body: new URLSearchParams({ action: btn.dataset.action, line: btn.dataset.line || '' })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.success) { window.location.reload(); return; }
+        var num = card.querySelector('.qty-num');
+        num.textContent = d.quantity;
+        num.classList.remove('pop'); void num.offsetWidth; num.classList.add('pop');
+        card.querySelector('[data-action=dec]').disabled = d.quantity <= 1;
+        card.querySelector('.line-total').textContent = inr(d.line_subtotal);
+        $('#sumSubtotal').textContent = inr(d.subtotal);
+        baseTotal = parseFloat(String(d.total).replace(/,/g, '')) || 0;
+        renderTotals(true);
+        // header badge = number of different dishes (+ / - never changes it)
+        if (typeof d.count === 'number') { setHeaderBadge(d.count); }
       })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-          if (!d.success) { window.location.reload(); return; }
-          var num = card.querySelector('.qty-num');
-          num.textContent = d.quantity;
-          num.classList.remove('pop'); void num.offsetWidth; num.classList.add('pop');
-          card.querySelector('[data-action=dec]').disabled = d.quantity <= 1;
-          card.querySelector('.line-total').textContent = inr(d.line_subtotal);
-          $('#sumSubtotal').textContent = inr(d.subtotal);
-          baseTotal = parseFloat(String(d.total).replace(/,/g, '')) || 0;
-          renderTotals(true);
-        })
-        .catch(function () { window.location.reload(); })
-        .then(function () { card.classList.remove('busy'); });
-    });
-  });
+      .catch(function () { window.location.reload(); })
+      .then(function () { card.classList.remove('busy'); });
+  }, true);
 
   // ---- slide-out before a remove form is submitted ----
   document.querySelectorAll('.remove-form').forEach(function (f) {
@@ -555,7 +578,7 @@
     var mode = $('input[name=arrival_mode]:checked').value;
     var take = type === 'takeaway';
 
-    // CHANGED: if the customer scanned a table QR, say so instead of "staff will assign"
+    // If the customer scanned a table QR, say so instead of "staff will assign"
     var tableNo = $('#typeHint').dataset.table;
     $('#typeHint').textContent = take
       ? 'We will pack it fresh. Collect it at the counter when you arrive.'
@@ -569,7 +592,7 @@
 
     var eta, label;
     if (mode === 'asap') {
-      // CHANGED: shown as an estimate, the chef confirms the exact time later
+      // Shown as an estimate, the chef confirms the exact time later
       eta = 'Estimated ready time: about ' + PREP_MINUTES + ' minutes. The chef will confirm the exact time once cooking starts.';
       label = 'ASAP';
     } else if (mode === 'custom') {
@@ -602,6 +625,39 @@
     });
   });
 
+  // ---- keep the customer's choices while they go to login and come back ----
+  function setRadio(name, value) {
+    if (!value) return;
+    var el = document.querySelector('input[name=' + name + '][value="' + value + '"]');
+    if (el) el.checked = true;
+  }
+
+  function saveFormState() {
+    try {
+      sessionStorage.setItem(FORM_KEY, JSON.stringify({
+        order_type: $('input[name=order_type]:checked').value,
+        arrival_mode: $('input[name=arrival_mode]:checked').value,
+        arrival_custom: customTime.value,
+        note: noteBox.value
+      }));
+    } catch (e) {}
+  }
+
+  function restoreFormState() {
+    try {
+      var raw = sessionStorage.getItem(FORM_KEY);
+      if (!raw) return;
+      sessionStorage.removeItem(FORM_KEY);   // restore only once
+      var s = JSON.parse(raw);
+      setRadio('order_type', s.order_type);
+      setRadio('arrival_mode', s.arrival_mode);
+      if (s.arrival_custom) customTime.value = s.arrival_custom;
+      if (s.note) { noteBox.value = s.note; noteCount.textContent = s.note.length; }
+      refresh();
+    } catch (e) {}
+  }
+  restoreFormState();
+
   // ---- Confirm Order animation ----
   var btn = $('#confirmBtn'), overlay = $('#successOverlay'), box = $('#confetti');
   var colors = ['#ff6b6b', '#ffb703', '#22c55e', '#3b82f6', '#a855f7', '#ffffff'];
@@ -627,6 +683,15 @@
       customTime.classList.remove('shake'); void customTime.offsetWidth; customTime.classList.add('shake');
       customTime.scrollIntoView({ behavior: 'smooth', block: 'center' });
       customTime.focus();
+      return;
+    }
+
+    // Not logged in: go to login right now. No "Order sent" animation, no form submit.
+    // After login the customer lands on this cart page again, with the cart and the
+    // choices (tip, order type, arrival, note) still in place.
+    if (btn.dataset.auth !== '1') {
+      saveFormState();
+      window.location.href = btn.dataset.loginUrl;
       return;
     }
 
