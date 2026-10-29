@@ -18,6 +18,7 @@ urlpatterns = [
     path('payment/initiate/<int:order_id>/', views.initiate_payment, name='initiate_payment'),
     path('payment/success/<int:order_id>/', views.payment_success, name='payment_success'),
     path('history/', views.order_history, name='order_history'),
+    path('track/', views.track_order, name='track_order'),
     path('status-poll/', views.order_status_poll, name='order_status_poll'),
     path('table/<int:table_id>/', views.select_table, name='select_table'),
     path('table/clear/', views.clear_table, name='clear_table'),

@@ -49,6 +49,11 @@ logger = logging.getLogger(__name__)
 # to zero once the kitchen/server move an order past "confirmed".
 PAID_STATUSES = ['confirmed', 'preparing', 'ready', 'delivered']
 
+# NEW (payment first): every staff screen reads orders through Order.objects.visible_to_staff()
+# so an online order that is still unpaid (or whose 15 minute payment time ran out) never shows
+# up for the admin, server or kitchen. Always call visible_to_staff() FIRST, then .filter(...).
+# Actions on ONE order by id (approve, reject, mark cash...) still use the plain Order lookup.
+
 
 # ---- Pagination helpers ----
 def _paginate(request, queryset, per_page=20):
@@ -78,7 +83,7 @@ def _sales_chart_data(start):
     Daily = last 30 days, Monthly = last 12 months (always, so the trend is visible).
     Top / least foods follow the selected range (today / week / month / year / all)."""
     today = timezone.localdate()
-    paid = Order.objects.filter(status__in=PAID_STATUSES)
+    paid = Order.objects.visible_to_staff().filter(status__in=PAID_STATUSES)   # CHANGED
 
     # ---- Daily sales: last 30 days (days with no orders show 0) ----
     d_start = today - timedelta(days=29)
@@ -169,9 +174,9 @@ def admin_dashboard(request):
         'total_tables': Table.objects.count(),
         'total_bookings': TableBooking.objects.count(),
         'total_users': User.objects.count(),
-        'total_orders': Order.objects.count(),
-        'total_sales': Order.objects.filter(status__in=PAID_STATUSES).aggregate(Sum('total_amount'))['total_amount__sum'] or 0,
-        'recent_orders': Order.objects.order_by('-created_at')[:5],
+        'total_orders': Order.objects.visible_to_staff().count(),   # CHANGED
+        'total_sales': Order.objects.visible_to_staff().filter(status__in=PAID_STATUSES).aggregate(Sum('total_amount'))['total_amount__sum'] or 0,   # CHANGED
+        'recent_orders': Order.objects.visible_to_staff().order_by('-created_at')[:5],   # CHANGED
         'recent_bookings': TableBooking.objects.order_by('-created_at')[:5],
         'notifications': Notification.objects.select_related('order')[:10],
         'unread_notifications': Notification.objects.filter(is_read=False).count(),
@@ -339,7 +344,7 @@ def _slot_conflicts(booking):
 
     # Running orders only matter when the booking is for today (or already past)
     if d <= timezone.localdate():
-        running = (Order.objects
+        running = (Order.objects.visible_to_staff()      # CHANGED: an unpaid order holds no table
                    .filter(table__isnull=False, table_released=False,
                            created_at__gte=timezone.now() - timedelta(hours=24))
                    .exclude(status='cancelled'))
@@ -610,8 +615,10 @@ def add_staff(request):
 # A served (delivered) order keeps its table until the server taps
 # "Customer Left" (table_released=True). Only cancelled orders free the table by themselves.
 def _order_holding_table(table_id, exclude_order_id=None):
-    """Active order that currently holds this table."""
-    qs = (Order.objects.filter(table_id=table_id, table_released=False)
+    """Active order that currently holds this table.
+    CHANGED: an unpaid online order (still on the payment page) does not hold the table."""
+    qs = (Order.objects.visible_to_staff()
+          .filter(table_id=table_id, table_released=False)
           .exclude(status='cancelled'))
     if exclude_order_id:
         qs = qs.exclude(pk=exclude_order_id)
@@ -632,7 +639,8 @@ def _table_error(order, table):
 # Tables that are free right now (not booked, not held by an order)
 def _free_tables():
     held = set(
-        Order.objects.filter(table__isnull=False, table_released=False)
+        Order.objects.visible_to_staff()      # CHANGED
+        .filter(table__isnull=False, table_released=False)
         .exclude(status='cancelled')
         .values_list('table_id', flat=True)
     )
@@ -682,8 +690,10 @@ def manage_orders(request):
     q = request.GET.get('q', '').strip().lstrip('#')
 
     # NEW: prepared_by is loaded too, so Manage Orders can show a "Prepared by" column
-    orders = (Order.objects
-              .select_related('user', 'table', 'prepared_by')
+    # NEW: taken_by is loaded too, so Manage Orders can show which server took the order
+    # CHANGED: starts from visible_to_staff(), so unpaid / expired online orders are never listed
+    orders = (Order.objects.visible_to_staff()
+              .select_related('user', 'table', 'prepared_by', 'taken_by')
               .prefetch_related('items__food_item'))
 
     if f_filter != 'all':
@@ -691,8 +701,10 @@ def manage_orders(request):
     if f_pay != 'all':
         orders = orders.filter(ORDER_PAY_Q[f_pay])
     if q:
+        # CHANGED: guest orders have no user, so the guest name and phone are searched too
         cond = (Q(user__username__icontains=q) | Q(user__first_name__icontains=q)
                 | Q(user__last_name__icontains=q)
+                | Q(guest_name__icontains=q) | Q(guest_phone__icontains=q)
                 | Q(id__in=OrderItem.objects.filter(food_item__name__icontains=q).values('order_id')))
         if q.isdigit():
             cond |= Q(id=int(q))
@@ -715,7 +727,7 @@ def manage_orders(request):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="orders_%s.csv"' % timezone.localdate()
         writer = csv.writer(response)
-        writer.writerow(['Order', 'Customer', 'Table', 'Items', 'Amount', 'Payment', 'Payment Status', 'Status', 'Placed', 'Prepared by'])
+        writer.writerow(['Order', 'Customer', 'Phone', 'Table', 'Items', 'Amount', 'Payment', 'Payment Status', 'Status', 'Placed', 'Prepared by', 'Source', 'Taken by'])
         for o in orders:
             if o.table:
                 where = f'Table {o.table.number}'
@@ -725,7 +737,8 @@ def manage_orders(request):
                 where = 'No table yet'
             writer.writerow([
                 o.id,
-                o.user.get_full_name() or o.user.username,
+                o.customer_name,          # CHANGED: works for a guest too
+                o.customer_phone,         # NEW: guest phone (blank for logged in customers)
                 where,
                 '; '.join(f'{i.quantity} {i.food_item.name}' for i in o.items.all()),
                 o.total_amount,
@@ -734,10 +747,12 @@ def manage_orders(request):
                 o.status,
                 timezone.localtime(o.created_at).strftime('%d %b %Y %H:%M'),
                 (o.prepared_by.get_full_name() or o.prepared_by.username) if o.prepared_by else '',
+                o.get_source_display(),   # NEW: QR / Customer or Server
+                o.taken_by_name,          # NEW: server who took the order (blank for QR orders)
             ])
         return response
 
-    # Stat cards and chip counts: one query over ALL orders (not only this page)
+    # Stat cards and chip counts: one query over ALL visible orders (not only this page)
     agg = {'total': Count('id')}
     for key, cond in ORDER_FILTER_Q.items():
         agg[key] = Count('id', filter=cond)
@@ -746,7 +761,7 @@ def manage_orders(request):
     agg['sales'] = Sum('total_amount', filter=Q(created_at__date=timezone.localdate(), status__in=PAID_STATUSES))
     agg['cash'] = Sum('total_amount', filter=ORDER_PAY_Q['cashpending'] & ~Q(status='cancelled'))
     agg['refund'] = Sum('total_amount', filter=ORDER_PAY_Q['refundpending'])
-    st = Order.objects.aggregate(**agg)
+    st = Order.objects.visible_to_staff().aggregate(**agg)    # CHANGED
     for key in ('sales', 'cash', 'refund'):
         st[key] = st[key] or Decimal('0')
 
@@ -756,16 +771,17 @@ def manage_orders(request):
     # Orders of the same running table (customer not left yet) become ONE row:
     # one combined amount, one cash button. Example: Table 8 with #17 and #18 -> one row, Rs.4800.
     # Every row gets: sitting_orders, sitting_count, sitting_total, sitting_cash_ids,
-    # sitting_cash_total, sitting_same_status, sitting_needs_approval, sitting_chefs, sitting_first.
+    # sitting_cash_total, sitting_same_status, sitting_needs_approval, sitting_chefs, sitting_first,
+    # NEW: sitting_servers (names of the servers who took orders on this table).
     _page_orders = list(page_obj.object_list)
     _live = lambda o: bool(o.table_id) and not o.table_released and o.status != 'cancelled'
     _tids = {o.table_id for o in _page_orders if _live(o)}
     _by_table = {}
     if _tids:
-        _running = (Order.objects
+        _running = (Order.objects.visible_to_staff()      # CHANGED
                     .filter(table_id__in=_tids, table_released=False)
                     .exclude(status='cancelled')
-                    .select_related('user', 'prepared_by', 'table')
+                    .select_related('user', 'prepared_by', 'table', 'taken_by')
                     .prefetch_related('items__food_item')
                     .order_by('-id'))
         for g in _running:
@@ -793,6 +809,14 @@ def manage_orders(request):
                 if name not in chefs:
                     chefs.append(name)
 
+        # NEW: servers who took the orders of this row
+        servers = []
+        for m in members:
+            if m.taken_by_id:
+                sname = m.taken_by_name
+                if sname not in servers:
+                    servers.append(sname)
+
         o.sitting_orders = members
         o.sitting_count = len(members)
         o.sitting_total = sum((m.total_amount for m in members), Decimal('0'))
@@ -802,6 +826,7 @@ def manage_orders(request):
         o.sitting_needs_approval = any(m.status == 'pending' and m.payment_status != 'pending'
                                        for m in members)
         o.sitting_chefs = chefs
+        o.sitting_servers = servers
         o.sitting_first = min(m.created_at for m in members)
         _rows.append(o)
     page_obj.object_list = _rows
@@ -810,7 +835,8 @@ def manage_orders(request):
     tables = list(Table.objects.all().order_by('number'))
     held = {
         o.table_id: o.id
-        for o in Order.objects.filter(table__isnull=False, table_released=False)
+        for o in Order.objects.visible_to_staff()      # CHANGED
+                              .filter(table__isnull=False, table_released=False)
                               .exclude(status='cancelled')
     }
     tables_info = [{
@@ -868,12 +894,14 @@ def mark_cash_received(request, pk):
     A pending (not yet approved) order only gets the payment marked.
     A cancelled order has nothing to collect, so it is refused.
     NEW: a 'cash_received' Notification is saved so the Server dashboard can show
-    a toast + sound as soon as the admin collects the cash."""
+    a toast + sound as soon as the admin collects the cash.
+    The JSON carries both 'ok' and 'success' so any page script can read it."""
     order = get_object_or_404(Order, pk=pk, payment_method='cash')
     # CHANGED: never mark a rejected/cancelled order as cash paid
     if order.status == 'cancelled':
         return JsonResponse(
-            {'success': False, 'error': f'Order #{order.id} is cancelled, so there is no cash to collect.'},
+            {'ok': False, 'success': False,
+             'error': f'Order #{order.id} is cancelled, so there is no cash to collect.'},
             status=400)
     order.payment_status = 'paid'
     fields = ['payment_status']
@@ -891,20 +919,21 @@ def mark_cash_received(request, pk):
         is_read=True,
         message=f'Cash received for order #{order.id} ({where}): Rs.{order.total_amount}'[:255],
     )
-    return JsonResponse({'success': True, 'status': order.status})
+    return JsonResponse({'ok': True, 'success': True, 'status': order.status})
 
 
 @admin_required
 @require_POST
 def mark_refunded(request, pk):
     """Used by the 'Mark Refunded' button on Manage Orders: the admin has paid the
-    money back for a cancelled order that was paid online."""
+    money back for a cancelled order that was paid online.
+    The JSON carries both 'ok' and 'success' so any page script can read it."""
     order = get_object_or_404(Order, pk=pk)
     if order.status != 'cancelled' or order.payment_method != 'online' or order.payment_status != 'paid':
-        return JsonResponse({'success': False, 'error': 'No refund is due for this order.'}, status=400)
+        return JsonResponse({'ok': False, 'success': False, 'error': 'No refund is due for this order.'}, status=400)
     order.refunded = True
     order.save(update_fields=['refunded'])
-    return JsonResponse({'success': True})
+    return JsonResponse({'ok': True, 'success': True})
 
 
 # The approve logic lives in a helper so the SERVER can use it too.
@@ -1019,8 +1048,9 @@ def _reject_pending_order(pk, reason, user):
             order.refunded = True
             order.save(update_fields=['refunded'])
 
-    # Tell the customer (a mail failure must not break the reject action)
-    if order.user.email:
+    # Tell the customer (a mail failure must not break the reject action).
+    # CHANGED: a guest order has no user, so there is nobody to email.
+    if order.user_id and order.user.email:
         try:
             # Suggest available dishes from the same category(ies) as the rejected order
             ordered = [oi.food_item for oi in order.items.select_related('food_item')]
@@ -1105,9 +1135,11 @@ def order_stock_check(request, pk):
     } for g, qty in need.items()]
     requirements.sort(key=lambda r: (not r['short'], r['name']))
     # Today's demand per food item (all non-cancelled orders placed today, incl. this one)
+    # CHANGED: unpaid / expired online orders are not counted as demand
     todays = (
         OrderItem.objects
-        .filter(order__created_at__date=timezone.localdate())
+        .filter(order__in=Order.objects.visible_to_staff(),
+                order__created_at__date=timezone.localdate())
         .exclude(order__status='cancelled')
         .values('food_item__name')
         .annotate(qty=Sum('quantity'), orders=Count('order', distinct=True))
@@ -1270,7 +1302,7 @@ def sales_reports(request):
     else:
         start = None
 
-    orders = Order.objects.filter(status__in=PAID_STATUSES)
+    orders = Order.objects.visible_to_staff().filter(status__in=PAID_STATUSES)   # CHANGED
     if start:
         orders = orders.filter(created_at__date__gte=start)
 
@@ -1283,7 +1315,7 @@ def sales_reports(request):
         for o in orders.select_related('user').order_by('-created_at'):
             writer.writerow([
                 o.id,
-                o.user.get_full_name() or o.user.username,
+                o.customer_name,          # CHANGED: works for a guest too
                 o.total_amount,
                 o.payment_method,
                 o.payment_status,
@@ -1425,9 +1457,10 @@ def _kitchen_order(qs):
 
 @kitchen_required
 def kitchen_dashboard(request):
-    confirmed_orders = _kitchen_order(Order.objects.filter(status='confirmed'))
-    preparing_orders = _kitchen_order(Order.objects.filter(status='preparing'))
-    ready_orders = _kitchen_order(Order.objects.filter(status='ready'))
+    # CHANGED: all three boards start from visible_to_staff()
+    confirmed_orders = _kitchen_order(Order.objects.visible_to_staff().filter(status='confirmed'))
+    preparing_orders = _kitchen_order(Order.objects.visible_to_staff().filter(status='preparing'))
+    ready_orders = _kitchen_order(Order.objects.visible_to_staff().filter(status='ready'))
 
     grocery_items, store_low = _store_stock_overview()
     low_stock_count = len(store_low)
@@ -1623,8 +1656,9 @@ def _transition_error(order, user, role, new_status):
 
 
 def _email_customer(order, subject, message):
-    """Email the customer. A mail failure must never break the staff action."""
-    if not order.user.email:
+    """Email the customer. A mail failure must never break the staff action.
+    CHANGED: a guest order has no user (and no email), so nothing is sent."""
+    if not order.user_id or not order.user.email:
         return
     try:
         send_mail(
@@ -1687,7 +1721,7 @@ def update_order_status(request, pk, new_status):
         messages.error(request, error)
         return redirect(_board_for(role, new_status))
 
-    name = order.user.get_full_name() or order.user.username
+    name = order.customer_name        # CHANGED: works for a guest too (order.user can be None)
 
     if new_status == 'delivered':
         if order.table:
@@ -1781,7 +1815,8 @@ def _tables_info():
     """Table chips for the Take Order popup: free / booked now / occupied by an order."""
     held = {
         o.table_id: o.id
-        for o in Order.objects.filter(table__isnull=False, table_released=False)
+        for o in Order.objects.visible_to_staff()      # CHANGED
+                              .filter(table__isnull=False, table_released=False)
                               .exclude(status='cancelled')
     }
     return [{
@@ -1799,9 +1834,10 @@ def _table_bill_orders(order):
     """All orders of the same sitting: same table, customer not left yet, not cancelled.
     Takeaway / already-released / cancelled orders get their own single bill."""
     if order.table_id and not order.table_released and order.status != 'cancelled':
-        return list(Order.objects.filter(table_id=order.table_id, table_released=False)
+        return list(Order.objects.visible_to_staff()      # CHANGED
+                    .filter(table_id=order.table_id, table_released=False)
                     .exclude(status='cancelled')
-                    .select_related('user', 'table')
+                    .select_related('user', 'table', 'taken_by')
                     .prefetch_related('items__food_item')
                     .order_by('created_at', 'id'))
     return [order]
@@ -1811,41 +1847,64 @@ def _table_bill_orders(order):
 def server_dashboard(request):
     # Customer orders waiting for the server. Server sends them to the kitchen (or rejects).
     # Online orders whose payment is not finished yet are not shown.
-    # CHANGED: newest order comes first (-created_at).
-    new_orders = (Order.objects.filter(status='pending')
+    # CHANGED: newest order comes first (-created_at). Starts from visible_to_staff().
+    # NEW: taken_by is loaded too. In the template use {{ o.taken_by_name }} and {{ o.is_server_order }}.
+    new_orders = (Order.objects.visible_to_staff()
+                  .filter(status='pending')
                   .exclude(payment_status='pending')
-                  .select_related('table', 'user')
+                  .select_related('table', 'user', 'taken_by')
                   .prefetch_related('items__food_item')
                   .order_by('-created_at'))
 
-    ready_orders = (Order.objects.filter(status='ready')
-                    .select_related('table', 'user').order_by('created_at'))
-    delivered_today = (Order.objects.filter(status='delivered', created_at__date=timezone.localdate())
+    ready_orders = (Order.objects.visible_to_staff()
+                    .filter(status='ready')
+                    .select_related('table', 'user', 'taken_by').order_by('created_at'))
+    delivered_today = (Order.objects.visible_to_staff()
+                       .filter(status='delivered', created_at__date=timezone.localdate())
+                       .select_related('table', 'taken_by')
                        .order_by('-created_at'))
 
     # Served, but the customer has not left yet (table still held until "Customer Left")
-    dining_orders = list(Order.objects.filter(status='delivered', table__isnull=False, table_released=False)
-                         .select_related('table', 'user').order_by('created_at'))
+    dining_orders = list(Order.objects.visible_to_staff()
+                         .filter(status='delivered', table__isnull=False, table_released=False)
+                         .select_related('table', 'user', 'taken_by').order_by('created_at'))
 
     # NEW: total / amount due for the WHOLE table (all its running orders), so the Dining Now
     # card can show one combined amount. In the template use:
     #   {{ o.table_total }}  {{ o.table_due }}  {{ o.table_order_count }}
+    # NEW: and who took the orders of that table:
+    #   {{ o.table_servers }} (list of server names)  {{ o.table_has_qr }} (True if a customer QR order is on the table)
     # The bill link is: {% url 'dashboard:server_table_bill' o.id %}
     _table_totals = {}
-    for tid, amount, paid in (Order.objects
-                              .filter(table_id__in=[o.table_id for o in dining_orders], table_released=False)
-                              .exclude(status='cancelled')
-                              .values_list('table_id', 'total_amount', 'payment_status')):
-        t = _table_totals.setdefault(tid, {'total': Decimal('0'), 'due': Decimal('0'), 'count': 0})
-        t['total'] += amount
+    for g in (Order.objects.visible_to_staff()
+              .filter(table_id__in=[o.table_id for o in dining_orders], table_released=False)
+              .exclude(status='cancelled')
+              .select_related('taken_by')
+              .order_by('created_at', 'id')):
+        t = _table_totals.setdefault(
+            g.table_id,
+            {'total': Decimal('0'), 'due': Decimal('0'), 'count': 0, 'servers': [], 'has_qr': False})
+        t['total'] += g.total_amount
         t['count'] += 1
-        if paid != 'paid':
-            t['due'] += amount
+        if g.payment_status != 'paid':
+            t['due'] += g.total_amount
+        if g.taken_by_id:
+            sname = g.taken_by_name
+            if sname not in t['servers']:
+                t['servers'].append(sname)
+        else:
+            t['has_qr'] = True
     for o in dining_orders:
-        t = _table_totals.get(o.table_id, {'total': o.total_amount, 'due': Decimal('0'), 'count': 1})
+        t = _table_totals.get(o.table_id, {
+            'total': o.total_amount, 'due': Decimal('0'), 'count': 1,
+            'servers': [o.taken_by_name] if o.taken_by_id else [],
+            'has_qr': not o.taken_by_id,
+        })
         o.table_total = t['total']
         o.table_due = t['due']
         o.table_order_count = t['count']
+        o.table_servers = t['servers']
+        o.table_has_qr = t['has_qr']
 
     # NEW: show ONE Dining Now card per table (the first order of that table carries the
     # combined total), so Table 10 with orders #13 and #14 is a single card
@@ -1943,7 +2002,7 @@ def server_table_cash_received(request, pk):
     """One click: every unpaid cash order of this table is marked paid."""
     order = get_object_or_404(Order, pk=pk)
     if order.table_id and not order.table_released and order.status != 'cancelled':
-        qs = Order.objects.filter(table_id=order.table_id, table_released=False)
+        qs = Order.objects.visible_to_staff().filter(table_id=order.table_id, table_released=False)   # CHANGED
     else:
         qs = Order.objects.filter(pk=order.pk)
     (qs.filter(payment_method='cash')
@@ -1990,7 +2049,8 @@ def server_free_table(request, pk):
     elif order.table_released:
         msg, ok = f'Table #{order.table.number} is already free.', False
     else:
-        on_table = list(Order.objects.filter(table_id=order.table_id, table_released=False)
+        on_table = list(Order.objects.visible_to_staff()      # CHANGED
+                        .filter(table_id=order.table_id, table_released=False)
                         .exclude(status='cancelled'))
         unpaid = [o for o in on_table if o.payment_status != 'paid']
         unserved = [o for o in on_table if o.status != 'delivered']
@@ -2033,7 +2093,10 @@ def server_mark_cash_received(request, pk):
 def server_take_order(request):
     """Server takes an order at the table. It lands straight on the Kitchen board (status 'confirmed'),
     paid in cash at the counter (cash_pending until the cash is marked received).
-    A table whose customer is still eating can take another order (extra juice, dessert...)."""
+    A table whose customer is still eating can take another order (extra juice, dessert...).
+    Payment first: this is the ONLY place a cash order is created (customers pay online only).
+    NEW: the order is saved with source='server' and taken_by=<this server>, so every dashboard
+    can show WHICH server took it."""
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, TypeError):
@@ -2089,6 +2152,8 @@ def server_take_order(request):
             payment_method='cash',
             payment_status='cash_pending',
             table_released=False,
+            source='server',              # NEW: taken by a server (not a customer QR scan)
+            taken_by=request.user,        # NEW: which server took it
         )
         for food, qty in lines:
             item_kwargs = {'order': order, 'food_item': food, 'quantity': qty}
@@ -2107,16 +2172,18 @@ def server_poll(request):
     """Polled by the server dashboard so new customer orders, finished orders,
     payment changes and cash-received alerts show up live."""
     # Customer orders waiting for the server. CHANGED: newest first + date/time sent to the page.
-    new_orders = (Order.objects.filter(status='pending')
+    new_orders = (Order.objects.visible_to_staff()      # CHANGED
+                  .filter(status='pending')
                   .exclude(payment_status='pending')
                   .select_related('table').order_by('-created_at'))
-    orders = (Order.objects.filter(status='ready')
+    orders = (Order.objects.visible_to_staff()          # CHANGED
+              .filter(status='ready')
               .select_related('table').order_by('created_at'))
 
     # NEW: signature of everything the board shows (today's orders + orders still holding a table).
     # When the admin marks cash received, a table is freed, an order is served, etc., this value
     # changes, so the server page knows it must refresh itself without a manual reload.
-    _board = (Order.objects
+    _board = (Order.objects.visible_to_staff()          # CHANGED
               .filter(Q(created_at__date=timezone.localdate())
                       | Q(table__isnull=False, table_released=False))
               .order_by('id')
@@ -2152,12 +2219,12 @@ def admin_poll(request):
     the admin pages show. When it changes, the open page refreshes itself."""
     today = timezone.localdate()
 
-    paid_total = (Order.objects.filter(status__in=PAID_STATUSES)
+    paid_total = (Order.objects.visible_to_staff().filter(status__in=PAID_STATUSES)     # CHANGED
                   .aggregate(s=Sum('total_amount'))['s'] or 0)
 
     # Orders: today's, still holding a table, or waiting for approval (any date)
     orders = list(
-        Order.objects
+        Order.objects.visible_to_staff()                 # CHANGED
         .filter(Q(created_at__date=today)
                 | Q(table__isnull=False, table_released=False)
                 | Q(status='pending'))
@@ -2184,7 +2251,7 @@ def admin_poll(request):
     _items, low = _store_stock_overview()
 
     parts = [
-        Order.objects.count(), str(paid_total), orders,
+        Order.objects.visible_to_staff().count(), str(paid_total), orders,      # CHANGED
         TableBooking.objects.count(), bookings,
         users, menu, tables,
         latest_note.id if latest_note else 0,

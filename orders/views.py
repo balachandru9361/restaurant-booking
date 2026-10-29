@@ -1,24 +1,16 @@
 import json
-import logging
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
-from urllib.parse import quote
 from django.http import JsonResponse
-from django.shortcuts import render, redirect, get_object_or_404, resolve_url
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from django.core.mail import send_mail
-from django.conf import settings
 from django.db import transaction
-from django.urls import reverse
 from django.utils import timezone
 from menu.models import FoodItem, Option
 from booking.models import Table
 from booking.availability import table_status_map, is_table_busy_now, upcoming_holds, WALKIN_BUFFER
-from .models import Order, OrderItem
-
-logger = logging.getLogger(__name__)
+from .models import Order, OrderItem, PAYMENT_HOLD_MINUTES
 
 # Highest quantity of one dish a customer can put in the cart
 MAX_QTY = 20
@@ -32,25 +24,25 @@ def _is_ajax(request):
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
 
-def _redirect_to_login(request):
-    """Customer is not logged in. Send them to the login page and bring them
-    back to the CART afterwards (never to /orders/confirm/, because the tip /
-    order type / arrival time they chose would be lost).
-    The cart lives in the session, so it is still there after login.
+def _my_orders(request):
+    """Only the orders that this browser session placed (or added with Track Order).
+    There is no customer login, so a customer can never see anybody else's order."""
+    ids = request.session.get('guest_order_ids', [])
+    return Order.objects.filter(id__in=ids, user__isnull=True)
 
-    The login page url comes from settings.LOGIN_URL, so no url namespace
-    is assumed here.
 
-    For fetch() calls this returns JSON (status 401) with the login url, so the
-    cart page JavaScript can redirect WITHOUT showing the 'Order sent' animation."""
-    login_url = resolve_url(settings.LOGIN_URL) + '?next=' + quote(reverse('orders:view_cart'))
-    if _is_ajax(request):
-        return JsonResponse(
-            {'success': False, 'login_required': True, 'login_url': login_url},
-            status=401,
-        )
-    messages.info(request, 'Please login to place your order. Your cart is saved.')
-    return redirect(login_url)
+def _expire_stale_orders(request):
+    """Cancels this customer's online orders that were not paid within
+    PAYMENT_HOLD_MINUTES. Staff screens never show them anyway
+    (Order.objects.visible_to_staff()), this just cleans them up."""
+    for order in _my_orders(request).stale_unpaid():
+        order.expire_if_unpaid()
+
+
+def _clean_phone(raw):
+    """Keeps the digits only and returns the last 10. Empty string when it is too short."""
+    digits = ''.join(ch for ch in str(raw) if ch.isdigit())
+    return digits[-10:] if len(digits) >= 10 else ''
 
 
 def _safe_qty(raw, default=1):
@@ -169,7 +161,7 @@ def add_to_cart(request, item_id):
 def add_to_order(request, item_id):
     """'Order now' from a dish page. Adds the dish to the cart and opens the cart
     page, where the customer picks tip / order type / arrival time and presses
-    Confirm. Login is asked only at Confirm time, so no login check is needed here."""
+    Confirm. No login is needed to order."""
     quantity = _safe_qty(request.POST.get('quantity', 1))
 
     if not FoodItem.objects.filter(id=item_id, is_available=True).exists():
@@ -235,7 +227,7 @@ def bulk_add_to_cart(request):
 
 def select_table(request, table_id):
     """QR code scan lands here. Stores the table in the session and
-    sends the customer to the HOME page (View Full Menu is one tap from there)."""
+    shows the welcome animation (qr_welcome), which then opens the HOME page."""
     table = get_object_or_404(Table, id=table_id)
 
     # If the table is held by someone else right now, don't attach it
@@ -251,7 +243,7 @@ def select_table(request, table_id):
     request.session['selected_table'] = table.id
     request.session.modified = True
     messages.success(request, f'You are at Table #{table.number}. Tap "View Full Menu" to start ordering!')
-    return redirect('home')
+    return redirect('qr_welcome')
 
 
 # "Change table" button on the cart page
@@ -448,8 +440,8 @@ def _collect_cart_options(data):
 
 @require_POST
 def save_cart_options(request):
-    """The cart page JavaScript calls this just before it sends a guest to the
-    login page, so the choices are still there when the customer comes back."""
+    """Not used any more (there is no customer login). Kept only so the URL in
+    orders/urls.py still works. Delete this view and its URL line later."""
     request.session['cart_options'] = _collect_cart_options(request.POST)
     request.session.modified = True
     return JsonResponse({'success': True})
@@ -476,11 +468,6 @@ def view_cart(request):
         'total': total,
         'suggestions': suggestions,
         'selected_table': selected_table,
-        # Choices saved before login (order type, arrival, note, tip); {} if none
-        'saved_options': request.session.get('cart_options', {}),
-        # Used by the Confirm button JavaScript: a customer who is not logged in
-        # goes straight to login (no 'Order sent' animation) and returns to the cart
-        'login_url': resolve_url(settings.LOGIN_URL) + '?next=' + quote(reverse('orders:view_cart')),
     }
     return render(request, 'orders/cart.html', context)
 
@@ -580,22 +567,27 @@ def _parse_arrival(request):
 
 
 def confirm_order(request):
-    """Creates the order as PENDING (payment_status 'pending') and sends the
-    user to the mock Razorpay checkout page.
+    """Creates the order as an UNPAID online order (payment_method 'online',
+    payment_status 'pending') and sends the customer to the checkout page.
 
-    Not decorated with @login_required on purpose: a customer who is not logged in
-    goes to login and comes back to the CART (see _redirect_to_login), never to
-    this URL.
+    PAYMENT FIRST: an unpaid order is invisible to the admin, server and kitchen
+    (see Order.objects.visible_to_staff). It reaches them only after
+    payment_success marks it paid. If the customer never pays, the order is
+    expired after PAYMENT_HOLD_MINUTES.
+
+    No login. The customer must give a name and a 10 digit phone number, and the
+    order is remembered in this browser session (guest_order_ids), so only this
+    browser can open it (another browser can use Track Order).
 
     Only a POST from the cart page creates an order. A plain GET (browser refresh,
     back button, link prefetch) never creates anything, it just opens the cart."""
-    if not request.user.is_authenticated:
-        if request.method == 'POST':
-            request.session['cart_options'] = _collect_cart_options(request.POST)
-            request.session.modified = True
-        return _redirect_to_login(request)
-
     if request.method != 'POST':
+        return redirect('orders:view_cart')
+
+    guest_name = request.POST.get('guest_name', '').strip()[:100]
+    guest_phone = _clean_phone(request.POST.get('guest_phone', ''))
+    if not guest_name or not guest_phone:
+        messages.error(request, 'Please enter your name and a valid 10 digit phone number.')
         return redirect('orders:view_cart')
 
     cart = request.session.get('cart', {})
@@ -647,7 +639,9 @@ def confirm_order(request):
     # All-or-nothing: if anything fails, no half-created order is left behind
     with transaction.atomic():
         order = Order.objects.create(
-            user=request.user,
+            user=None,
+            guest_name=guest_name,
+            guest_phone=guest_phone,
             table=selected_table,
             status='pending',
             coupon=None,
@@ -656,6 +650,8 @@ def confirm_order(request):
             order_type=order_type,
             arrival_time=arrival_time,
             note=note,
+            payment_method='online',
+            payment_status='pending',
         )
 
         for food_item, quantity, price, options_text in order_items_data:
@@ -667,6 +663,11 @@ def confirm_order(request):
                 options_text=options_text,
             )
 
+    # This browser can open the order (payment page, My Orders) from now on
+    ids = request.session.get('guest_order_ids', [])
+    ids.append(order.id)
+    request.session['guest_order_ids'] = ids
+
     request.session['cart'] = {}
     request.session.pop('selected_table', None)
     request.session.pop('coupon_code', None)
@@ -676,84 +677,99 @@ def confirm_order(request):
     return redirect('orders:initiate_payment', order_id=order.id)
 
 
-@login_required
+def _payment_block(request, order):
+    """Returns a redirect when this order can no longer be paid, otherwise None.
+    Covers: already paid (page refresh / double click), expired, cancelled,
+    and an order that waited longer than PAYMENT_HOLD_MINUTES."""
+    if order.status != 'pending' or order.payment_status != 'pending':
+        if order.payment_status == 'expired':
+            messages.error(request, 'Payment time was over, so this order was cancelled. Please order again.')
+            return redirect('orders:view_cart')
+        return redirect('orders:order_history')
+
+    if order.created_at < timezone.now() - timedelta(minutes=PAYMENT_HOLD_MINUTES):
+        order.expire_if_unpaid()
+        messages.error(request, 'Payment time was over, so this order was cancelled. Please order again.')
+        return redirect('orders:view_cart')
+
+    return None
+
+
 def initiate_payment(request, order_id):
-    """Shows the mock Razorpay checkout page. Only for orders that are still
-    waiting for payment (status 'pending' AND payment_status 'pending')."""
-    order = get_object_or_404(
-        Order, id=order_id, user=request.user, status='pending', payment_status='pending'
-    )
-    return render(request, 'orders/razorpay_checkout.html', {'order': order})
+    """Shows the mock Razorpay checkout page. Only for an order of this browser
+    session that is still waiting for payment and is not older than PAYMENT_HOLD_MINUTES."""
+    order = get_object_or_404(_my_orders(request), id=order_id)
+
+    blocked = _payment_block(request, order)
+    if blocked:
+        return blocked
+
+    # Seconds left to pay, counted from when the order was created. This uses the
+    # same created_at that _payment_block checks, so the timer and the expiry agree.
+    expires_at = order.created_at + timedelta(minutes=PAYMENT_HOLD_MINUTES)
+    seconds_left = max(int((expires_at - timezone.now()).total_seconds()), 0)
+
+    return render(request, 'orders/razorpay_checkout.html', {
+        'order': order,
+        'payment_hold_minutes': PAYMENT_HOLD_MINUTES,
+        'seconds_left': seconds_left,
+    })
 
 
-@login_required
 @require_POST
 def payment_success(request, order_id):
-    """Called when the mock checkout 'completes'. The order stays PENDING:
-    it now waits for the server/admin to approve (-> 'confirmed', appears on the
-    Kitchen board) or reject (-> 'cancelled')."""
-    order = get_object_or_404(
-        Order, id=order_id, user=request.user, status='pending', payment_status='pending'
-    )
+    """Called when the mock checkout 'completes'. Marks the order PAID. Only now does
+    it become visible to the admin / server, who approve it (-> 'confirmed', appears on
+    the Kitchen board) or reject it (-> 'cancelled', and a paid order is refunded).
 
-    payment_method = request.POST.get('payment_method', 'online')
-    if payment_method not in ('online', 'cash'):
-        payment_method = 'online'
+    A customer can ONLY pay online here. Cash orders are created by the server
+    (waiter) in the staff dashboard, never from this public page, otherwise anybody
+    could post payment_method=cash and push an unpaid order to the kitchen."""
+    order = get_object_or_404(_my_orders(request), id=order_id)
+
+    blocked = _payment_block(request, order)
+    if blocked:
+        return blocked
 
     # status is NOT changed here - approval moves it to 'confirmed'
-    order.payment_method = payment_method
-    order.payment_status = 'cash_pending' if payment_method == 'cash' else 'paid'
-    fields = ['payment_method', 'payment_status']
+    order.payment_method = 'online'
+    order.payment_status = 'paid'
 
-    if payment_method == 'online':
-        # This checkout is a MOCK, so no real Razorpay payment exists. A mock id is saved
-        # so the automatic refund on Reject works end to end (see _razorpay_refund in
-        # dashboard/views.py: ids starting with "mock_" are refunded without calling Razorpay).
-        # With the REAL Razorpay checkout, verify the signature and save the real "pay_xxx"
-        # id here instead. That real id is what the Razorpay refund API needs.
-        order.razorpay_payment_id = f'mock_pay_{order.id}'
-        fields.append('razorpay_payment_id')
+    # This checkout is a MOCK, so no real Razorpay payment exists. A mock id is saved
+    # so the automatic refund on Reject works end to end (see _razorpay_refund in
+    # dashboard/views.py: ids starting with "mock_" are refunded without calling Razorpay).
+    # With the REAL Razorpay checkout, verify the signature here (server side) and save
+    # the real "pay_xxx" id instead. That real id is what the Razorpay refund API needs.
+    order.razorpay_payment_id = f'mock_pay_{order.id}'
 
-    order.save(update_fields=fields)
+    order.save(update_fields=['payment_method', 'payment_status', 'razorpay_payment_id'])
 
-    if request.user.email:
-        item_lines = "\n".join(
-            f"- {oi.food_item.name} x{oi.quantity} = Rs.{oi.price * oi.quantity}"
-            for oi in order.items.all()
-        )
-        # Old orders placed before coupons were removed can still have a coupon
-        discount_line = f"\nDiscount ({order.coupon.code}): -Rs.{order.discount_amount}\n" if order.coupon else ""
+    messages.success(request, f'Payment received. Order #{order.id} is waiting for restaurant approval.')
+    return redirect('orders:order_history')
 
-        if payment_method == 'cash':
-            payment_line = f"\nPayment: Cash at Restaurant (Rs.{order.total_amount} to be paid on arrival)\n"
-        else:
-            payment_line = f"\nPayment: Paid Online (Rs.{order.total_amount})\n"
 
-        try:
-            send_mail(
-                subject=f'Order Received - Order #{order.id}',
-                message=(
-                    f"Hi {request.user.get_full_name() or request.user.username},\n\n"
-                    f"We have received your order #{order.id}. "
-                    f"It will go to the kitchen as soon as our team approves it.\n\n"
-                    f"{item_lines}\n"
-                    f"{discount_line}"
-                    f"{payment_line}\n"
-                    f"Total: Rs.{order.total_amount}\n\n"
-                    f"Thank you for ordering with Chandru Restaurant!"
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[request.user.email],
-                fail_silently=False,
-            )
-        except Exception:
-            logger.exception('Could not send order received email for order %s', order.id)
+@require_POST
+def track_order(request):
+    """Open an order on a different browser or phone: order number + phone number.
+    On a match the order is added to this browser session, then My Orders opens."""
+    raw_id = request.POST.get('order_id', '').strip().lstrip('#')
+    phone = _clean_phone(request.POST.get('phone', ''))
 
-    if payment_method == 'cash':
-        messages.success(request, 'Order placed! Waiting for restaurant approval. Please pay in cash at the restaurant.')
-    else:
-        messages.success(request, 'Order placed! Waiting for restaurant approval.')
+    order = None
+    if raw_id.isdigit() and phone:
+        order = Order.objects.filter(id=int(raw_id), guest_phone=phone).first()
 
+    if order is None:
+        messages.error(request, 'No order found for that order number and phone number.')
+        return redirect('orders:order_history')
+
+    ids = request.session.get('guest_order_ids', [])
+    if order.id not in ids:
+        ids.append(order.id)
+        request.session['guest_order_ids'] = ids
+        request.session.modified = True
+
+    messages.success(request, f'Order #{order.id} is now shown on this device.')
     return redirect('orders:order_history')
 
 
@@ -785,10 +801,11 @@ def _rejection_reasons(order_ids):
     return reasons
 
 
-@login_required
 def order_history(request):
+    _expire_stale_orders(request)
+
     orders = list(
-        Order.objects.filter(user=request.user).prefetch_related('items__food_item')
+        _my_orders(request).prefetch_related('items__food_item')
     )
 
     cancelled_ids = [o.id for o in orders if o.status == 'cancelled']
@@ -802,6 +819,8 @@ def order_history(request):
     for order in orders:
         order.reject_reason = ''
         order.suggestions = []
+        # True while the customer can still open the payment page for this order
+        order.can_pay = order.awaiting_payment and order.status == 'pending'
         if order.status != 'cancelled':
             continue
         order.reject_reason = reasons.get(order.id, '')
@@ -817,16 +836,22 @@ def order_history(request):
     return render(request, 'orders/order_history.html', {'orders': orders})
 
 
-@login_required
 def order_status_poll(request):
     """Light JSON feed used by My Orders to show live status changes."""
-    orders = list(Order.objects.filter(user=request.user).order_by('-created_at')[:60])
+    _expire_stale_orders(request)
+
+    orders = list(_my_orders(request).order_by('-created_at')[:60])
     cancelled_ids = [o.id for o in orders if o.status == 'cancelled']
     reasons = _rejection_reasons(cancelled_ids)
 
     return JsonResponse({
         'orders': [
-            {'id': o.id, 'status': o.status, 'reason': reasons.get(o.id, '')}
+            {
+                'id': o.id,
+                'status': o.status,
+                'payment_status': o.payment_status,
+                'reason': reasons.get(o.id, ''),
+            }
             for o in orders
         ]
     })

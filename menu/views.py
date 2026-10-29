@@ -24,7 +24,10 @@ def qr_welcome(request):
         table = Table.objects.filter(id=table_id).first()
         if table:
             table_no = table.number
-    return render(request, 'menu/qr_welcome.html', {'table_no': table_no})
+    return render(request, 'menu/qr_welcome.html', {
+        'table_no': table_no,
+        'home_url': reverse('home'),
+    })
 
 
 def menu_list(request):

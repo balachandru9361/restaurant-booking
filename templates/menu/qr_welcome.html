@@ -3,202 +3,257 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#050b19">
-<title>Welcome – Chandru Restaurant</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#07101f">
+<title>Welcome - Chandru Restaurant</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,500&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --gold:#f5b335; --gold2:#ffe29a; --coral:#ff6b4a; }
+  :root {
+    --ink:#07101f; --navy:#0e1c38; --gold:#f2b53f; --gold-hi:#ffe3a0; --brass:#b9812a; --cream:#fff6e2; --coral:#ff6b4a;
+  }
   * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
-  html,body { height:100%; overflow:hidden; background:#050b19; font-family:'Poppins',sans-serif; color:#fff; }
+  html, body { height:100%; overflow:hidden; background:var(--ink); color:#fff; font-family:'Poppins', sans-serif; }
 
-  .stage { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden;
-    background: radial-gradient(ellipse at 50% 30%, #1c3263 0%, #0b1836 45%, #040916 100%);
-    transition: opacity .3s ease, transform .3s ease, filter .3s ease; }
-  .stage.leave { opacity:0; transform:scale(1.18); filter:blur(6px) brightness(1.5); }
+  .stage {
+    position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+    background:
+      radial-gradient(ellipse at 50% 28%, #213e75 0%, rgba(33,62,117,0) 55%),
+      radial-gradient(ellipse at 50% 110%, rgba(255,107,74,.22) 0%, rgba(255,107,74,0) 55%),
+      linear-gradient(180deg, #0b1830 0%, var(--ink) 100%);
+    transition:opacity .35s ease, transform .35s ease, filter .35s ease;
+    cursor:pointer;
+  }
+  .stage.leave { opacity:0; transform:scale(1.08); filter:blur(5px) brightness(1.4); }
 
-  .spot { position:absolute; inset:0; opacity:0; animation: fade .3s ease forwards;
-    background: conic-gradient(from 180deg at 50% -8%, transparent 158deg, rgba(255,226,154,.2) 174deg, rgba(255,226,154,.2) 186deg, transparent 202deg); }
-  .vig { position:absolute; inset:0; background:radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.6) 100%); pointer-events:none; z-index:6; }
-  .orb { position:absolute; border-radius:50%; filter:blur(80px); opacity:.45; }
-  .o1 { width:320px; height:320px; background:#ff6b4a66; top:-90px; left:-100px; }
-  .o2 { width:360px; height:360px; background:#f5b33550; bottom:-120px; right:-110px; }
+  /* soft table-cloth light from below + vignette */
+  .glow { position:absolute; left:50%; bottom:-30%; width:140%; height:60%; transform:translateX(-50%);
+    background:radial-gradient(ellipse at center, rgba(242,181,63,.28), rgba(242,181,63,0) 65%); pointer-events:none; }
+  .vig { position:absolute; inset:0; pointer-events:none; z-index:6;
+    background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.55) 100%); }
   canvas#fx { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; }
-  .flash { position:absolute; inset:0; z-index:7; pointer-events:none; opacity:0;
-    background:radial-gradient(circle at 50% 38%, #fff 0%, rgba(255,226,154,.85) 25%, transparent 65%); animation: flash .5s ease .38s forwards; }
-  @keyframes flash { 0%{opacity:0} 25%{opacity:.9} 100%{opacity:0} }
 
-  .scene { position:relative; width:min(310px,82vw); height:270px; z-index:4; }
-  .scene > * { position:absolute; left:50%; }
-  .rays { top:128px; width:720px; height:720px; margin:-360px 0 0 -360px; border-radius:50%; opacity:0;
-    background:repeating-conic-gradient(from 0deg, rgba(255,214,120,.30) 0 7deg, transparent 7deg 22deg);
-    -webkit-mask:radial-gradient(circle, #000 0%, transparent 62%); mask:radial-gradient(circle, #000 0%, transparent 62%);
-    animation: fade .4s ease .4s forwards, spin 12s linear .4s infinite; }
+  /* ---------- logo medallion ---------- */
+  .medal { position:relative; width:168px; height:168px; z-index:4; flex:none; }
+  .medal svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+  .ring-draw { fill:none; stroke:var(--gold); stroke-width:2.5; stroke-linecap:round;
+    stroke-dasharray:452; stroke-dashoffset:452; transform:rotate(-90deg); transform-origin:50% 50%;
+    filter:drop-shadow(0 0 8px rgba(242,181,63,.8)); animation:draw 1s cubic-bezier(.6,0,.2,1) .15s forwards; }
+  .ring-dash { fill:none; stroke:rgba(255,227,160,.45); stroke-width:1.2; stroke-dasharray:2 9; stroke-linecap:round;
+    transform-origin:50% 50%; opacity:0; animation:fade .5s ease .9s forwards, spin 28s linear .9s infinite; }
+  @keyframes draw { to { stroke-dashoffset:0; } }
   @keyframes spin { to { transform:rotate(360deg); } }
-  .halo { top:128px; width:260px; height:260px; margin:-130px 0 0 -130px; border-radius:50%; opacity:0;
-    background:radial-gradient(circle, rgba(255,200,90,.55), transparent 68%); animation: fade .4s ease .45s forwards; }
-
-  .plate { bottom:0; width:100%; margin-left:-50%; opacity:0; animation: plateIn .3s cubic-bezier(.2,1.2,.4,1) 0s forwards; z-index:1; filter:drop-shadow(0 18px 24px rgba(0,0,0,.6)); }
-  @keyframes plateIn { from{opacity:0; transform:translateY(30px) scale(.85);} to{opacity:1; transform:none;} }
-
-  .logo { top:128px; width:124px; height:124px; margin:-62px 0 0 -62px; z-index:2; opacity:0; animation: logoRise .55s cubic-bezier(.2,1.6,.35,1) .42s forwards; }
-  @keyframes logoRise { from{opacity:0; transform:translateY(60px) scale(.35);} to{opacity:1; transform:translateY(-6px) scale(1);} }
-  .logo img { width:100%; height:100%; border-radius:50%; object-fit:cover; background:#fff; border:3px solid var(--gold);
-    box-shadow:0 0 0 7px rgba(245,179,53,.14), 0 0 45px rgba(245,179,53,.85), 0 0 120px rgba(245,179,53,.35); }
-
-  .cloche { bottom:34px; width:100%; margin-left:-50%; z-index:3; opacity:0; transform-origin:50% 100%;
-    animation: clocheIn .28s cubic-bezier(.3,1.3,.5,1) .03s forwards, clocheLift .4s cubic-bezier(.6,0,.25,1) .34s forwards;
-    filter:drop-shadow(0 10px 18px rgba(0,0,0,.5)); }
-  @keyframes clocheIn { from{opacity:0; transform:translateY(-200px);} to{opacity:1; transform:none;} }
-  @keyframes clocheLift { from{opacity:1; transform:none;} to{opacity:0; transform:translateY(-220px) rotate(-16deg);} }
-
-  .text { z-index:5; display:flex; flex-direction:column; align-items:center; margin-top:4px; width:100%; }
-  .greet { font-size:.72rem; letter-spacing:.4em; color:#a9bce3; font-weight:500; text-align:center; padding:0 12px; opacity:0; transform:translateY(10px); animation: up .35s ease .4s forwards; }
-  .name { margin-top:8px; font-family:'Playfair Display',serif; font-weight:800; font-size:clamp(2.1rem,9.5vw,3.7rem);
-    text-align:center; line-height:1.08; padding:0 14px; display:flex; flex-wrap:wrap; justify-content:center; perspective:600px; }
-  .name .w { display:inline-flex; white-space:nowrap; margin:0 .14em; }
-  .name .l { display:inline-block; opacity:0; transform:translateY(40px) scale(.5) rotateX(90deg); filter:blur(8px);
-    background:linear-gradient(110deg,#ffcf6b 20%,#fff9dc 45%,#f5a623 70%); background-size:250% 100%;
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-    animation: letter .4s cubic-bezier(.2,1.3,.3,1) forwards; animation-delay:var(--d); }
-  @keyframes letter { to { opacity:1; transform:none; filter:blur(0); } }
-  .divider { margin-top:10px; height:14px; display:flex; align-items:center; gap:10px; color:var(--gold); font-size:.7rem; opacity:0; animation: fade .3s ease .75s forwards; }
-  .divider i { display:block; height:1px; width:0; background:linear-gradient(90deg,transparent,var(--gold)); animation: line .4s ease .75s forwards; }
-  .divider i:last-child { background:linear-gradient(270deg,transparent,var(--gold)); }
-  @keyframes line { to { width:70px; } }
-  .tag { margin-top:10px; color:#dbe5fb; font-size:.98rem; font-weight:300; text-align:center; padding:0 22px; opacity:0; transform:translateY(10px); animation: up .35s ease .8s forwards; }
-  .tag b { color:var(--gold2); font-weight:500; }
-  .chip { margin-top:14px; padding:8px 20px; border-radius:40px; opacity:0; font-size:.9rem; font-weight:500;
-    background:linear-gradient(135deg,rgba(255,107,74,.28),rgba(245,179,53,.22)); border:1px solid rgba(255,170,130,.7); color:#ffe0d3;
-    box-shadow:0 0 28px rgba(255,107,74,.35); animation: bounce .4s cubic-bezier(.2,1.7,.4,1) .9s forwards; }
-  @keyframes up { to { opacity:1; transform:none; } }
-  @keyframes bounce { from{opacity:0; transform:translateY(20px) scale(.5);} to{opacity:1; transform:none;} }
   @keyframes fade { to { opacity:1; } }
 
-  .bar { position:absolute; left:0; right:0; bottom:0; height:3px; background:rgba(255,255,255,.08); z-index:8; }
-  .bar i { display:block; height:100%; width:0; background:linear-gradient(90deg,var(--coral),var(--gold),var(--gold2)); box-shadow:0 0 12px var(--gold); animation: fill 1.3s ease-out forwards; }
+  .logo { position:absolute; inset:21px; border-radius:50%; opacity:0; transform:scale(.4);
+    animation:pop .7s cubic-bezier(.2,1.5,.35,1) .45s forwards; }
+  .logo img { width:100%; height:100%; border-radius:50%; object-fit:cover; background:#fff; display:block;
+    box-shadow:0 0 0 4px rgba(7,16,31,.9), 0 0 40px rgba(242,181,63,.65), 0 14px 30px rgba(0,0,0,.5); }
+  .logo.nologo { display:grid; place-items:center; background:radial-gradient(circle at 35% 30%, #fff, #f3e3bd);
+    font-size:54px; box-shadow:0 0 0 4px rgba(7,16,31,.9), 0 0 40px rgba(242,181,63,.65), 0 14px 30px rgba(0,0,0,.5); }
+  .logo.nologo::before { content:'\1F37D\FE0F'; }
+  @keyframes pop { to { opacity:1; transform:scale(1); } }
+
+  /* steam rising from the medallion */
+  .steam { position:absolute; left:50%; bottom:78%; width:46px; height:90px; margin-left:-23px; border-radius:50%;
+    background:radial-gradient(ellipse at 50% 80%, rgba(255,255,255,.32), rgba(255,255,255,0) 70%);
+    filter:blur(9px); opacity:0; z-index:3; animation:steam 3.2s ease-in-out infinite; }
+  .steam.s2 { margin-left:-48px; animation-delay:.9s; width:36px; }
+  .steam.s3 { margin-left:4px; animation-delay:1.7s; width:40px; }
+  @keyframes steam {
+    0%   { opacity:0; transform:translateY(20px) scaleX(.8); }
+    30%  { opacity:.9; }
+    100% { opacity:0; transform:translateY(-70px) scaleX(1.5); }
+  }
+
+  /* ---------- text ---------- */
+  .copy { position:relative; z-index:5; display:flex; flex-direction:column; align-items:center; width:100%; margin-top:22px; }
+  .greet { font-size:.9rem; font-weight:300; color:#b9c9ee; letter-spacing:.04em; opacity:0; transform:translateY(8px);
+    animation:up .5s ease .75s forwards; }
+  .name { margin-top:6px; font-family:'Playfair Display', serif; font-weight:800; line-height:1.04; text-align:center;
+    font-size:clamp(2.5rem, 12.5vw, 4.4rem); display:flex; flex-direction:column; align-items:center; }
+  .name .w { display:flex; }
+  .name .l { display:inline-block; opacity:0; transform:translateY(34px) rotate(6deg); filter:blur(6px);
+    background:linear-gradient(180deg, var(--gold-hi) 10%, var(--gold) 55%, var(--brass) 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    animation:letter .55s cubic-bezier(.2,1.2,.3,1) forwards; animation-delay:var(--d); }
+  @keyframes letter { to { opacity:1; transform:none; filter:blur(0); } }
+
+  .tagline { margin-top:12px; font-family:'Playfair Display', serif; font-style:italic; font-weight:500; font-size:1.08rem;
+    color:var(--cream); text-align:center; padding:0 12px; opacity:0; transform:translateY(8px); animation:up .6s ease 1.35s forwards; }
+  @keyframes up { to { opacity:1; transform:none; } }
+
+  /* ---------- table plaque: the one memorable moment ---------- */
+  .plaque { position:relative; margin-top:26px; display:flex; align-items:center; gap:14px; padding:10px 24px 10px 12px;
+    border-radius:18px; opacity:0; transform:scale(1.7) rotate(-5deg);
+    background:linear-gradient(180deg, #17294d, #0c1730);
+    border:1.5px solid var(--gold);
+    box-shadow:0 0 0 4px rgba(242,181,63,.12), 0 10px 30px rgba(0,0,0,.55), 0 0 36px rgba(242,181,63,.35), inset 0 1px 0 rgba(255,227,160,.4);
+    animation:stamp .5s cubic-bezier(.2,1.4,.3,1) 1.65s forwards; }
+  .plaque::after { content:''; position:absolute; inset:-2px; border-radius:20px; border:2px solid var(--gold); opacity:0;
+    animation:ripple .9s ease-out 1.75s forwards; }
+  .plaque .no { min-width:58px; height:58px; border-radius:12px; display:grid; place-items:center; padding:0 10px;
+    font-family:'Playfair Display', serif; font-weight:800; font-size:2rem; color:#2a1a02;
+    background:linear-gradient(145deg, var(--gold-hi), var(--gold) 55%, var(--brass)); box-shadow:inset 0 -3px 0 rgba(0,0,0,.18); }
+  .plaque .txt { display:flex; flex-direction:column; line-height:1.2; }
+  .plaque .txt b { font-weight:600; font-size:1.05rem; color:#fff; }
+  .plaque .txt span { font-weight:300; font-size:.82rem; color:#b9c9ee; }
+  @keyframes stamp { to { opacity:1; transform:none; } }
+  @keyframes ripple { 0% { opacity:.9; transform:scale(1); } 100% { opacity:0; transform:scale(1.4, 1.9); } }
+
+  .seat { margin-top:24px; padding:10px 22px; border-radius:40px; font-size:.95rem; font-weight:400; color:var(--cream);
+    border:1px solid rgba(242,181,63,.6); background:rgba(242,181,63,.1); opacity:0; transform:translateY(10px);
+    animation:up .6s ease 1.65s forwards; }
+
+  /* ---------- footer ---------- */
+  .skip { position:absolute; left:0; right:0; bottom:calc(22px + env(safe-area-inset-bottom)); text-align:center; z-index:8;
+    font-size:.78rem; font-weight:300; color:#8da2d1; opacity:0; animation:fade .5s ease 1.2s forwards; }
+  .bar { position:absolute; left:0; right:0; bottom:0; height:3px; background:rgba(255,255,255,.07); z-index:9; }
+  .bar i { display:block; height:100%; width:0; background:linear-gradient(90deg, var(--coral), var(--gold), var(--gold-hi));
+    box-shadow:0 0 12px var(--gold); animation:fill 2.7s cubic-bezier(.3,.1,.3,1) forwards; }
   @keyframes fill { to { width:100%; } }
 
-  @media (max-height:640px) { .scene { height:230px; transform:scale(.85); margin-bottom:-20px; } }
+  @media (max-height:620px) { .medal { width:132px; height:132px; } .logo { inset:16px; } .copy { margin-top:12px; }
+    .plaque { margin-top:16px; } .tagline { margin-top:8px; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration:.01ms !important; animation-delay:0s !important; animation-iteration-count:1 !important; }
+    .steam { display:none; }
+  }
 </style>
 </head>
 <body>
-<div class="stage" id="stage" onclick="go()">
-  <div class="spot"></div>
-  <div class="orb o1"></div><div class="orb o2"></div>
+<div class="stage" id="stage" role="button" aria-label="Skip welcome and open the menu" onclick="go()">
+  <div class="glow"></div>
   <canvas id="fx"></canvas>
 
-  <div class="scene">
-    <div class="rays"></div>
-    <div class="halo"></div>
-
-    <svg class="plate" viewBox="0 0 310 70" aria-hidden="true">
-      <defs>
-        <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f6fb"/><stop offset="1" stop-color="#8c97ad"/></linearGradient>
-        <linearGradient id="pg2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#aab4c8"/><stop offset="1" stop-color="#e9edf5"/></linearGradient>
-      </defs>
-      <ellipse cx="155" cy="38" rx="150" ry="28" fill="url(#pg)"/>
-      <ellipse cx="155" cy="34" rx="118" ry="19" fill="url(#pg2)"/>
-      <ellipse cx="155" cy="33" rx="96" ry="14" fill="none" stroke="#f5b335" stroke-width="1.4" opacity=".8"/>
+  <div class="medal" id="medal">
+    <span class="steam"></span><span class="steam s2"></span><span class="steam s3"></span>
+    <svg viewBox="0 0 168 168" aria-hidden="true">
+      <circle class="ring-dash" cx="84" cy="84" r="80"/>
+      <circle class="ring-draw" cx="84" cy="84" r="72"/>
     </svg>
-
-    <!-- Login animation-la use pannura same logo path inga podunga -->
-    <div class="logo"><img src="{% static 'images/logo.png' %}" alt="Chandru Restaurant"></div>
-
-    <svg class="cloche" viewBox="0 0 310 200" aria-hidden="true">
-      <defs>
-        <linearGradient id="cg" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stop-color="#7d889e"/><stop offset=".25" stop-color="#f2f5fb"/><stop offset=".5" stop-color="#b9c2d4"/><stop offset=".8" stop-color="#e8ecf5"/><stop offset="1" stop-color="#7d889e"/>
-        </linearGradient>
-      </defs>
-      <path d="M30 170 C30 40 280 40 280 170 Z" fill="url(#cg)"/>
-      <path d="M62 150 C66 92 110 66 150 62" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".55"/>
-      <rect x="18" y="166" width="274" height="12" rx="6" fill="url(#cg)"/>
-      <circle cx="155" cy="53" r="11" fill="url(#cg)"/><rect x="149" y="56" width="12" height="9" fill="#9aa5ba"/>
-      <circle cx="152" cy="50" r="3.5" fill="#fff" opacity=".8"/>
-    </svg>
+    <!-- If static/images/logo.png is missing on the server, a plate icon is shown instead -->
+    <div class="logo" id="logoBox">
+      <img src="{% static 'images/logo.png' %}" alt="Chandru Restaurant"
+           onerror="this.onerror=null; this.style.display='none'; document.getElementById('logoBox').classList.add('nologo');">
+    </div>
   </div>
 
-  <div class="text">
-    <div class="greet" id="greet">WELCOME TO</div>
-    <div class="name" id="name"></div>
-    <div class="divider"><i></i>◆<i></i></div>
-    <div class="tag">Hungry? Let's find something <b>delicious</b> 🍽️</div>
-    {% if table_no %}<div class="chip">🪑 Table {{ table_no }}</div>{% endif %}
+  <div class="copy">
+    <div class="greet" id="greet">Welcome to</div>
+    <div class="name" id="name" aria-label="Chandru Restaurant"></div>
+    <div class="tagline">Fresh, hot and made for you</div>
+
+    {% if table_no %}
+    <div class="plaque" id="plaque">
+      <div class="no">{{ table_no }}</div>
+      <div class="txt"><b>Table {{ table_no }}</b><span>Your table is ready</span></div>
+    </div>
+    {% else %}
+    <div class="seat" id="plaque">Pick a seat and explore our menu</div>
+    {% endif %}
   </div>
 
+  <div class="skip">Tap anywhere to skip</div>
   <div class="bar"><i></i></div>
-  <div class="flash"></div>
   <div class="vig"></div>
 </div>
 
 <script>
 (function () {
-  var HOME = "{{ home_url|default:'/' }}";
+  var HOME = "{{ home_url|default:'/'|escapejs }}";
   var NAME = "Chandru Restaurant";
+  var REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var done = false;
   var $ = function (id) { return document.getElementById(id); };
 
   window.go = function () {
-    if (done) return; done = true;
+    if (done) return;
+    done = true;
     $('stage').classList.add('leave');
-    setTimeout(function () { location.replace(HOME); }, 280);
+    setTimeout(function () { location.replace(HOME); }, 320);
   };
 
+  /* greeting by local time */
   var h = new Date().getHours();
-  $('greet').textContent = (h < 12 ? 'GOOD MORNING' : h < 17 ? 'GOOD AFTERNOON' : h < 21 ? 'GOOD EVENING' : 'HELLO') + ' · WELCOME TO';
+  $('greet').textContent = (h < 12 ? 'Good morning, welcome to' : h < 17 ? 'Good afternoon, welcome to' : h < 21 ? 'Good evening, welcome to' : 'Welcome to');
 
+  /* name: one word per line, letters rise one by one */
   var idx = 0;
   NAME.split(' ').forEach(function (word) {
-    var w = document.createElement('span'); w.className = 'w';
+    var w = document.createElement('span');
+    w.className = 'w';
     word.split('').forEach(function (ch) {
-      var s = document.createElement('span'); s.className = 'l'; s.textContent = ch;
-      s.style.setProperty('--d', (0.42 + idx * 0.02) + 's'); idx++;
+      var s = document.createElement('span');
+      s.className = 'l';
+      s.textContent = ch;
+      s.style.setProperty('--d', (0.85 + idx * 0.035) + 's');
+      idx++;
       w.appendChild(s);
     });
     $('name').appendChild(w);
   });
 
-  /* canvas sparks + food emoji burst */
-  var cv = $('fx'), ctx = cv.getContext('2d'), W, H, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  if (REDUCED) { setTimeout(go, 900); return; }
+
+  /* drifting gold dust + one spark burst when the table plaque lands */
+  var cv = $('fx'), ctx = cv.getContext('2d'), W, H;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
   function size() { W = cv.width = innerWidth * dpr; H = cv.height = innerHeight * dpr; }
-  size(); addEventListener('resize', size);
-  var EM = ['🍕','🍔','🍗','🍛','🍜','🍰','🥗','🍟','🌮','🍤','🥘','🧁'];
-  var P = [];
-  function burst(n) {
-    var r = document.querySelector('.logo').getBoundingClientRect();
+  size();
+  addEventListener('resize', size);
+
+  var dust = [], sparks = [];
+  for (var i = 0; i < 38; i++) {
+    dust.push({ x: Math.random() * innerWidth, y: Math.random() * innerHeight,
+                r: 0.6 + Math.random() * 1.8, v: 0.15 + Math.random() * 0.5, a: 0.15 + Math.random() * 0.5,
+                s: Math.random() * 6.28 });
+  }
+
+  function burst() {
+    var el = $('plaque');
+    if (!el) return;
+    var r = el.getBoundingClientRect();
     var ox = (r.left + r.width / 2) * dpr, oy = (r.top + r.height / 2) * dpr;
-    for (var i = 0; i < n; i++) {
-      var a = Math.random() * Math.PI * 2, sp = (4 + Math.random() * 9) * dpr;
-      P.push({ x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2.5 * dpr, g: .12 * dpr,
-               r: (1.5 + Math.random() * 2.6) * dpr, life: 1, decay: .014 + Math.random() * .014,
-               e: i % 3 === 0 ? EM[Math.floor(Math.random() * EM.length)] : null,
-               rot: Math.random() * 6, vr: (Math.random() - .5) * .3, sz: (20 + Math.random() * 18) * dpr,
-               hue: Math.random() < .5 ? '255,205,95' : '255,120,90' });
+    for (var i = 0; i < 46; i++) {
+      var a = Math.random() * 6.283, sp = (2 + Math.random() * 7) * dpr;
+      sparks.push({ x: ox, y: oy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 1.5 * dpr, g: 0.1 * dpr,
+                    r: (1 + Math.random() * 2.2) * dpr, life: 1, decay: 0.017 + Math.random() * 0.02 });
     }
   }
+
+  var t = 0;
   (function frame() {
+    if (done && sparks.length === 0) return;
+    t += 0.016;
     ctx.clearRect(0, 0, W, H);
-    for (var i = P.length - 1; i >= 0; i--) {
-      var p = P[i];
-      p.x += p.vx; p.y += p.vy; p.vy += p.g; p.vx *= .985; p.life -= p.decay;
-      if (p.life <= 0) { P.splice(i, 1); continue; }
+
+    ctx.shadowBlur = 0;
+    for (var i = 0; i < dust.length; i++) {
+      var d = dust[i];
+      d.y -= d.v; d.x += Math.sin(t + d.s) * 0.25;
+      if (d.y < -4) { d.y = innerHeight + 4; d.x = Math.random() * innerWidth; }
+      ctx.globalAlpha = d.a * (0.6 + 0.4 * Math.sin(t * 2 + d.s));
+      ctx.fillStyle = '#ffe3a0';
+      ctx.beginPath(); ctx.arc(d.x * dpr, d.y * dpr, d.r * dpr, 0, 6.283); ctx.fill();
+    }
+
+    ctx.shadowColor = 'rgba(255,200,90,.9)'; ctx.shadowBlur = 10 * dpr;
+    for (var j = sparks.length - 1; j >= 0; j--) {
+      var p = sparks[j];
+      p.x += p.vx; p.y += p.vy; p.vy += p.g; p.vx *= 0.985; p.life -= p.decay;
+      if (p.life <= 0) { sparks.splice(j, 1); continue; }
       ctx.globalAlpha = p.life;
-      if (p.e) {
-        p.rot += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-        ctx.font = p.sz + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.e, 0, 0); ctx.restore();
-      } else {
-        ctx.fillStyle = 'rgba(' + p.hue + ',1)'; ctx.shadowColor = 'rgba(255,200,90,.9)'; ctx.shadowBlur = 10 * dpr;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
-      }
+      ctx.fillStyle = j % 3 === 0 ? '#ff8a66' : '#ffd36b';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
     }
     ctx.globalAlpha = 1;
     requestAnimationFrame(frame);
   })();
 
-  setTimeout(function () { burst(60); if (navigator.vibrate) navigator.vibrate([25, 30, 25]); }, 400); // cloche lifts
-  setTimeout(function () { burst(30); }, 850);                                                          // name done
+  setTimeout(function () { burst(); if (navigator.vibrate) navigator.vibrate([20, 30, 20]); }, 1850);
 
-  setTimeout(go, 1200);   // total = ~1.5 sec, then home page
+  setTimeout(go, 2800);   // about 2.8 seconds in total, then the home page
 })();
 </script>
 </body>

@@ -121,13 +121,20 @@
   }
   .order-table-badge.takeaway { background: #eef1f5; color: #6b7280; border-color: #d1d5db; }
 
-  /* QR table badge */
+  /* badge group (table + who took the order) */
   .badge-group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
   .qr-tag {
     display: inline-flex; align-items: center; gap: 3px;
     background: #ecfdf5; color: #047857; border: 1px solid #10b981;
     font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 20px; white-space: nowrap;
   }
+  /* NEW: "Taken by <server>" (indigo) or "QR Order" (green) */
+  .taken-badge {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe;
+    font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 20px; white-space: nowrap;
+  }
+  .taken-badge.qr { background: #ecfdf5; color: #047857; border-color: #10b981; }
   .order-table-badge.warn { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; animation: warnPulse 1.8s ease-in-out infinite; }
   @keyframes warnPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
@@ -648,15 +655,19 @@
           </div>
           <div class="order-user">
             <span>👤 {{ order.user.username }}</span>
-            {# table from QR scan shows a green QR tag; orders without a table show no badge #}
-            {% if order.table %}
-              <span class="badge-group">
+            {# table / takeaway badge + who took the order (server name, or QR order) #}
+            <span class="badge-group">
+              {% if order.table %}
                 <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
-                <span class="qr-tag" title="Customer scanned the table QR, so the table is already set">📱 QR</span>
-              </span>
-            {% elif order.is_takeaway %}
-              <span class="order-table-badge takeaway">🥡 Takeaway</span>
-            {% endif %}
+              {% elif order.is_takeaway %}
+                <span class="order-table-badge takeaway">🥡 Takeaway</span>
+              {% endif %}
+              {% if order.taken_by_name %}
+                <span class="taken-badge" title="Order taken by this server">👤 {{ order.taken_by_name }}</span>
+              {% else %}
+                <span class="taken-badge qr" title="Customer ordered by scanning the table QR">📱 QR Order</span>
+              {% endif %}
+            </span>
           </div>
           {% include 'dashboard/_order_meta.html' %}
           <ul class="order-items">
@@ -700,11 +711,18 @@
           </div>
           <div class="order-user">
             <span>👤 {{ order.user.username }}</span>
-            {% if order.table %}
-              <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
-            {% else %}
-              {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
-            {% endif %}
+            <span class="badge-group">
+              {% if order.table %}
+                <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
+              {% else %}
+                {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
+              {% endif %}
+              {% if order.taken_by_name %}
+                <span class="taken-badge" title="Order taken by this server">👤 {{ order.taken_by_name }}</span>
+              {% else %}
+                <span class="taken-badge qr" title="Customer ordered by scanning the table QR">📱 QR Order</span>
+              {% endif %}
+            </span>
           </div>
           {% include 'dashboard/_order_meta.html' %}
           <ul class="order-items">
@@ -749,6 +767,15 @@
           </div>
           <div class="order-user">
             <span>👤 {{ order.user.username }}</span>
+            {# all servers who took orders for this table, plus a QR badge if any order came from the table QR #}
+            <span class="badge-group">
+              {% for s in order.table_servers %}
+                <span class="taken-badge" title="Order taken by this server">👤 {{ s }}</span>
+              {% endfor %}
+              {% if order.table_has_qr %}
+                <span class="taken-badge qr" title="At least one order came from the table QR">📱 QR</span>
+              {% endif %}
+            </span>
           </div>
 
           {# NEW: combined amount of the whole table #}
@@ -836,6 +863,13 @@
             <div class="booking-name">Order #{{ order.id }} · {{ order.user.username }}</div>
             <div class="booking-meta">
               {% if order.table %}Table {{ order.table.number }}{% elif order.is_takeaway %}Takeaway{% else %}Dine-in{% endif %} · ₹{{ order.total_amount|inr }} · 🕒 {{ order.created_at|time:"h:i A" }}
+            </div>
+            <div class="booking-meta" style="margin-top:4px;">
+              {% if order.taken_by_name %}
+                <span class="taken-badge" title="Order taken by this server">👤 {{ order.taken_by_name }}</span>
+              {% else %}
+                <span class="taken-badge qr" title="Customer ordered by scanning the table QR">📱 QR Order</span>
+              {% endif %}
             </div>
           </div>
           <div class="served-right">

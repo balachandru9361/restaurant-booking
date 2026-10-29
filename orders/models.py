@@ -1,8 +1,19 @@
+from datetime import timedelta
+
+from django.core.validators import RegexValidator
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from menu.models import FoodItem
 from booking.models import Table
+
+# An online order that is still unpaid after this many minutes is expired.
+PAYMENT_HOLD_MINUTES = 15
+
+phone_validator = RegexValidator(
+    regex=r'^[0-9]{10}$',
+    message='Enter a valid 10-digit phone number.',
+)
 
 
 class Coupon(models.Model):
@@ -26,6 +37,25 @@ class Coupon(models.Model):
         return True
 
 
+class OrderQuerySet(models.QuerySet):
+    """Helpers so every staff screen uses the same payment-first rule."""
+
+    def visible_to_staff(self):
+        # Online orders reach the admin / server / kitchen only after payment.
+        # Orders taken by the server (cash at the counter) are always visible.
+        return self.exclude(
+            payment_method='online',
+            payment_status__in=['pending', 'expired'],
+        )
+
+    def awaiting_payment(self):
+        return self.filter(payment_method='online', payment_status='pending')
+
+    def stale_unpaid(self, minutes=PAYMENT_HOLD_MINUTES):
+        cutoff = timezone.now() - timedelta(minutes=minutes)
+        return self.awaiting_payment().filter(created_at__lt=cutoff)
+
+
 class Order(models.Model):
     # Flow: pending -> confirmed -> preparing -> ready
     #   dine-in / takeaway : ready -> delivered ("Served" in the staff dashboards)
@@ -47,6 +77,7 @@ class Order(models.Model):
         ('pending', 'Pending'),
         ('paid', 'Paid'),
         ('cash_pending', 'Cash Pending'),
+        ('expired', 'Expired'),  # online order that was never paid
     ]
 
     ORDER_TYPE_CHOICES = [
@@ -54,7 +85,22 @@ class Order(models.Model):
         ('takeaway', 'Take away'),
     ]
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
+    # Who placed the order: the customer (QR scan / website) or a server.
+    SOURCE_CHOICES = [
+        ('qr', 'QR / Customer'),
+        ('server', 'Server'),
+    ]
+
+    # null=True: a guest order (no login) has no user. SET_NULL: if a customer
+    # account is deleted, the order stays for the restaurant's sales records.
+    user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders'
+    )
+
+    # Details the customer types on the cart page (no customer login)
+    guest_name = models.CharField(max_length=100, blank=True)
+    guest_phone = models.CharField(max_length=15, blank=True, validators=[phone_validator])
+
     table = models.ForeignKey(Table, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
@@ -101,15 +147,70 @@ class Order(models.Model):
         help_text="Chef who took this order (set when preparing starts)."
     )
 
+    # Where the order came from: customer QR scan / website, or a server.
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='qr')
+
+    # The server who took this order from the "Take Order" screen.
+    # Blank for QR / website orders. SET_NULL keeps the order if the server's login is deleted.
+    taken_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='taken_orders',
+        help_text="Server who took this order (blank for QR / customer orders)."
+    )
+
+    objects = OrderQuerySet.as_manager()
+
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"Order #{self.id} - {self.user.username}"
+        return f"Order #{self.id} - {self.customer_name}"
+
+    @property
+    def customer_name(self):
+        """Name to show in dashboards, emails and templates."""
+        if self.guest_name:
+            return self.guest_name
+        if self.user_id:
+            return self.user.get_full_name() or self.user.username
+        return 'Guest'
+
+    @property
+    def customer_phone(self):
+        return self.guest_phone
+
+    @property
+    def is_guest(self):
+        return self.user_id is None
 
     @property
     def is_takeaway(self):
         return self.order_type == 'takeaway'
+
+    @property
+    def is_server_order(self):
+        return self.source == 'server'
+
+    @property
+    def taken_by_name(self):
+        """Server name to show on dashboard cards (blank for QR orders)."""
+        if not self.taken_by_id:
+            return ''
+        return self.taken_by.get_full_name() or self.taken_by.username
+
+    @property
+    def awaiting_payment(self):
+        return self.payment_method == 'online' and self.payment_status == 'pending'
+
+    def expire_if_unpaid(self):
+        """Cancel an online order that was never paid. Returns True if it was expired."""
+        if not self.awaiting_payment:
+            return False
+        self.payment_status = 'expired'
+        self.status = 'cancelled'
+        self.save(update_fields=['payment_status', 'status'])
+        return True
 
 
 class OrderItem(models.Model):

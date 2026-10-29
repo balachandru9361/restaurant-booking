@@ -209,7 +209,7 @@
   .rain { position:fixed; top:-40px; z-index:2002; pointer-events:none; font-size:var(--s,26px); animation:rainfall var(--d,2.4s) linear forwards; }
   @keyframes rainfall { to { transform:translateY(112vh) rotate(var(--r,360deg)); } }
 
-  /* ==== NEW: QR table banner ==== */
+  /* ==== QR table banner ==== */
   .table-banner { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     background:#ecfdf5; border:1.5px solid #10b981; color:#065f46; padding:14px 18px; border-radius:16px;
     margin-bottom:16px; font-weight:500; box-shadow:0 6px 18px rgba(16,185,129,.15); }
@@ -262,10 +262,16 @@
 }
 </style>
 
-
-
 <style>
-.login-note { margin:18px 0 -8px; padding:10px 14px; border-radius:12px; background:rgba(255,183,3,.12); color:#fcd34d; font-size:.8rem; line-height:1.4; }
+/* customer details (no login needed) */
+.guest-fields { margin:18px 0 0; padding-top:16px; border-top:1px dashed rgba(255,255,255,.18); display:grid; gap:10px; }
+.guest-fields .gf-title { margin:0; font-size:.85rem; font-weight:600; color:#fff; }
+.guest-fields .gf-sub { margin:0; font-size:.74rem; color:#9ca3af; }
+.guest-fields input { width:100%; box-sizing:border-box; border:1.5px solid rgba(255,255,255,.2); background:rgba(255,255,255,.06);
+  color:#fff; border-radius:12px; padding:11px 14px; font:inherit; font-size:.92rem; }
+.guest-fields input::placeholder { color:#9ca3af; }
+.guest-fields input:focus { outline:none; border-color:var(--gold); }
+.guest-fields input.shake { animation:shake .4s; border-color:#dc2626; }
 .ci-opts { margin:3px 0 0; font-size:.8rem; color:#6b7280; line-height:1.35; word-break:break-word; }
 </style>
 
@@ -275,6 +281,7 @@
     <p>Review your items before checking out.</p>
     <ol class="journey">
       <li class="active">Cart</li>
+      <li>Payment</li>
       <li>Admin approval</li>
       <li>Kitchen</li>
       <li>Served</li>
@@ -287,7 +294,7 @@
 
   <div class="cart-grid">
     <section>
-      {# NEW: shows the table the customer got from the QR scan #}
+      {# Shows the table the customer got from the QR scan #}
       {% if selected_table %}
       <div class="table-banner">
         <div class="tb-left"><span class="tb-ico">🪑</span><span>You are at <strong>Table #{{ selected_table.number }}</strong></span></div>
@@ -320,7 +327,7 @@
           <input type="radio" id="ot-take" name="order_type" value="takeaway" form="checkoutForm">
           <label for="ot-take"><span class="ico">🥡</span><b>Take away</b><small>Packed and ready for pickup</small></label>
         </div>
-        {# CHANGED: data-table holds the QR table number (empty if no QR scan) #}
+        {# data-table holds the QR table number (empty if no QR scan) #}
         <p class="hint" id="typeHint" data-table="{% if selected_table %}{{ selected_table.number }}{% endif %}">Our staff will assign your table when you arrive.</p>
 
         <h3 id="arrivalTitle">When will you arrive?</h3>
@@ -383,14 +390,16 @@
       <div class="mini"><span>Order type</span><b id="sumType">Dine-in</b></div>
       <div class="mini"><span>Arrival</span><b id="sumArrival">ASAP</b></div>
 
-      {% if not user.is_authenticated %}
-      <p class="login-note">🔒 Login is needed only to place your order. Your cart and choices are saved.</p>
-      {% endif %}
-      {# data-auth / data-login-url: the click handler sends a logged-out customer to login BEFORE any animation #}
-      <button type="submit" form="checkoutForm" class="confirm-btn" id="confirmBtn"
-              data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}"
-              data-login-url="{{ login_url }}">
-        <span class="cb-label">{% if user.is_authenticated %}Confirm Order{% else %}Login to place order{% endif %} <span class="arrow">→</span></span>
+      {# Customer details: name and phone are always required (there is no customer login) #}
+      <div class="guest-fields">
+        <p class="gf-title">👤 Your details</p>
+        <input type="text" name="guest_name" form="checkoutForm" placeholder="Your name" maxlength="100" autocomplete="name" required>
+        <input type="tel" name="guest_phone" form="checkoutForm" placeholder="10 digit phone number" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" autocomplete="tel" required>
+        <p class="gf-sub">We call or message this number only about your order.</p>
+      </div>
+
+      <button type="submit" form="checkoutForm" class="confirm-btn" id="confirmBtn">
+        <span class="cb-label">Confirm Order <span class="arrow">→</span></span>
         <span class="cb-spinner"></span>
         <svg class="cb-check" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
       </button>
@@ -412,7 +421,7 @@
   <div class="ov-card">
     <div class="ov-ring"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg></div>
     <h3>Order sent!</h3>
-    <p id="ovText">Waiting for admin approval. Taking you to payment...</p>
+    <p id="ovText">Order saved. Taking you to payment...</p>
   </div>
 </div>
 <div class="confetti" id="confetti"></div>
@@ -478,7 +487,6 @@
   var totalEl = $('#sumTotal');
   var baseTotal = parseFloat(totalEl.dataset.base) || 0;   // subtotal (no tip)
   var TIP_KEY = 'cartTipPercent';
-  var FORM_KEY = 'cartFormState';
 
   function tipPercent() {
     var c = document.querySelector('input[name=tip_percent]:checked');
@@ -504,7 +512,7 @@
     }
   }
 
-  // restore the tip the customer picked before a reload (or before going to login)
+  // restore the tip the customer picked before a reload
   try {
     var saved = sessionStorage.getItem(TIP_KEY);
     if (saved === '5' || saved === '10') {
@@ -625,39 +633,6 @@
     });
   });
 
-  // ---- keep the customer's choices while they go to login and come back ----
-  function setRadio(name, value) {
-    if (!value) return;
-    var el = document.querySelector('input[name=' + name + '][value="' + value + '"]');
-    if (el) el.checked = true;
-  }
-
-  function saveFormState() {
-    try {
-      sessionStorage.setItem(FORM_KEY, JSON.stringify({
-        order_type: $('input[name=order_type]:checked').value,
-        arrival_mode: $('input[name=arrival_mode]:checked').value,
-        arrival_custom: customTime.value,
-        note: noteBox.value
-      }));
-    } catch (e) {}
-  }
-
-  function restoreFormState() {
-    try {
-      var raw = sessionStorage.getItem(FORM_KEY);
-      if (!raw) return;
-      sessionStorage.removeItem(FORM_KEY);   // restore only once
-      var s = JSON.parse(raw);
-      setRadio('order_type', s.order_type);
-      setRadio('arrival_mode', s.arrival_mode);
-      if (s.arrival_custom) customTime.value = s.arrival_custom;
-      if (s.note) { noteBox.value = s.note; noteCount.textContent = s.note.length; }
-      refresh();
-    } catch (e) {}
-  }
-  restoreFormState();
-
   // ---- Confirm Order animation ----
   var btn = $('#confirmBtn'), overlay = $('#successOverlay'), box = $('#confetti');
   var colors = ['#ff6b6b', '#ffb703', '#22c55e', '#3b82f6', '#a855f7', '#ffffff'];
@@ -686,13 +661,20 @@
       return;
     }
 
-    // Not logged in: go to login right now. No "Order sent" animation, no form submit.
-    // After login the customer lands on this cart page again, with the cart and the
-    // choices (tip, order type, arrival, note) still in place.
-    if (btn.dataset.auth !== '1') {
-      saveFormState();
-      window.location.href = btn.dataset.loginUrl;
-      return;
+    // Name and a 10 digit phone number are always required (there is no customer login).
+    // Checked here because this handler calls preventDefault() and submits with
+    // form.submit(), which skips the browser's own "required" validation.
+    var gName = $('input[name=guest_name]'), gPhone = $('input[name=guest_phone]');
+    if (gName && gPhone) {
+      var bad = null;
+      if (!gName.value.trim()) bad = gName;
+      else if (gPhone.value.replace(/\D/g, '').length < 10) bad = gPhone;
+      if (bad) {
+        bad.classList.remove('shake'); void bad.offsetWidth; bad.classList.add('shake');
+        bad.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        bad.focus();
+        return;
+      }
     }
 
     var r = btn.getBoundingClientRect(), dot = document.createElement('span');
@@ -702,9 +684,7 @@
     btn.appendChild(dot);
     setTimeout(function () { dot.remove(); }, 700);
 
-    $('#ovText').textContent = ($('input[name=order_type]:checked').value === 'takeaway'
-      ? 'We will pack it for you once approved. '
-      : 'We will keep your table ready. ') + 'Taking you to payment...';
+    $('#ovText').textContent = 'Taking you to payment. The restaurant gets your order after you pay.';
 
     try { sessionStorage.removeItem(TIP_KEY); } catch (e2) {}
 

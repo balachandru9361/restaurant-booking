@@ -1121,11 +1121,157 @@
     }
 </style>
 
+<style id="payTrackStyle">
+    /* ===== Pay now box (unpaid online order) ===== */
+    .pay-now-box {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 0 0 16px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: #9a3412;
+        font-size: 0.88rem;
+        font-weight: 700;
+    }
+    .pay-now-box .pay-now-text { flex: 1; min-width: 180px; line-height: 1.4; }
+    .btn-pay-now {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 40px;
+        padding: 0 22px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #3395ff, #1c7ce0);
+        color: #fff;
+        font-weight: 800;
+        font-size: 0.88rem;
+        text-decoration: none;
+        box-shadow: 0 8px 18px -8px rgba(51, 149, 255, 0.6);
+        transition: transform 0.15s ease;
+    }
+    .btn-pay-now:hover { color: #fff; text-decoration: none; transform: translateY(-2px); }
+
+    /* ===== Flash messages (green for success, red for error) ===== */
+    .flash-wrap {
+        max-width: 720px;
+        margin: 0 auto 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .flash {
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        border: 1px solid transparent;
+    }
+    .flash.success { background: #ecfdf3; border-color: #bbf7d0; color: #166534; }
+    .flash.error   { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+    .flash.warning { background: #fff7e0; border-color: #fde7b0; color: #8a5a00; }
+    .flash.info    { background: #eaf2ff; border-color: #bfdbfe; color: #1d4ed8; }
+
+    /* ===== Track order form (order number + phone), collapsed at the bottom ===== */
+    .track-box {
+        max-width: 720px;
+        margin: 36px auto 0;
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07);
+        padding: 18px 22px;
+    }
+    .track-box summary {
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 800;
+        color: #1f2937;
+        list-style: none;
+    }
+    .track-box summary::-webkit-details-marker { display: none; }
+    .track-box summary::after {
+        content: "\25BE";
+        float: right;
+        color: #8a90a3;
+        transition: transform 0.2s ease;
+    }
+    .track-box[open] summary::after { transform: rotate(180deg); }
+    .track-box .track-sub {
+        font-size: 0.82rem;
+        color: #888;
+        margin: 10px 0 14px;
+    }
+    .track-form {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 10px;
+        align-items: end;
+    }
+    .track-form label {
+        display: block;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #8a90a3;
+        margin-bottom: 5px;
+    }
+    .track-form input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1.5px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #1f2937;
+        background: #fbfcfe;
+        font-family: inherit;
+    }
+    .track-form input:focus {
+        outline: none;
+        border-color: #3395ff;
+        box-shadow: 0 0 0 3px rgba(51, 149, 255, 0.15);
+        background: #fff;
+    }
+    .track-form button {
+        height: 42px;
+        padding: 0 22px;
+        border: 0;
+        border-radius: 10px;
+        background: #1f2937;
+        color: #fff;
+        font-weight: 800;
+        font-size: 0.88rem;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background-color 0.2s;
+    }
+    .track-form button:hover { background: #ff6b6b; }
+    @media (max-width: 560px) {
+        .track-form { grid-template-columns: 1fr; }
+        .track-form button { width: 100%; }
+    }
+</style>
+
 <div class="orders-hero">
     <div class="icon">🧾</div>
     <h1>My Orders</h1>
     <p>Track and review all your past orders.</p>
 </div>
+
+{# Flash messages (payment received, track errors ...). Green for success, red for error. #}
+{% if messages %}
+    <div class="flash-wrap">
+        {% for message in messages %}
+            <div class="flash {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+{% endif %}
 
 {% if orders %}
     <div class="orders-stats">
@@ -1181,6 +1327,14 @@
                 </div>
                 <p class="order-date">Placed on {{ order.created_at|date:"d M Y, h:i A" }}</p>
 
+                {# Payment not finished yet, so the customer can go back and pay (only while can_pay is true) #}
+                {% if order.can_pay %}
+                    <div class="pay-now-box">
+                        <span class="pay-now-text">💳 Payment is not done yet. The restaurant gets your order only after you pay.</span>
+                        <a class="btn-pay-now" href="{% url 'orders:initiate_payment' order.id %}">Pay now</a>
+                    </div>
+                {% endif %}
+
                 {% if order.status != 'cancelled' %}
                     <div class="tracker">
                         <div class="t-step {% if order.status == 'pending' %}current{% else %}done{% endif %}">
@@ -1201,7 +1355,12 @@
                     </div>
                     <div class="t-msg t-{{ order.status }}">
                         {% if order.status == 'pending' %}
-                            <span class="t-ic">&#9203;</span><span>Waiting for the restaurant to accept your order<span class="t-dots"><i></i><i></i><i></i></span></span>
+                            {# An unpaid order is not waiting for the restaurant yet #}
+                            {% if order.payment_status == 'pending' and order.payment_method != 'cash' %}
+                                <span class="t-ic">&#128179;</span><span>Waiting for your payment</span>
+                            {% else %}
+                                <span class="t-ic">&#9203;</span><span>Waiting for the restaurant to accept your order<span class="t-dots"><i></i><i></i><i></i></span></span>
+                            {% endif %}
                         {% elif order.status == 'confirmed' %}
                             <span class="t-ic">&#9989;</span><span>Order accepted! The kitchen is getting ready</span>
                         {% elif order.status == 'preparing' %}
@@ -1343,6 +1502,24 @@
         <a href="{% url 'menu_list' %}" class="btn-browse">Browse Menu</a>
     </div>
 {% endif %}
+
+{# Track an order from another phone or browser (order number + phone number). Collapsed, at the bottom. #}
+<details class="track-box">
+    <summary>🔎 Track an order from another phone</summary>
+    <p class="track-sub">Enter your order number and the phone number you used when ordering.</p>
+    <form method="post" action="{% url 'orders:track_order' %}" class="track-form">
+        {% csrf_token %}
+        <div>
+            <label for="trackOrderId">Order number</label>
+            <input type="text" id="trackOrderId" name="order_id" placeholder="e.g. 25" inputmode="numeric" maxlength="10" required>
+        </div>
+        <div>
+            <label for="trackPhone">Phone number</label>
+            <input type="tel" id="trackPhone" name="phone" placeholder="10 digit phone number" inputmode="numeric" maxlength="10" pattern="[0-9]{10}" autocomplete="tel" required>
+        </div>
+        <button type="submit">Track order</button>
+    </form>
+</details>
 
 <script>
     (function () {
