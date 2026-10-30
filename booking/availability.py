@@ -120,7 +120,7 @@ def get_holds():
             end = now + OPEN_ENDED
         if end > now:
             holds.append(Hold('order', o.table_id, o.created_at, end, o.user_id,
-                              f"Order #{o.id} ({o.user.username})", o))
+                              f"Order #{o.id} ({(o.user.username if o.user else 'Guest')})", o))
     return holds
 
 
