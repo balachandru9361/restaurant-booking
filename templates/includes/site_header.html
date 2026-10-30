@@ -19,13 +19,14 @@
     max-width: 1280px; margin: 0 auto; padding: 12px 24px;
     display: flex; align-items: center; justify-content: space-between; gap: 16px;
   }
-  .hd-left { display: flex; align-items: center; gap: 16px; }
+  .hd-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
 
   /* ---- 3 bar button ---- */
   .burger {
     width: 46px; height: 46px; border-radius: 12px; border: 1px solid var(--line);
-    background: var(--brand-soft); cursor: pointer;
+    background: var(--brand-soft); cursor: pointer; flex-shrink: 0;
     display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px;
+    -webkit-tap-highlight-color: transparent;
   }
   .burger span {
     display: block; width: 22px; height: 3px; border-radius: 2px; background: var(--brand);
@@ -36,17 +37,18 @@
   .burger.open span:nth-child(3) { transform: translateY(-8px) rotate(-45deg); }
 
   /* ---- Logo ---- */
-  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-  .brand .logo-img { height: 68px; width: 68px; object-fit: contain; }
+  .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; min-width: 0; }
+  .brand .logo-img { height: 68px; width: 68px; object-fit: contain; flex-shrink: 0; }
   .brand .name { font-family: "Playfair Display", Georgia, serif; font-size: 25px; font-weight: 700; color: var(--brand); line-height: 1.1; }
   .brand .tag { font-size: 12px; color: #777; margin-top: 2px; }
 
   /* ---- Right icons ---- */
-  .hd-actions { display: flex; align-items: center; gap: 14px; }
+  .hd-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
   .cart-btn {
     position: relative; width: 46px; height: 46px; border-radius: 50%;
     background: var(--brand-soft); border: 1px solid var(--line);
     display: grid; place-items: center; color: var(--brand); text-decoration: none;
+    flex-shrink: 0;
   }
   .cart-btn:hover { background: #fbe4c0; }
   .cart-btn svg { width: 22px; height: 22px; }
@@ -61,7 +63,7 @@
   .profile-btn {
     width: 48px; height: 48px; border-radius: 50%; padding: 3px; border: 0; cursor: pointer;
     background: conic-gradient(from 180deg, #d9a441, #e63946, #b45309, #d9a441);
-    transition: transform .2s;
+    transition: transform .2s; flex-shrink: 0;
   }
   .profile-btn:hover { transform: scale(1.07) rotate(8deg); }
   .profile-btn .face {
@@ -70,7 +72,7 @@
   }
   .profile-btn svg { width: 28px; height: 28px; }
   .hd-dropdown {
-    display: none; position: absolute; right: 0; top: 60px; min-width: 220px;
+    display: none; position: absolute; right: 0; top: 60px; min-width: 220px; max-width: calc(100vw - 24px);
     background: #fff; border: 1px solid var(--line); border-radius: 14px;
     box-shadow: 0 12px 30px rgba(0,0,0,.14); padding: 8px;
   }
@@ -91,22 +93,27 @@
 
   .login-btn {
     padding: 10px 20px; border-radius: 24px; background: var(--brand); color: #fff;
-    text-decoration: none; font-weight: 600;
+    text-decoration: none; font-weight: 600; white-space: nowrap;
   }
 
   /* ---- Drawer (opens from 3 bar) ---- */
   .drawer-backdrop {
     position: fixed; inset: 0; background: rgba(0,0,0,.45); opacity: 0; pointer-events: none;
-    transition: opacity .25s; z-index: 1001;
+    visibility: hidden;
+    transition: opacity .25s, visibility .25s; z-index: 1001;
   }
-  .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+  .drawer-backdrop.open { opacity: 1; pointer-events: auto; visibility: visible; }
   .drawer {
     position: fixed; top: 0; left: 0; bottom: 0; width: 290px; max-width: 85vw;
     background: #fff; z-index: 1002; padding: 24px 18px;
-    transform: translateX(-100%); transition: transform .3s ease;
+    transform: translateX(-100%); transition: transform .3s ease, visibility .3s;
+    visibility: hidden; pointer-events: none;                 /* closed drawer can never catch a touch */
     box-shadow: 8px 0 30px rgba(0,0,0,.2); display: flex; flex-direction: column; gap: 6px;
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    padding-top: calc(24px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   }
-  .drawer.open { transform: translateX(0); }
+  .drawer.open { transform: translateX(0); visibility: visible; pointer-events: auto; }
   .drawer .d-title {
     font-family: "Playfair Display", Georgia, serif; font-size: 22px; color: var(--brand);
     padding: 4px 12px 16px; border-bottom: 2px solid var(--gold); margin-bottom: 10px;
@@ -117,6 +124,9 @@
   }
   .drawer a:hover, .drawer a.active { background: var(--brand-soft); color: var(--brand); }
   .drawer a .em { font-size: 22px; width: 28px; text-align: center; }
+
+  /* page scroll is locked ONLY while the drawer is open (removed again on close) */
+  html.drawer-open, html.drawer-open body { overflow: hidden; }
 
 
   /* full width like the hero + hide the old base.html header */
@@ -147,11 +157,40 @@
   .drawer a { color: #e5e7eb; }
   .drawer a:hover, .drawer a.active { background: rgba(255,255,255,.08); color: #f5c451; }
 
+  /* ===== MOBILE (CHANGED: now fits every phone width) ===== */
   @media (max-width: 560px) {
     .brand .tag { display: none; }
     .brand .name { font-size: 20px; }
     .brand .logo-img { height: 54px; width: 54px; }
-    .site-header .inner { padding: 10px 14px; }
+    .site-header .inner { padding: 10px 14px; gap: 10px; }
+    .hd-left { gap: 10px; }
+    .hd-actions { gap: 10px; }
+    .site-header { padding-top: env(safe-area-inset-top, 0px); }
+  }
+  @media (max-width: 440px) {
+    .site-header .inner { padding: 8px 10px; gap: 6px; }
+    .hd-left { gap: 8px; }
+    .hd-actions { gap: 8px; }
+    .burger { width: 42px; height: 42px; gap: 4px; }
+    .burger span { width: 20px; }
+    .brand { gap: 8px; }
+    .brand .logo-img { height: 42px; width: 42px; }
+    .brand .name { font-size: 16px; line-height: 1.05; }
+    .cart-btn { width: 42px; height: 42px; }
+    .cart-btn svg { width: 20px; height: 20px; }
+    .profile-btn { width: 42px; height: 42px; }
+    .profile-btn svg { width: 24px; height: 24px; }
+    .login-btn { padding: 8px 14px; font-size: 14px; }
+    .hd-dropdown { top: 52px; }
+  }
+  @media (max-width: 360px) {
+    .brand .name { font-size: 14px; }
+    .brand .logo-img { height: 36px; width: 36px; }
+    .burger, .cart-btn, .profile-btn { width: 38px; height: 38px; }
+    .login-btn { padding: 7px 10px; font-size: 13px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .drawer, .drawer-backdrop, .burger span { transition: none; }
   }
 </style>
 
@@ -159,7 +198,7 @@
   <div class="inner">
 
     <div class="hd-left">
-      <button class="burger" id="burger" aria-label="Open menu" aria-expanded="false">
+      <button class="burger" id="burger" aria-label="Open menu" aria-expanded="false" aria-controls="drawer">
         <span></span><span></span><span></span>
       </button>
 
@@ -217,7 +256,7 @@
 
 <!-- Drawer opened by 3 bar -->
 <div class="drawer-backdrop" id="backdrop"></div>
-<aside class="drawer" id="drawer">
+<aside class="drawer" id="drawer" aria-hidden="true">
   <div class="d-title">Chandru Restaurant</div>
   <a href="/" class="{% if request.path == '/' %}active{% endif %}"><span class="em">🏠</span> Home</a>
   <a href="{% url 'menu_list' %}"><span class="em">📖</span> Menu</a>
@@ -227,6 +266,7 @@
 
 <script>
   (function () {
+    const root = document.documentElement;
     const burger = document.getElementById('burger');
     const drawer = document.getElementById('drawer');
     const backdrop = document.getElementById('backdrop');
@@ -234,11 +274,16 @@
       burger.classList.toggle('open', open);
       drawer.classList.toggle('open', open);
       backdrop.classList.toggle('open', open);
+      root.classList.toggle('drawer-open', open);          // scroll lock only while open, always removed on close
       burger.setAttribute('aria-expanded', open);
+      drawer.setAttribute('aria-hidden', !open);
     }
     burger.addEventListener('click', () => toggleDrawer(!drawer.classList.contains('open')));
     backdrop.addEventListener('click', () => toggleDrawer(false));
+    drawer.addEventListener('click', e => { if (e.target.closest && e.target.closest('a')) toggleDrawer(false); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleDrawer(false); });
+    window.addEventListener('resize', () => { if (window.innerWidth > 900) toggleDrawer(false); });
+    window.addEventListener('pageshow', () => toggleDrawer(false));   // back button: never come back with a stuck lock
 
     const btn = document.getElementById('userBtn'), drop = document.getElementById('userDrop');
     if (btn) {

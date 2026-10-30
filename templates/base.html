@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>{% block title %}Restaurant{% endblock %}</title>
 <link rel="stylesheet" href="{% static 'css/style.css' %}">
 
@@ -17,25 +17,20 @@
   border-top: 3px solid #d9a441 !important;
   box-shadow: 0 -2px 12px rgba(0,0,0,.35) !important;
 }
-/* Brand name + section headings = header gold + Playfair */
 .site-footer h1, .site-footer h2, .site-footer h3,
 .site-footer h4, .site-footer h5, .site-footer h6 {
   color: #f5c451 !important;
   font-family: "Playfair Display", Georgia, serif !important;
   letter-spacing: 0.5px;
 }
-/* Social icons = header cart button style */
 .footer-social a {
   background: rgba(255,255,255,.08) !important;
   border: 1px solid rgba(255,255,255,.18) !important;
   color: #f5c451 !important;
 }
 .footer-social a:hover { background: rgba(255,255,255,.16) !important; color: #f5c451 !important; }
-/* Links hover = gold */
 .site-footer a:hover { color: #f5c451 !important; }
-/* Small icons (location, phone, mail, clock) = gold */
 .site-footer i, .site-footer svg { color: #d9a441; }
-/* Bottom divider line = gold tint */
 .site-footer hr, .footer-bottom { border-color: rgba(217,164,65,.35) !important; }
 </style>
 
@@ -50,8 +45,6 @@
 .site-footer .footer-brand-desc { color: rgba(255,255,255,.72) !important; }
 .site-footer .footer-rating .stars { color: #f5c451 !important; }
 .site-footer .footer-rating .rating-text { color: rgba(255,255,255,.72) !important; }
-
-/* social icons: round gold ring like header icons */
 .site-footer .footer-social a {
   border-radius: 50% !important;
   border: 1.5px solid #d9a441 !important;
@@ -62,18 +55,12 @@
   background: #d9a441 !important;
   color: #0f172a !important;
 }
-
-/* contact icons gold */
 .site-footer .footer-contact-item svg { fill: #d9a441; color: #d9a441; }
-
-/* badges */
 .site-footer .footer-badge {
   border: 1px solid rgba(217,164,65,.5) !important;
   color: #f5c451 !important;
   background: transparent !important;
 }
-
-/* bottom bar */
 .site-footer .footer-bottom {
   border-top: 1px solid rgba(217,164,65,.35) !important;
 }
@@ -98,8 +85,6 @@
 }
 .site-footer .footer-brand-desc,
 .site-footer .footer-rating .rating-text { color: #9ca3af !important; }
-
-/* social icons use the header cart-button style */
 .site-footer .footer-social a {
   background: rgba(255,255,255,.08) !important;
   border: 1px solid rgba(255,255,255,.18) !important;
@@ -115,14 +100,14 @@
 </style>
 
 <style>
-/* fix-hscroll : stop sideways scroll caused by the 100vw header.
-   "clip" hides the overflow WITHOUT turning html/body into scroll containers, so
-   sticky and fixed elements (header, side cart panel) keep working on phones.
-   Old browsers without "clip" fall back to "hidden" on html only. */
-html { overflow-x: hidden; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-body { max-width: 100%; }
+/* fix-hscroll (CHANGED) : stop sideways scroll caused by the 100vw header.
+   Old version put overflow-x on BOTH html and body, which can make the phone's touch scroll
+   stick. Now only <body> is clipped and <html> is left alone, so the page scrolls normally.
+   "clip" hides the overflow WITHOUT creating a scroll container (sticky/fixed keep working). */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { max-width: 100%; overflow-x: hidden; }
 @supports (overflow: clip) {
-  html, body { overflow-x: clip; }
+  body { overflow-x: clip; }
 }
 </style>
 
@@ -160,8 +145,9 @@ body { max-width: 100%; }
 </style>
 
 <style>
-/* no-bounce : prevent over-scroll bounce at the top and bottom of the page */
-html, body { overscroll-behavior: none; }
+/* no-bounce (CHANGED) : only stops the sideways swipe-back / bounce.
+   The old "overscroll-behavior: none" on html AND body could block touch scroll on phones. */
+html, body { overscroll-behavior-x: none; }
 </style>
 
 <style>
@@ -288,6 +274,77 @@ a.footer-contact-item:hover svg { color: #f5c451; fill: #f5c451; }
   .footer-map { padding: 24px 0; flex-direction: column; align-items: center; text-align: center; gap: 18px; }
   .footer-map-btn { text-align: center; padding: 11px 14px; }
   .minimap { width: 150px; height: 150px; }
+}
+</style>
+
+<style>
+/* =====================================================================
+   MOBILE-GLOBAL (NEW) : customer side responsive safety net.
+   Placed after the footer CSS so it wins. It does not change the desktop look.
+   ===================================================================== */
+img, video, canvas, svg { max-width: 100%; }
+img, video { height: auto; }
+.minimap iframe { max-width: none; }          /* the minimap iframe must stay bigger than its circle */
+
+/* long words / emails never push the page wider than the screen */
+main.container, .site-footer { overflow-wrap: anywhere; }
+.footer-contact-item span { min-width: 0; }
+
+/* tables scroll sideways inside themselves */
+main.container table { max-width: 100%; }
+
+/* thumbnails / chip rows / category tabs: swipe sideways with the finger, vertical scroll untouched */
+.thumbs, .thumbnails, .gallery-thumbs, .thumb-row, .category-tabs, .chips, .filter-row {
+  overflow-x: auto; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y;
+  scrollbar-width: none;
+}
+.thumbs::-webkit-scrollbar, .thumbnails::-webkit-scrollbar, .gallery-thumbs::-webkit-scrollbar,
+.thumb-row::-webkit-scrollbar, .category-tabs::-webkit-scrollbar, .chips::-webkit-scrollbar,
+.filter-row::-webkit-scrollbar { display: none; }
+
+@media (max-width: 900px) {
+  main.container { padding-left: 14px; padding-right: 14px; }
+  .footer-main { padding: 44px 18px 0; }
+  .footer-map { padding-left: 0; padding-right: 0; }
+}
+
+@media (max-width: 640px) {
+  main.container table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* forms: no iOS zoom on focus, easy to tap */
+  main.container input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  main.container select,
+  main.container textarea { font-size: 16px; max-width: 100%; }
+  main.container button, main.container .btn { min-height: 42px; }
+
+  /* popups on phones: fit the screen and scroll inside themselves */
+  .modal, .modal-overlay, .modal-backdrop, .popup-overlay {
+    overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  }
+  .modal-content, .modal-box, .modal-dialog, .modal-card, .popup, .popup-content {
+    max-width: 96vw; max-height: 88vh; max-height: 88dvh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
+
+  /* floating scroll buttons: smaller and clear of the phone's gesture bar */
+  .back-to-top, .scroll-to-bottom { right: 14px; width: 40px; height: 40px; }
+  .back-to-top { bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+  .scroll-to-bottom { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+
+  .map-modal { padding: 10px; }
+  .map-modal-box { height: min(520px, 80vh); border-radius: 12px; }
+
+  .footer-bottom { padding: 18px 16px 22px; }
+  .footer-brand-desc { max-width: none; }
+}
+
+@media (max-width: 380px) {
+  main.container { padding-left: 10px; padding-right: 10px; }
+  .footer-brand-name { font-size: 1.1rem; }
+  .minimap { width: 138px; height: 138px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; }
 }
 </style>
 
@@ -418,7 +475,7 @@ a.footer-contact-item:hover svg { color: #f5c451; fill: #f5c451; }
 </button>
 
 <script>
-/* minimap : open and close the full map popup */
+/* minimap : open and close the full map popup (CHANGED: page scroll is locked only while the popup is open and always restored) */
 (function () {
   var btn = document.getElementById('minimapBtn');
   var modal = document.getElementById('mapModal');
@@ -430,15 +487,46 @@ a.footer-contact-item:hover svg { color: #f5c451; fill: #f5c451; }
     if (!frame.getAttribute('src')) frame.setAttribute('src', frame.getAttribute('data-src'));
     modal.classList.add('open');
     modal.setAttribute('aria-hidden', 'false');
+    document.documentElement.style.overflow = 'hidden';
   }
   function closeMap() {
     modal.classList.remove('open');
     modal.setAttribute('aria-hidden', 'true');
+    document.documentElement.style.overflow = '';      // scroll always comes back
   }
   btn.addEventListener('click', openMap);
   closeBtn.addEventListener('click', closeMap);
   modal.addEventListener('click', function (e) { if (e.target === modal) closeMap(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMap(); });
+  window.addEventListener('pageshow', closeMap);
+})();
+</script>
+
+<script>
+/* scroll-safety (NEW) : if any popup / drawer script leaves the page locked
+   (overflow hidden on html/body) while nothing is open, unlock it on the next touch.
+   Customer pages only, the dashboard has its own layout. */
+(function () {
+  if (location.pathname.indexOf('/dashboard') === 0) return;
+
+  function somethingOpen() {
+    return !!document.querySelector(
+      '.map-modal.open, .modal.show, .modal.open, .modal.active, dialog[open], ' +
+      '.drawer.open, .drawer.active, .side-menu.open, .side-menu.active, .sidebar.open, .sidebar.active, ' +
+      '.nav-drawer.open, .nav-drawer.active, .cart-panel.open, .cart-panel.active, .side-cart.open, ' +
+      '.search-overlay.open, .search-overlay.active, .search-overlay.show, [aria-modal="true"]:not([hidden])'
+    );
+  }
+  function unlockIfStuck() {
+    if (somethingOpen()) return;
+    var h = document.documentElement, b = document.body;
+    if (h.style.overflow === 'hidden') h.style.overflow = '';
+    if (b.style.overflow === 'hidden') b.style.overflow = '';
+    if (b.style.position === 'fixed') { b.style.position = ''; b.style.top = ''; b.style.width = ''; }
+    if (b.style.touchAction === 'none') b.style.touchAction = '';
+  }
+  document.addEventListener('touchstart', unlockIfStuck, { passive: true });
+  window.addEventListener('pageshow', unlockIfStuck);
 })();
 </script>
 
