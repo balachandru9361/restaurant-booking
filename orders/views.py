@@ -58,6 +58,32 @@ def _active_table_session(request):
     return table_session
 
 
+def _current_table(request):
+    """(table, table_session) for the order this browser is about to place.
+
+    1. The active TableSession of the QR scan (normal case).
+    2. Backup: if there is no active session (for example the QR scan was handled
+       by another view), use the table of this browser's latest dine-in order whose
+       customer has not left yet (table_released=False, not cancelled). This is what
+       makes "Order again" from My Orders go to the same table.
+    Returns (None, None) when neither is found."""
+    table_session = _active_table_session(request)
+    if table_session:
+        return table_session.table, table_session
+
+    previous = (
+        _my_orders(request)
+        .filter(order_type='dine_in', table__isnull=False, table_released=False)
+        .exclude(status='cancelled')
+        .select_related('table', 'table_session')
+        .order_by('-id')
+        .first()
+    )
+    if previous:
+        return previous.table, previous.table_session
+    return None, None
+
+
 def _my_orders(request):
     """Only the orders that this browser session placed (or added with Track Order).
     There is no customer login, so a customer can never see anybody else's order."""
@@ -501,8 +527,7 @@ def view_cart(request):
 
     # Table from the QR scan (None if the customer did not scan one, or if
     # the table session has ended)
-    table_session = _active_table_session(request)
-    selected_table = table_session.table if table_session else None
+    selected_table, _ = _current_table(request)
 
     context = {
         'cart_items': cart_items,
@@ -675,10 +700,8 @@ def confirm_order(request):
     selected_table = None
     table_session = None
     if order_type == 'dine_in':
-        table_session = _active_table_session(request)
-        if table_session:
-            selected_table = table_session.table
-
+        selected_table, table_session = _current_table(request)
+        if selected_table:
             # Guard: if the table got booked between the QR scan and submit, drop it
             if is_table_busy_now(selected_table.id, request.user):
                 messages.warning(request, f'Table #{selected_table.number} is booked now - our staff will assign you a table.')
