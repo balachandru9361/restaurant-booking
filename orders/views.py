@@ -8,7 +8,7 @@ from django.views.decorators.http import require_POST
 from django.db import transaction
 from django.utils import timezone
 from menu.models import FoodItem, Option
-from booking.models import Table
+from booking.models import Table, TableSession
 from booking.availability import table_status_map, is_table_busy_now, upcoming_holds, WALKIN_BUFFER
 from .models import Order, OrderItem, PAYMENT_HOLD_MINUTES
 
@@ -18,10 +18,44 @@ MAX_QTY = 20
 # Tip percentages the cart page offers. Anything else is treated as no tip.
 ALLOWED_TIPS = ('5', '10')
 
+# A dine-in table session older than this is treated as finished, even if the
+# staff forgot to close the table. This stops a customer ordering "again" from home
+# the next day.
+TABLE_SESSION_MAX_HOURS = 4
+
 
 def _is_ajax(request):
     """True when the request comes from fetch() with the X-Requested-With header."""
     return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
+def _forget_table(request):
+    """Removes the QR table from this browser session."""
+    request.session.pop('table_session_id', None)
+    request.session.pop('selected_table', None)
+    request.session.modified = True
+
+
+def _active_table_session(request):
+    """The dine-in table session of this browser, or None.
+
+    The session ends when staff close the table (TableSession.close()) or after
+    TABLE_SESSION_MAX_HOURS. When it has ended, the table is also removed from this
+    browser, so a later order (or "Order again") gets no table until the customer
+    scans the QR again."""
+    session_id = request.session.get('table_session_id')
+    if not session_id:
+        return None
+
+    cutoff = timezone.now() - timedelta(hours=TABLE_SESSION_MAX_HOURS)
+    table_session = (
+        TableSession.objects.select_related('table')
+        .filter(id=session_id, is_active=True, started_at__gte=cutoff)
+        .first()
+    )
+    if table_session is None:
+        _forget_table(request)
+    return table_session
 
 
 def _my_orders(request):
@@ -226,8 +260,9 @@ def bulk_add_to_cart(request):
 
 
 def select_table(request, table_id):
-    """QR code scan lands here. Stores the table in the session and
-    shows the welcome animation (qr_welcome), which then opens the HOME page."""
+    """QR code scan lands here. Starts (or joins) the dine-in session of this table,
+    stores it in the browser session and shows the welcome animation (qr_welcome),
+    which then opens the HOME page."""
     table = get_object_or_404(Table, id=table_id)
 
     # If the table is held by someone else right now, don't attach it
@@ -236,11 +271,20 @@ def select_table(request, table_id):
             request,
             f'Table #{table.number} is booked right now. Our staff will help you with a table.'
         )
-        request.session.pop('selected_table', None)
-        request.session.modified = True
+        _forget_table(request)
         return redirect('home')
 
+    # A session that staff forgot to close is ended here, so the new customer
+    # starts a fresh one instead of joining the old visit.
+    cutoff = timezone.now() - timedelta(hours=TABLE_SESSION_MAX_HOURS)
+    TableSession.objects.filter(
+        table=table, is_active=True, started_at__lt=cutoff
+    ).update(is_active=False, closed_at=timezone.now())
+
+    table_session = TableSession.get_or_start(table)
+
     request.session['selected_table'] = table.id
+    request.session['table_session_id'] = table_session.id
     request.session.modified = True
     messages.success(request, f'You are at Table #{table.number}. Tap "View Full Menu" to start ordering!')
     return redirect('qr_welcome')
@@ -251,8 +295,7 @@ def select_table(request, table_id):
 def clear_table(request):
     """Customer taps 'Change table': forget the QR table so they can scan a new
     one, or the server assigns a table."""
-    request.session.pop('selected_table', None)
-    request.session.modified = True
+    _forget_table(request)
     messages.info(request, 'Table removed. Scan the QR on your new table, or our staff will assign one.')
     return redirect('orders:view_cart')
 
@@ -456,11 +499,10 @@ def view_cart(request):
         FoodItem.objects.orderable().exclude(id__in=cart_ids).order_by('?')[:4]
     )
 
-    # Table from the QR scan (None if the customer did not scan one)
-    selected_table = None
-    table_id = request.session.get('selected_table')
-    if table_id:
-        selected_table = Table.objects.filter(id=table_id).first()
+    # Table from the QR scan (None if the customer did not scan one, or if
+    # the table session has ended)
+    table_session = _active_table_session(request)
+    selected_table = table_session.table if table_session else None
 
     context = {
         'cart_items': cart_items,
@@ -624,17 +666,24 @@ def confirm_order(request):
     note = request.POST.get('note', '').strip()[:255]
 
     # Customers no longer pick a table in the cart. A table is only attached
-    # when they scanned a table QR code and are dining in; otherwise the server
-    # (or admin) assigns one. Take away orders never get a table.
-    table_id = request.session.get('selected_table') if order_type == 'dine_in' else None
+    # when they scanned a table QR code, the table session is still active and
+    # they are dining in; otherwise the server (or admin) assigns one.
+    # Take away orders never get a table.
+    #
+    # The table comes from the TableSession, not from the URL, so "Order again"
+    # from My Orders keeps the same table for the whole visit.
     selected_table = None
-    if table_id:
-        selected_table = Table.objects.filter(id=table_id).first()
+    table_session = None
+    if order_type == 'dine_in':
+        table_session = _active_table_session(request)
+        if table_session:
+            selected_table = table_session.table
 
-        # Guard: if the table got booked between the QR scan and submit, drop it
-        if selected_table and is_table_busy_now(selected_table.id, request.user):
-            messages.warning(request, f'Table #{selected_table.number} is booked now - our staff will assign you a table.')
-            selected_table = None
+            # Guard: if the table got booked between the QR scan and submit, drop it
+            if is_table_busy_now(selected_table.id, request.user):
+                messages.warning(request, f'Table #{selected_table.number} is booked now - our staff will assign you a table.')
+                selected_table = None
+                table_session = None
 
     # All-or-nothing: if anything fails, no half-created order is left behind
     with transaction.atomic():
@@ -643,6 +692,7 @@ def confirm_order(request):
             guest_name=guest_name,
             guest_phone=guest_phone,
             table=selected_table,
+            table_session=table_session,
             status='pending',
             coupon=None,
             discount_amount=Decimal('0.00'),
@@ -668,8 +718,10 @@ def confirm_order(request):
     ids.append(order.id)
     request.session['guest_order_ids'] = ids
 
+    # The table stays in the browser session on purpose (it is NOT removed here),
+    # so the next order of the same visit gets the same table. It is removed
+    # automatically when the table session ends.
     request.session['cart'] = {}
-    request.session.pop('selected_table', None)
     request.session.pop('coupon_code', None)
     request.session.pop('cart_options', None)
     request.session.modified = True

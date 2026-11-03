@@ -5,7 +5,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from menu.models import FoodItem
-from booking.models import Table
+from booking.models import Table, TableSession
 
 # An online order that is still unpaid after this many minutes is expired.
 PAYMENT_HOLD_MINUTES = 15
@@ -102,6 +102,16 @@ class Order(models.Model):
     guest_phone = models.CharField(max_length=15, blank=True, validators=[phone_validator])
 
     table = models.ForeignKey(Table, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
+
+    # The dine-in visit this order belongs to (started when the customer scans the
+    # table QR). "Order again" is allowed only while this session is active, and the
+    # table is always taken from the session, never from the URL.
+    # Blank for takeaway orders and for orders made before this field existed.
+    table_session = models.ForeignKey(
+        TableSession, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='orders',
+    )
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)

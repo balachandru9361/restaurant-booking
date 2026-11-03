@@ -1,6 +1,7 @@
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 
 class Table(models.Model):
@@ -9,6 +10,42 @@ class Table(models.Model):
 
     def __str__(self):
         return f"Table {self.number} (seats {self.capacity})"
+
+
+class TableSession(models.Model):
+    """One dine-in visit at a table. Starts on QR scan, ends when the table is closed.
+    Orders (and reorders) are allowed only while is_active is True."""
+    table = models.ForeignKey(Table, on_delete=models.PROTECT, related_name='sessions')
+    started_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-started_at']
+        constraints = [
+            # A table can have only one active session at a time.
+            models.UniqueConstraint(
+                fields=['table'],
+                condition=models.Q(is_active=True),
+                name='one_active_session_per_table',
+            ),
+        ]
+
+    @classmethod
+    def get_or_start(cls, table):
+        """Used on QR scan: reuse the active session or start a new one."""
+        session, _ = cls.objects.get_or_create(table=table, is_active=True)
+        return session
+
+    def close(self):
+        """Call this when the table is closed (bill paid / Open Table)."""
+        self.is_active = False
+        self.closed_at = timezone.now()
+        self.save(update_fields=['is_active', 'closed_at'])
+
+    def __str__(self):
+        state = 'active' if self.is_active else 'closed'
+        return f"Table {self.table.number} session ({state})"
 
 
 class TableBooking(models.Model):

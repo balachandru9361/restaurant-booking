@@ -34,7 +34,7 @@ from .models import Notification, GroceryItem, RecipeIngredient
 from accounts.forms import StaffCreationForm
 from menu.models import Category, FoodItem, FoodItemImage
 from menu.forms import MenuItemForm
-from booking.models import Table, TableBooking
+from booking.models import Table, TableBooking, TableSession
 from booking.forms import SEATS_PER_TABLE, tables_needed
 # CHANGED: later_reservations (clash with a later approved booking) and ALLOW_SINGLE_BIG_TABLE added
 from booking.availability import (
@@ -2061,6 +2061,10 @@ def server_free_table(request, pk):
             msg, ok = f'Order #{unserved[0].id} is not served yet.', False
         else:
             Order.objects.filter(pk__in=[o.id for o in on_table]).update(table_released=True)
+            # End the dine-in session of this table, so "Order again" from
+            # My Orders no longer works after the customer has left.
+            TableSession.objects.filter(table_id=order.table_id, is_active=True).update(
+                is_active=False, closed_at=timezone.now())
             msg, ok = f'Table #{order.table.number} is free now.', True
 
     payload = {'ok': ok, 'message': msg, 'table': order.table.number if order.table_id else None}

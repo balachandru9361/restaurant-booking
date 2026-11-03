@@ -22,7 +22,8 @@ class KitchenToServerToAdminFlowTests(TestCase):
         self.customer = User.objects.create_user('cust', password='x', email='cust@example.com')
         self.table = Table.objects.create(number=5, capacity=4)
         self.order = Order.objects.create(
-            user=self.customer, table=self.table, status='confirmed', total_amount=250
+            user=self.customer, table=self.table, status='confirmed', total_amount=250,
+            payment_method='online', payment_status='paid',
         )
 
     def move(self, user, status):
