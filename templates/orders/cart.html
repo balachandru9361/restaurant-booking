@@ -13,22 +13,17 @@
     max-width:1180px; margin:0 auto; padding:30px 20px 70px; font-family:'Inter',system-ui,sans-serif; color:var(--ink); }
   .cart-hero { text-align:center; margin-bottom:26px; }
   .cart-hero h1 { font-family:'Sora',sans-serif; font-size:2.2rem; margin:0 0 6px; }
-  .cart-hero p { color:var(--muted); margin:0 0 22px; }
+  .cart-hero p { color:var(--muted); margin:0; }
   .cart-icon { display:inline-block; animation:wiggle 2.4s ease-in-out infinite; transform-origin:70% 70%; }
   @keyframes wiggle { 0%,100%{transform:rotate(0)} 10%{transform:rotate(-14deg)} 20%{transform:rotate(10deg)} 30%{transform:rotate(0)} }
 
-  .journey { list-style:none; display:flex; padding:0; margin:0 auto; max-width:620px; counter-reset:step; }
-  .journey li { flex:1; position:relative; font-size:.78rem; color:var(--muted); font-weight:500; padding-top:34px; text-align:center; counter-increment:step; }
-  .journey li::before { content:counter(step); position:absolute; top:0; left:50%; transform:translateX(-50%); width:26px; height:26px; border-radius:50%;
-    background:#e5e7eb; color:#6b7280; display:grid; place-items:center; font-weight:600; font-size:.78rem; z-index:1; }
-  .journey li::after { content:""; position:absolute; top:12px; left:-50%; width:100%; height:2px; background:#e5e7eb; }
-  .journey li:first-child::after { display:none; }
-  .journey li.active { color:var(--ink); }
-  .journey li.active::before { background:var(--coral); color:#fff; animation:pulse 1.8s infinite; }
-  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,107,107,.6)} 70%{box-shadow:0 0 0 10px rgba(255,107,107,0)} 100%{box-shadow:0 0 0 0 rgba(255,107,107,0)} }
-
-  .cart-grid { display:grid; grid-template-columns:1fr 380px; gap:26px; align-items:start; }
-  @media (max-width:900px){ .cart-grid{grid-template-columns:1fr} }
+  .cart-grid { display:grid; grid-template-columns:1fr 380px; grid-template-rows:auto 1fr;
+    grid-template-areas:"main side" "more side"; gap:26px; align-items:start; }
+  .cart-main { grid-area:main; }
+  .cart-more { grid-area:more; }
+  @media (max-width:900px){
+    .cart-grid { grid-template-columns:1fr; grid-template-rows:auto; grid-template-areas:"main" "side" "more"; }
+  }
 
   /* items */
   .cart-item { display:grid; grid-template-columns:76px 1fr auto auto auto; align-items:center; gap:16px; background:#fff; border-radius:18px;
@@ -56,7 +51,6 @@
   .remove-form { margin:0; }
   .remove-btn { border:0; background:none; color:#9ca3af; font-size:.85rem; cursor:pointer; padding:6px 10px; border-radius:8px; transition:.2s; font-family:inherit; }
   .remove-btn:hover { color:#dc2626; background:#fee2e2; }
-  @media (max-width:700px){ .cart-item{grid-template-columns:64px 1fr auto;} .ci-img{width:64px;height:64px} .stepper,.remove-form{grid-column:2} .ci-price{grid-row:1;grid-column:3;min-width:0} }
 
   /* options card */
   .card { background:#fff; border-radius:20px; padding:22px 24px; margin-bottom:18px; box-shadow:0 6px 22px rgba(15,23,42,.07); border:1px solid #f1f5f9; }
@@ -100,7 +94,7 @@
   .sug button:hover { background:var(--coral); }
 
   /* summary */
-  .summary { background:linear-gradient(160deg,#1c2333,#111827); color:#e5e7eb; border-radius:24px; padding:28px; position:sticky; top:90px;
+  .summary { background:linear-gradient(160deg,#1c2333,#111827); color:#e5e7eb; border-radius:24px; padding:28px; position:sticky; top:90px; grid-area:side;
     box-shadow:0 20px 45px rgba(17,24,39,.35); opacity:0; animation:rise .6s .2s cubic-bezier(.2,.8,.2,1) forwards; }
   .summary h2 { font-family:'Sora',sans-serif; color:#fff; font-size:1.25rem; margin:0 0 18px; }
   .row { display:flex; justify-content:space-between; margin:10px 0; font-size:.95rem; }
@@ -220,45 +214,54 @@
     padding:6px 16px; font:inherit; font-size:.82rem; font-weight:600; cursor:pointer; transition:.2s; }
   .change-table-btn:hover { background:#10b981; color:#fff; }
 </style>
-<style>
-/* cart-mobile-fix : stop grid blowout on small screens */
+<style id="cart-align">
+/* cart-align : same left/right edges everywhere, tidy item rows, equal suggestion cards */
 .cart-grid > * { min-width: 0; }
+.cart-grid { row-gap: 18px; }
+.cart-main > .card:last-child, .cart-more .card { margin-bottom: 0; }
+.ci-info { min-width: 0; }
+
+/* Dine-in / Take away: icon keeps its place when selected (no overlap on the border) */
+.seg label .ico { display: block; align-self: flex-start; line-height: 1.1; margin-bottom: 4px; }
+.seg input:checked + label .ico { transform: scale(1.15); }
+
+/* You may also like: name always takes 2 lines, price under it, button pinned to the bottom,
+   so every card in a row lines up */
+.sug .body > b { min-height: 2.6em; }
+.sug .body > span { display: block; margin: 2px 0 10px; }
+.sug .body > button { margin-top: auto; }
+
 @media (max-width: 900px) {
   .cart-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }
 @media (max-width: 700px) {
-  .cart-wrap, .cart-page { padding-left: 14px; padding-right: 14px; }
+  .cart-page { padding-left: 10px !important; padding-right: 10px !important; }
+
+  /* every block uses the same 16px inner edge */
+  .card { padding: 18px 16px !important; }
+  .summary { position: static !important; padding: 22px 16px; }
+
+  /* cart item: photo | name + price on the first row, quantity stepper + Remove on the second */
   .cart-item {
-    grid-template-columns: 64px minmax(0, 1fr) auto !important;
-    gap: 8px 12px !important;
-    padding: 12px !important;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-areas: "img info price" "img step rem";
+    gap: 8px 12px;
+    align-items: start;
+    padding: 14px 16px;
   }
-  .ci-name { flex-wrap: wrap; font-size: .98rem; }
-  .ci-price { min-width: 0 !important; font-size: 1rem; white-space: nowrap; align-self: start; }
-  .stepper, .remove-form { grid-column: 2 / 4 !important; }
-  .journey li { font-size: .7rem; }
-  .summary { position: static !important; }
-}
-</style>
-<style>
-/* cart-mobile-fix-v2 : tighter side gaps, name row, suggestion cards */
-@media (max-width: 700px) {
-  /* page wrapper: whichever element holds the hero */
-  *:has(> .cart-hero) { padding-left: 10px !important; padding-right: 10px !important; }
-
-  .card { padding: 16px 14px !important; }
-  .cart-item { padding: 12px 12px !important; }
-
-  /* veg dot and name stay on one row */
-  .ci-name { flex-wrap: nowrap !important; align-items: flex-start; gap: 6px; line-height: 1.25; }
+  .ci-img { grid-area: img; width: 64px; height: 64px; }
+  .ci-info { grid-area: info; }
+  .ci-price { grid-area: price; min-width: 0; font-size: 1rem; line-height: 1.3; white-space: nowrap; text-align: right; }
+  .stepper { grid-area: step; justify-self: start; align-self: center; }
+  .remove-form { grid-area: rem; justify-self: end; align-self: center; }
+  .ci-name { flex-wrap: nowrap; align-items: flex-start; gap: 6px; line-height: 1.3; font-size: .98rem; }
   .ci-name .veg-dot { margin-top: 3px; }
 
-  /* suggestions: two compact columns, space between price and button */
-  .sug-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
-  .sug .body { padding: 10px 10px 12px !important; gap: 4px; }
+  /* suggestions: two equal columns */
+  .sug-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .sug .body { padding: 10px 10px 12px; }
   .sug b { font-size: .82rem; }
-  .sug .body > :not(button):not(b) { margin-bottom: 6px; }
-  .sug button { margin-top: 10px !important; padding: 8px !important; font-size: .8rem; }
+  .sug button { padding: 8px; font-size: .8rem; }
 }
 </style>
 
@@ -279,13 +282,6 @@
   <header class="cart-hero">
     <h1><span class="cart-icon">🛒</span> Your Cart</h1>
     <p>Review your items before checking out.</p>
-    <ol class="journey">
-      <li class="active">Cart</li>
-      <li>Payment</li>
-      <li>Admin approval</li>
-      <li>Kitchen</li>
-      <li>Served</li>
-    </ol>
   </header>
 
   {% if cart_items %}
@@ -293,7 +289,7 @@
   <form id="checkoutForm" method="post" action="{% url 'orders:confirm_order' %}">{% csrf_token %}</form>
 
   <div class="cart-grid">
-    <section>
+    <section class="cart-main">
       {# Shows the table the customer got from the QR scan #}
       {% if selected_table %}
       <div class="table-banner">
@@ -305,7 +301,7 @@
       {% for item in cart_items %}
       <article class="cart-item" style="--i:{{ forloop.counter0 }}">
         <div class="ci-img">{% if item.image_url %}<img src="{{ item.image_url }}" alt="{{ item.name }}" style="width:100%;height:100%;object-fit:cover">{% else %}🍽️{% endif %}</div>
-        <div>
+        <div class="ci-info">
           <h3 class="ci-name"><span class="veg-dot{% if not item.is_veg %} non{% endif %}" title="{% if item.is_veg %}Veg{% else %}Non-veg{% endif %}"></span>{{ item.name }}</h3>
           <p class="ci-each">₹{{ item.price|inr }} each</p>{% if item.options_text %}<p class="ci-opts">{{ item.options_text }}</p>{% endif %}
         </div>
@@ -350,21 +346,6 @@
         </div>
         <div class="note-count"><span id="noteCount">0</span>/255</div>
       </div>
-
-      {% if suggestions %}
-      <div class="card">
-        <h2>You may also like</h2>
-        <div class="sug-grid">
-          {% for food in suggestions %}
-          <form class="sug" method="post" action="{% url 'orders:add_to_cart' food.id %}">{% csrf_token %}
-            <input type="hidden" name="quantity" value="1">
-            <div class="pic">{% if food.image %}<img src="{{ food.image.url }}" alt="{{ food.name }}">{% else %}🍹{% endif %}</div>
-            <div class="body"><b>{{ food.name }}</b><span>₹{{ food.price|inr }}</span><button type="submit">+ Add</button></div>
-          </form>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
     </section>
 
     <aside class="summary">
@@ -406,6 +387,23 @@
       <a class="continue" href="{% url 'menu_list' %}">← Continue Shopping</a>
       <div class="trust"><span>🔒 Secure payments</span><span>👨‍🍳 Fresh from our kitchen</span></div>
     </aside>
+
+    <section class="cart-more">
+      {% if suggestions %}
+      <div class="card">
+        <h2>You may also like</h2>
+        <div class="sug-grid">
+          {% for food in suggestions %}
+          <form class="sug" method="post" action="{% url 'orders:add_to_cart' food.id %}">{% csrf_token %}
+            <input type="hidden" name="quantity" value="1">
+            <div class="pic">{% if food.image %}<img src="{{ food.image.url }}" alt="{{ food.name }}">{% else %}🍹{% endif %}</div>
+            <div class="body"><b>{{ food.name }}</b><span>₹{{ food.price|inr }}</span><button type="submit">+ Add</button></div>
+          </form>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </section>
   </div>
   {% else %}
   <div class="empty">

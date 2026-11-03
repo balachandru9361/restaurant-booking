@@ -32,16 +32,12 @@
         font-weight: 800;
         color: #1f2937;
         margin-bottom: 4px;
-    }
-
-    .profile-hero .email-line {
-        color: #888;
-        font-size: 0.92rem;
+        word-break: break-word;
     }
 
     .profile-stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        grid-template-columns: repeat(3, 1fr);
         gap: 16px;
         max-width: 700px;
         margin: 0 auto 30px;
@@ -53,6 +49,7 @@
         padding: 20px;
         text-align: center;
         box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+        min-width: 0;
     }
 
     .profile-stat-box .icon {
@@ -135,12 +132,6 @@
         gap: 14px;
     }
 
-    @media (max-width: 500px) {
-        .profile-actions {
-            grid-template-columns: 1fr;
-        }
-    }
-
     .profile-action-card {
         background: #fff;
         border-radius: 16px;
@@ -173,12 +164,61 @@
         color: #999;
         margin-top: 2px;
     }
+
+    /* ===== MOBILE ===== */
+    @media (max-width: 560px) {
+        .profile-hero {
+            margin-bottom: 22px;
+        }
+
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            font-size: 2rem;
+        }
+
+        .profile-hero h1 {
+            font-size: 1.5rem;
+        }
+
+        .profile-stats {
+            gap: 10px;
+            margin-bottom: 22px;
+        }
+
+        .profile-stat-box {
+            padding: 14px 6px;
+            border-radius: 14px;
+        }
+
+        .profile-stat-box .icon {
+            font-size: 1.3rem;
+            margin-bottom: 6px;
+        }
+
+        .profile-stat-box .num {
+            font-size: 1.15rem;
+        }
+
+        .profile-stat-box .lbl {
+            font-size: 0.68rem;
+        }
+
+        .profile-info-card {
+            padding: 20px 18px;
+            margin-bottom: 18px;
+        }
+
+        .profile-actions {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+    }
 </style>
 
 <div class="profile-hero">
     <div class="profile-avatar">{{ user.username|slice:":1" }}</div>
     <h1>{{ user.username }}</h1>
-    <p class="email-line">{{ user.email|default:"No email added" }}</p>
 </div>
 
 <div class="profile-stats">
@@ -207,14 +247,6 @@
         <div>
             <div class="d-label">Username</div>
             <div class="d-value">{{ user.username }}</div>
-        </div>
-    </div>
-
-    <div class="profile-detail-row">
-        <div class="d-icon">✉️</div>
-        <div>
-            <div class="d-label">Email</div>
-            <div class="d-value">{{ user.email|default:"Not provided" }}</div>
         </div>
     </div>
 

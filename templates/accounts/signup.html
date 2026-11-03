@@ -209,6 +209,12 @@
         font-weight: 600;
     }
 
+    .error a {
+        color: #ff6b35;
+        font-weight: 800;
+        text-decoration: underline;
+    }
+
     .btn-primary {
         width: 100%;
         padding: 14px 0;
@@ -314,7 +320,19 @@
                         <div class="help-text">{{ field.help_text|safe }}</div>
                     {% endif %}
                     {% if field.errors %}
-                        <p class="error">{{ field.errors|join:", " }}</p>
+                        <p class="error">
+                            {% for err in field.errors.as_data %}
+                                {% for msg in err.messages %}
+                                    {% if err.code == 'phone_taken' %}
+                                        {{ msg|cut:"Please login." }}
+                                        <a href="{% url 'accounts:login' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Please login.</a>
+                                    {% else %}
+                                        {{ msg }}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                        </p>
                     {% endif %}
                 </div>
             {% endfor %}
@@ -350,6 +368,15 @@
         });
     });
 
+    // Clear a field's error message as soon as the user edits that field
+    document.querySelectorAll('.form-group input').forEach(function (input) {
+        input.addEventListener('input', function () {
+            var group = this.closest('.form-group');
+            var err = group ? group.querySelector('.error') : null;
+            if (err) err.remove();
+        });
+    });
+
     var signupForm = document.getElementById('signupForm');
     var signupBtn = document.getElementById('signupBtn');
     var signupSpinner = document.getElementById('signupSpinner');
@@ -372,7 +399,7 @@
         });
     }
 
-    // Back button / bfcache: button stuck aagaama irukka
+    // Back button / bfcache: reset the button so it does not stay stuck
     window.addEventListener('pageshow', function (e) {
         if (e.persisted) resetSignupBtn();
     });

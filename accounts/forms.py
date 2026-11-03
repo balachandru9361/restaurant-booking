@@ -22,7 +22,7 @@ def normalize_phone(raw):
 
 
 class SignupForm(forms.Form):
-    """Customer sign up: name, phone number and password only."""
+    """Customer sign up: name, phone number, password and confirm password."""
 
     full_name = forms.CharField(
         max_length=60,
@@ -50,6 +50,13 @@ class SignupForm(forms.Form):
             'autocomplete': 'new-password',
         }),
     )
+    password2 = forms.CharField(
+        label='Confirm password',
+        widget=forms.PasswordInput(attrs={
+            'placeholder': 'Re-enter your password',
+            'autocomplete': 'new-password',
+        }),
+    )
 
     def clean_full_name(self):
         return self.cleaned_data['full_name'].strip()
@@ -57,11 +64,26 @@ class SignupForm(forms.Form):
     def clean_phone(self):
         phone = normalize_phone(self.cleaned_data['phone'])
         if phone is None:
-            raise forms.ValidationError('Enter a valid 10-digit mobile number.')
-        if User.objects.filter(username=phone).exists():
             raise forms.ValidationError(
-                'This number is already registered. Please login.')
+                'Enter a valid 10-digit mobile number.',
+                code='invalid_phone')
+        if User.objects.filter(username=phone).exists():
+            # The "phone_taken" code lets the template show a Login link
+            # next to this message.
+            raise forms.ValidationError(
+                'This number is already registered. Please login.',
+                code='phone_taken')
         return phone
+
+    def clean(self):
+        cleaned = super().clean()
+        password = cleaned.get('password')
+        password2 = cleaned.get('password2')
+        # Only compare when both were entered; the error shows under Confirm password.
+        if password and password2 and password != password2:
+            self.add_error('password2', forms.ValidationError(
+                'Passwords do not match.', code='password_mismatch'))
+        return cleaned
 
     def save(self):
         return User.objects.create_user(

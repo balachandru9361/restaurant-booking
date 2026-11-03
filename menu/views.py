@@ -89,15 +89,21 @@ def item_detail(request, item_id):
 def search_suggest(request):
     q = request.GET.get("q", "").strip()
 
+    base_items = (
+        FoodItem.objects.orderable()
+        .in_stock()
+        .select_related("category")
+    )
+
     if not q:
+        # Search box empty -> show all categories and ALL in-stock items.
         cats = Category.objects.all()[:12]
-        items = []
+        items = base_items
     else:
+        # Typing -> filter, max 15 results.
         cats = Category.objects.filter(name__icontains=q)[:6]
         items = (
-            FoodItem.objects.orderable()
-            .in_stock()
-            .select_related("category")
+            base_items
             .filter(
                 Q(name__icontains=q)
                 | Q(category__name__icontains=q)

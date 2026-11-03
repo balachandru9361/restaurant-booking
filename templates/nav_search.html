@@ -57,6 +57,7 @@
 .ns-dot.veg{background:#16a34a}
 .ns-dot.non{background:#b91c1c}
 .ns-msg{color:#6b7280;text-align:center;margin:18px 0 6px;font-size:14px}
+.ns-msg:empty{display:none}
 .ns-filters{display:flex;gap:12px;padding:10px 16px 0;flex:none}
 .ns-tg{display:inline-flex;align-items:center;gap:8px;padding:5px 12px 5px 6px;border-radius:999px;border:2px solid #7a3b2e;background:#fff;cursor:pointer}
 .ns-ic{width:20px;height:20px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;flex:none}
@@ -101,7 +102,8 @@ html.ns-lock, html.ns-lock body{overflow:hidden}
     panel.classList.add("open");
     root.classList.add("ns-lock");
     input.focus();
-    if (last === null) { run(""); }
+    // every time the panel opens with an empty box, load ALL items
+    if (!input.value.trim()) { run(""); }
   }
   function closePanel() {
     panel.classList.remove("open");
@@ -116,17 +118,19 @@ html.ns-lock, html.ns-lock body{overflow:hidden}
     return n;
   }
   function render(data, q) {
+    var allItems = data.items || [];
+    var allCats = data.categories || [];
     lastData = data;
     lastQ = q;
-    var list = data.items.filter(function (it) {
+    var list = allItems.filter(function (it) {
       return mode === "" || (mode === "veg") === !!it.is_veg;
     });
     cats.innerHTML = "";
     items.innerHTML = "";
     msg.textContent = "";
-    if (data.categories.length) {
+    if (allCats.length) {
       cats.appendChild(el("p", "ns-label", q ? "Menu categories" : "Browse menu"));
-      data.categories.forEach(function (c) {
+      allCats.forEach(function (c) {
         var chip = el("button", "ns-chip", c.name);
         chip.type = "button";
         chip.addEventListener("click", function () {
@@ -154,10 +158,14 @@ html.ns-lock, html.ns-lock body{overflow:hidden}
       a.appendChild(el("div", "ns-price", "\u20B9" + it.price));
       items.appendChild(a);
     });
-    if ((q || mode) && !list.length && (mode || !data.categories.length)) {
-      msg.textContent = "No " + (mode === "veg" ? "veg " : mode === "non" ? "non-veg " : "") + "dishes found" + (q ? " for \"" + q + "\"" : "") + ".";
-    } else if (!q) {
-      msg.textContent = "Type a dish name or pick a category.";
+    if (!list.length) {
+      if (q || mode) {
+        if (mode || !allCats.length) {
+          msg.textContent = "No " + (mode === "veg" ? "veg " : mode === "non" ? "non-veg " : "") + "dishes found" + (q ? " for \"" + q + "\"" : "") + ".";
+        }
+      } else {
+        msg.textContent = "Type a dish name or pick a category.";
+      }
     }
   }
   function run(q) {

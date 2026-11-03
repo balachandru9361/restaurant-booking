@@ -15,13 +15,12 @@
 
 .booking-flex-layout {
     display: flex;
-    gap: 24px;
-    align-items: flex-start;
+    justify-content: center;
     max-width: 980px;
     margin: 0 auto;
 }
 
-.booking-wrap { flex: 1; min-width: 0; max-width: 640px; }
+.booking-wrap { flex: 1; min-width: 0; max-width: 640px; margin: 0 auto; }
 
 .booking-eyebrow-row {
     display: flex;
@@ -95,7 +94,8 @@
 
 .status-pill { font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #fff4e0; color: #b9740a; transition: all 0.2s ease; }
 
-.booking-form-body { padding: 10px 26px 26px; }
+/* CHANGED: less empty space under the last field */
+.booking-form-body { padding: 10px 26px 4px; }
 
 .field-row-badge { display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-bottom: 1px solid #f0f1f4; }
 .field-row-badge:last-of-type { border-bottom: none; }
@@ -131,7 +131,14 @@
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.field-content textarea { resize: vertical; font-weight: 500; }
+/* CHANGED: taller box and normal line height so the placeholder and typed text are never cut off */
+.field-content textarea {
+    display: block;
+    resize: vertical;
+    font-weight: 500;
+    line-height: 1.45;
+    min-height: 96px;
+}
 
 .field-content input:focus,
 .field-content select:focus,
@@ -197,7 +204,7 @@
 .char-count { text-align: right; font-size: 0.68rem; color: #b3b8c2; margin-top: 4px; }
 
 .preview-card {
-    margin: 22px 26px 0;
+    margin: 14px 26px 0;
     background: #fafbfc;
     border: 1px solid #eef0f3;
     border-radius: 14px;
@@ -249,101 +256,6 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .booking-note { text-align: center; font-size: 0.78rem; color: #9aa0ab; margin-top: 12px; }
-
-/* Bookings sidebar */
-.bookings-sidebar {
-    width: 300px;
-    flex-shrink: 0;
-    background: #ffffff;
-    border-radius: 18px;
-    box-shadow: 0 20px 45px -25px rgba(16,24,39,0.25);
-    padding: 20px 20px 22px;
-    position: sticky;
-    top: 24px;
-}
-
-.sidebar-title {
-    font-size: 0.95rem;
-    font-weight: 800;
-    margin-bottom: 4px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.sidebar-subtitle {
-    font-size: 0.75rem;
-    color: #9aa0ab;
-    margin-bottom: 14px;
-}
-
-.sidebar-capacity {
-    background: #f5f6f8;
-    border-radius: 12px;
-    padding: 12px 14px;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: #1f2430;
-    margin-bottom: 14px;
-    display: none;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.sidebar-capacity .cap-row { display: flex; justify-content: space-between; }
-.sidebar-capacity .cap-total { color: #1f2430; }
-.sidebar-capacity .cap-booked { color: #b9740a; }
-.sidebar-capacity .cap-remaining { color: #1f9d55; }
-
-.capacity-bar-track {
-    width: 100%;
-    height: 6px;
-    border-radius: 999px;
-    background: #e7e9ee;
-    overflow: hidden;
-    margin-top: 2px;
-}
-
-.capacity-bar-fill {
-    height: 100%;
-    background: #f5a623;
-    border-radius: 999px;
-    transition: width 0.25s ease;
-}
-
-.sidebar-booking-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 9px 0;
-    border-bottom: 1px solid #f0f1f4;
-    font-size: 0.82rem;
-}
-
-.sidebar-booking-item:last-child { border-bottom: none; }
-
-.sidebar-booking-time { font-weight: 700; color: #1f2430; }
-
-.sidebar-booking-guests {
-    background: #fff1e0;
-    color: #b9740a;
-    font-weight: 700;
-    padding: 2px 9px;
-    border-radius: 999px;
-    font-size: 0.72rem;
-}
-
-.sidebar-empty {
-    text-align: center;
-    color: #b3b8c2;
-    font-size: 0.82rem;
-    padding: 20px 0;
-}
-
-@media (max-width: 900px) {
-    .booking-flex-layout { flex-direction: column; }
-    .bookings-sidebar { width: 100%; position: static; }
-}
 
 @media (max-width: 520px) {
     .field-row-double { grid-template-columns: 1fr; }
@@ -475,8 +387,9 @@
                         <div class="field-row-badge">
                             <div class="badge green">📝</div>
                             <div class="field-content">
-                                <label>Special request</label>
-                                <textarea name="special_request" id="fNote" rows="2" maxlength="200" placeholder="Optional — allergies, seating preference, anything else"></textarea>
+                                <label for="fNote">Special request</label>
+                                {# CHANGED: rows 3 and a shorter placeholder so the text fits on small phones #}
+                                <textarea name="special_request" id="fNote" rows="3" maxlength="200" placeholder="Optional: allergies, seating, anything else"></textarea>
                                 <div class="char-count"><span id="noteCount">0</span>/200</div>
                             </div>
                         </div>
@@ -503,31 +416,6 @@
                 </div>
             </div>
 
-        </div>
-
-        <div class="bookings-sidebar">
-            <div class="sidebar-title">📋 Bookings</div>
-            <p class="sidebar-subtitle" id="sidebarDateLabel">Loading today's bookings…</p>
-            <div class="sidebar-capacity" id="sidebarCapacity">
-                <div class="cap-row">
-                    <span>Total seats</span>
-                    <span class="cap-total" id="sidebarTotal">—</span>
-                </div>
-                <div class="cap-row">
-                    <span>Held</span>
-                    <span class="cap-booked" id="sidebarBooked">—</span>
-                </div>
-                <div class="cap-row">
-                    <span>Free</span>
-                    <span class="cap-remaining" id="sidebarRemaining">—</span>
-                </div>
-                <div class="capacity-bar-track">
-                    <div class="capacity-bar-fill" id="sidebarBarFill" style="width: 0%;"></div>
-                </div>
-            </div>
-            <div id="sidebarBookingsList">
-                <p class="sidebar-empty">Pick a date above to see bookings.</p>
-            </div>
         </div>
     </div>
 </div>
@@ -678,7 +566,6 @@
     // listen to both 'input' and 'change' to catch every update live.
     function onDateOrTimeChange() {
         updateSummary('rowDateTime');
-        loadBookingsForDate(document.getElementById('fDate').value);
     }
     document.getElementById('fDate').addEventListener('input', onDateOrTimeChange);
     document.getElementById('fDate').addEventListener('change', onDateOrTimeChange);
@@ -708,59 +595,7 @@
         document.getElementById('submitLabel').textContent = 'Sending…';
     });
 
-    function loadBookingsForDate(date) {
-        const listBox = document.getElementById('sidebarBookingsList');
-        const capBox = document.getElementById('sidebarCapacity');
-        const dateLabel = document.getElementById('sidebarDateLabel');
-
-        if (!date) {
-            listBox.innerHTML = '<p class="sidebar-empty">Pick a date above to see bookings.</p>';
-            capBox.style.display = 'none';
-            dateLabel.textContent = 'Select a date to view';
-            return;
-        }
-
-        const dt = new Date(date + 'T00:00:00');
-        dateLabel.textContent = dt.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'short' });
-
-        const timeVal = document.getElementById('fTime').value;
-        fetch(`/booking/bookings-for-date/?date=${date}${timeVal ? '&time=' + timeVal : ''}`)
-            .then(res => res.json())
-            .then(data => {
-                capBox.style.display = 'flex';
-
-                const total = data.total_capacity || 0;
-                const booked = data.booked_guests || 0;
-                const remaining = data.remaining;
-
-                document.getElementById('sidebarTotal').textContent = `${total} seats`;
-                document.getElementById('sidebarBooked').textContent = `${booked} seats`;
-                document.getElementById('sidebarRemaining').textContent = `${remaining} seats`;
-
-                const pctFilled = total > 0 ? Math.min(100, (booked / total) * 100) : 0;
-                document.getElementById('sidebarBarFill').style.width = `${pctFilled}%`;
-
-                if (data.bookings.length === 0) {
-                    listBox.innerHTML = '<p class="sidebar-empty">No bookings yet for this date. 🎉</p>';
-                    return;
-                }
-
-                // CHANGED: there is no end time any more (no 2-hour timer), so only the start time is shown
-                listBox.innerHTML = data.bookings.map(b => `
-                    <div class="sidebar-booking-item">
-                        <span class="sidebar-booking-time">${b.time} ${b.status === 'pending' ? '⏳' : '✅'}</span>
-                        <span class="sidebar-booking-guests">${b.guests} 👥</span>
-                    </div>
-                `).join('');
-            })
-            .catch(() => {
-                listBox.innerHTML = '<p class="sidebar-empty">Could not load bookings.</p>';
-            });
-    }
-
     window.addEventListener('DOMContentLoaded', () => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        loadBookingsForDate(todayStr);
         updateSummary();
     });
 </script>

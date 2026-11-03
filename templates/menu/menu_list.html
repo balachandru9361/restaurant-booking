@@ -865,138 +865,117 @@
         border: 1px solid #55627f;
     }
 
-    /* ===== RIGHT SIDE CART PANEL ===== */
+    /* ===== BOTTOM CART BAR (slides up when the cart has items) ===== */
     :root {
-        --cp-top: 72px;   /* navbar height: adjust if your navbar is taller/shorter */
-        --cp-width: 130px;
+        --cp-top: 72px;     /* navbar height: JS keeps it in sync, the toast uses it */
         --search-top: 72px; /* sticky filter bar position; JS keeps it in sync with the navbar */
     }
 
-    #menuMain {
-        transition: padding-right 0.25s ease;
-    }
-
-    body.has-cart-panel #menuMain {
-        padding-right: var(--cp-width);
-    }
-
-    .cart-panel {
-        display: none;
+    .cart-bar {
         position: fixed;
+        left: 0;
         right: 0;
-        top: var(--cp-top);
-        width: var(--cp-width);
-        height: calc(100vh - var(--cp-top));
-        background: #fff;
-        border-left: 1px solid #e5e7eb;
-        box-shadow: -4px 0 14px rgba(0, 0, 0, 0.06);
-        overflow-y: auto;
-        padding: 12px 8px 24px;
-        text-align: center;
-        z-index: 90;
+        bottom: max(14px, env(safe-area-inset-bottom));
+        margin: 0 auto;
+        width: calc(100% - 24px);
+        max-width: 560px;
         box-sizing: border-box;
-    }
-
-    .cart-panel.active {
-        display: block;
-        animation: fadeUpIn 0.25s ease both;
-    }
-
-    .cart-panel .cp-label {
-        font-size: 0.78rem;
-        font-weight: 700;
-        color: #1b2233;
-    }
-
-    .cart-panel .cp-subtotal {
-        font-size: 0.95rem;
-        font-weight: 800;
-        color: #c2253d;
-        margin-bottom: 8px;
-        word-break: break-word;
-    }
-
-    .cart-panel .cp-go {
-        display: block;
-        padding: 8px 4px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 9px 9px 9px 22px;
         border-radius: 999px;
         background: linear-gradient(135deg, #12204a, #0b1426);
-        font-size: 0.78rem;
-        font-weight: 800;
-        color: #f3cf7a;
+        border: 1px solid rgba(243, 207, 122, 0.4);
+        box-shadow: 0 16px 40px rgba(11, 20, 38, 0.45);
+        color: #fff;
         text-decoration: none;
-        margin-bottom: 14px;
-        transition: transform 0.2s ease;
-    }
-
-    .cart-panel .cp-go:hover {
-        color: #f3cf7a;
-        text-decoration: none;
-        transform: translateY(-1px);
-    }
-
-    .cp-item {
-        padding-bottom: 14px;
-        margin-bottom: 14px;
-        border-bottom: 1px solid #f0f0f0;
-    }
-
-    .cp-item img {
-        width: 80px;
-        height: 80px;
-        object-fit: cover;
-        border-radius: 12px;
-        display: block;
-        margin: 0 auto 6px;
-    }
-
-    .cp-price {
-        font-size: 0.85rem;
-        font-weight: 800;
-        color: #1b2233;
-        margin-bottom: 6px;
-    }
-
-    .cp-qty {
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-        border: 2px solid #d9a441;
-        border-radius: 30px;
-        padding: 2px 4px;
-        background: #fff;
-    }
-
-    .cp-qty button {
-        width: 24px;
-        height: 24px;
-        border: none;
-        background: transparent;
-        font-weight: 800;
-        font-size: 0.95rem;
-        line-height: 1;
-        cursor: pointer;
-        color: #1b2233;
-        border-radius: 50%;
-        padding: 0;
+        z-index: 190;
         -webkit-tap-highlight-color: transparent;
         touch-action: manipulation;
+
+        /* hidden state: parked below the screen (no layout shift, nothing blinks) */
+        transform: translateY(150%);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: transform 0.3s ease, opacity 0.3s ease, visibility 0s linear 0.3s;
     }
 
-    .cp-qty button:hover {
-        background: #fff4d6;
-        color: #c2253d;
+    .cart-bar.active {
+        transform: translateY(0);
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition: transform 0.3s ease, opacity 0.3s ease, visibility 0s;
     }
 
-    .cp-qty button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
+    .cart-bar:hover,
+    .cart-bar:focus {
+        color: #fff;
+        text-decoration: none;
     }
 
-    .cp-qty span {
-        min-width: 18px;
-        font-size: 0.85rem;
+    .cart-bar:focus-visible {
+        outline: 3px solid #f3cf7a;
+        outline-offset: 3px;
+    }
+
+    .cart-bar .cb-info {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        line-height: 1.2;
+    }
+
+    .cart-bar .cb-count {
+        font-size: 0.76rem;
+        font-weight: 700;
+        color: #aeb8d0;
+    }
+
+    .cart-bar .cb-total {
+        font-size: 1.15rem;
         font-weight: 800;
+        color: #fff;
+        white-space: nowrap;
+    }
+
+    .cart-bar .cb-go {
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        height: 44px;
+        padding: 0 24px;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #f3cf7a, #d9a441);
+        color: #0b1426;
+        font-size: 0.92rem;
+        font-weight: 800;
+        letter-spacing: 0.3px;
+        transition: transform 0.15s ease;
+    }
+
+    .cart-bar:active .cb-go {
+        transform: scale(0.96);
+    }
+
+    /* keep the last dish cards clear of the bar */
+    body.has-cart-bar {
+        padding-bottom: 120px;
+    }
+
+    /* when dishes are ticked, the "Add Selected" bar sits just above the cart bar */
+    body.has-cart-bar .bulk-select-bar {
+        bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* back-to-top button also moves up so the cart bar never covers it */
+    body.has-cart-bar #backToTopBtn,
+    body.has-cart-bar .back-to-top,
+    body.has-cart-bar .scroll-to-bottom {
+        bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
     }
 
     /* Small "Added to cart" toast */
@@ -1032,11 +1011,6 @@
             width: 30px;
             height: 30px;
         }
-
-        .cp-qty button {
-            width: 28px;
-            height: 28px;
-        }
     }
 
     /* ===== TABLET ===== */
@@ -1052,19 +1026,6 @@
 
     /* ===== MOBILE ===== */
     @media (max-width: 500px) {
-        :root {
-            --cp-width: 92px;
-        }
-
-        .cp-item img {
-            width: 62px;
-            height: 62px;
-        }
-
-        .cart-panel .cp-go {
-            font-size: 0.7rem;
-        }
-
         .menu-hero {
             margin: 12px 14px 0;
             padding: 28px 22px;
@@ -1184,19 +1145,43 @@
         body {
             padding-bottom: 120px;
         }
+
+        /* phone: bulk bar is taller (two rows), so lift it a bit higher above the cart bar */
+        body.has-cart-bar .bulk-select-bar {
+            bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+        }
+
+        .cart-bar {
+            width: calc(100% - 20px);
+            padding: 8px 8px 8px 20px;
+        }
+
+        .cart-bar .cb-go {
+            height: 42px;
+            padding: 0 20px;
+            font-size: 0.88rem;
+        }
     }
 
     @media (prefers-reduced-motion: reduce) {
 
         .menu-hero,
         .bulk-select-bar.active,
-        .cart-panel.active,
+        .cart-bar,
+        .cart-bar.active,
         .menu-category,
         .item-card {
             animation: none !important;
             transition: none !important;
             opacity: 1 !important;
             transform: none !important;
+        }
+
+        /* the cart bar must stay hidden until the cart has items */
+        .cart-bar:not(.active) {
+            opacity: 0 !important;
+            visibility: hidden !important;
+            transform: translateY(150%) !important;
         }
     }
     /* =====================================================
@@ -1208,7 +1193,7 @@
     }
 
     #menuMain {
-        transition: padding-right 0.15s ease, opacity 0.54s ease, transform 0.54s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.54s ease;
+        transition: opacity 0.54s ease, transform 0.54s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.54s ease;
     }
 
     html.splash-on #menuMain {
@@ -2336,7 +2321,6 @@
         color: #b45309; font-size: 0.85rem; font-weight: 800;
     }
     .im-loading { color: #8a93a6; font-size: 0.88rem; padding: 10px 0; margin: 0; }
-    .cp-opts { font-size: 0.68rem; color: #6b7280; line-height: 1.3; margin-bottom: 4px; word-break: break-word; }
 </style>
 
 <style id="itemModalStyle">
@@ -2944,13 +2928,14 @@
 
 </div><!-- /#menuMain -->
 
-<!-- Right side cart panel -->
-<aside id="cartPanel" class="cart-panel" aria-label="Your cart">
-    <div class="cp-label">Subtotal</div>
-    <div class="cp-subtotal" id="cpSubtotal">₹0.00</div>
-    <a href="{% url 'orders:view_cart' %}" class="cp-go">Go to Cart</a>
-    <div id="cpItems"></div>
-</aside>
+<!-- Bottom cart bar: slides up when the cart has items, tap anywhere on it to open the cart page -->
+<a href="{% url 'orders:view_cart' %}" class="cart-bar" id="cartBar" aria-label="View cart">
+    <span class="cb-info">
+        <span class="cb-count" id="cbCount">0 items</span>
+        <span class="cb-total" id="cbTotal">₹0.00</span>
+    </span>
+    <span class="cb-go">View Cart</span>
+</a>
 
 <div class="im-overlay" id="itemModal" aria-hidden="true">
     <div class="im-box" role="dialog" aria-modal="true" aria-labelledby="imName">
@@ -2979,43 +2964,6 @@
     </div>
 </div>
 
-<style id="cpMobileFix">
-    /* Phone: keep the side panel quantity pill inside the narrow panel */
-    @media (max-width: 500px) {
-        .cp-qty { gap: 0 !important; padding: 2px !important; max-width: 100%; box-sizing: border-box; }
-        .cp-qty button { width: 22px !important; height: 26px !important; font-size: 0.9rem !important; }
-        .cp-qty span { min-width: 14px !important; font-size: 0.8rem !important; text-align: center; }
-        .cp-price { font-size: 0.78rem !important; }
-    }
-</style>
-
-<style id="cpMobileFix2">
-    /* Side cart panel: stretch from the navbar down to the visible bottom of the phone screen */
-    .cart-panel {
-        height: auto !important;
-        bottom: 0;
-        padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-        overscroll-behavior: contain;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* Floating buttons and toast move left of the panel instead of covering it */
-    body.has-cart-panel #backToTopBtn,
-    body.has-cart-panel .back-to-top,
-    body.has-cart-panel .scroll-to-bottom,
-    body.has-cart-panel .cart-toast {
-        right: calc(var(--cp-width) + 12px);
-    }
-
-    /* Phone: bulk-select bar stops before the panel */
-    @media (max-width: 500px) {
-        body.has-cart-panel .bulk-select-bar {
-            left: 12px;
-            right: calc(var(--cp-width) + 12px);
-        }
-    }
-</style>
-
 <div class="cart-toast" id="cartToast"></div>
 
 <div class="bulk-select-bar" id="bulkBar">
@@ -3025,13 +2973,15 @@
 </div>
 
 <script>
-    // Move the bulk-select bar to <body> so no ancestor (overflow/transform)
-    // can clip or reposition this fixed element.
+    // Move the bulk-select bar and the cart bar to <body> so no ancestor (overflow/transform)
+    // can clip or reposition these fixed elements.
     (function () {
-        var bar = document.getElementById('bulkBar');
-        if (bar && bar.parentElement !== document.body) {
-            document.body.appendChild(bar);
-        }
+        ['bulkBar', 'cartBar'].forEach(function (id) {
+            var node = document.getElementById(id);
+            if (node && node.parentElement !== document.body) {
+                document.body.appendChild(node);
+            }
+        });
     })();
 
     function updateBulkBar() {
@@ -3078,7 +3028,7 @@
     }
 
     // =====================================================
-    // SIDE CART PANEL (Add to Cart without leaving the page)
+    // CART (Add to Cart without leaving the page + bottom cart bar)
     // =====================================================
 
     // The "0" is a placeholder item id, replaced with the real id in urlFor()
@@ -3206,62 +3156,33 @@
         });
     }
 
+    // Updates the header badge, the card steppers and the bottom cart bar.
+    // (Name kept as renderCartPanel so every existing call below still works.)
     function renderCartPanel(data) {
         updateHeaderBadge(data);
-        const panel = document.getElementById('cartPanel');
         syncCards(data);
 
+        const bar = document.getElementById('cartBar');
+        if (!bar) return;
+
         if (!data || !data.success || !data.items || data.items.length === 0) {
-            panel.classList.remove('active');
-            document.body.classList.remove('has-cart-panel');
-            document.getElementById('cpItems').innerHTML = '';
+            bar.classList.remove('active');
+            document.body.classList.remove('has-cart-bar');
             return;
         }
 
-        document.getElementById('cpSubtotal').textContent = formatMoney(data.subtotal);
-
-        document.getElementById('cpItems').innerHTML = data.items.map(function (i) {
-            const img = i.image_url || NO_IMAGE;
-            const isOne = i.quantity <= 1;
-            return '' +
-                '<div class="cp-item" data-id="' + i.id + '" data-line="' + escapeHtml(i.line || '') + '">' +
-                '<img src="' + escapeHtml(img) + '" alt="' + escapeHtml(i.name) + '" title="' + escapeHtml(i.name) + '">' +
-                (i.options_text ? '<div class="cp-opts">' + escapeHtml(i.options_text) + '</div>' : '') +
-                '<div class="cp-price">' + formatMoney(i.price) + '</div>' +
-                '<div class="cp-qty">' +
-                '<button type="button" data-action="' + (isOne ? 'remove' : 'dec') + '" aria-label="' + (isOne ? 'Remove' : 'Decrease') + '">' +
-                (isOne ? '🗑' : '−') + '</button>' +
-                '<span>' + i.quantity + '</span>' +
-                '<button type="button" data-action="inc" aria-label="Increase">+</button>' +
-                '</div>' +
-                '</div>';
-        }).join('');
-
-        panel.classList.add('active');
-        document.body.classList.add('has-cart-panel');
-    }
-
-    // + / - / delete buttons inside the panel
-    document.getElementById('cpItems').addEventListener('click', function (e) {
-        const btn = e.target.closest('button[data-action]');
-        if (!btn) return;
-
-        const itemEl = btn.closest('.cp-item');
-        const id = itemEl.dataset.id;
-        const action = btn.dataset.action;
-
-        btn.disabled = true;
-
-        const request = action === 'remove'
-            ? postForm(urlFor(CART_URLS.remove, id), {line: itemEl.dataset.line || ''})
-            : postForm(urlFor(CART_URLS.update, id), {action: action, line: itemEl.dataset.line || ''});
-
-        request.then(renderCartPanel).catch(function (err) {
-            console.error(err);
-            btn.disabled = false;
-            showToast('Could not update cart. Try again.', true);
+        // total pieces in the cart (3 biryani + 2 juice = 5 items)
+        let totalQty = 0;
+        data.items.forEach(function (i) {
+            totalQty += Number(i.quantity) || 0;
         });
-    });
+
+        document.getElementById('cbCount').textContent = totalQty + (totalQty === 1 ? ' item' : ' items');
+        document.getElementById('cbTotal').textContent = formatMoney(data.subtotal);
+
+        bar.classList.add('active');
+        document.body.classList.add('has-cart-bar');
+    }
 
     function refreshCartPanel() {
         fetch(CART_URLS.data, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
@@ -3270,7 +3191,7 @@
             .catch(function (err) { console.error(err); });
     }
 
-    // "Add" buttons: stay on this page, update the side panel (always adds 1)
+    // "Add" buttons: stay on this page, update the bottom cart bar (always adds 1)
     document.querySelectorAll('.add-to-cart-form').forEach(function (form) {
         form.addEventListener('submit', function (e) {
             e.preventDefault();
@@ -3321,7 +3242,7 @@
                 btn.disabled = false;
                 btn.textContent = 'Add Selected to Cart';
                 if (data.success) {
-                    // Stay on the menu page: clear the selection and refresh the side panel
+                    // Stay on the menu page: clear the selection and refresh the bottom cart bar
                     clearSelection();
                     refreshCartPanel();
                     showToast(data.added_count + ' item' + (data.added_count !== 1 ? 's' : '') + ' added to cart!');
@@ -3337,7 +3258,7 @@
             });
     }
 
-    // Fill the panel when the page loads (if the cart already has items)
+    // Fill the cart bar when the page loads (if the cart already has items)
     refreshCartPanel();
 
     // Keep the sticky filter bar just below the navbar.

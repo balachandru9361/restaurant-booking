@@ -32,6 +32,9 @@ def signup_view(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
+            # Lets the welcome splash show "Welcome" instead of
+            # "Welcome back" for a brand new customer.
+            request.session['is_new_signup'] = True
             messages.success(
                 request, f'Welcome, {user.first_name}! Your account is ready.')
             # Continue where the customer left off (e.g. cart / confirm order)
@@ -61,6 +64,7 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
+                request.session['is_new_signup'] = False
                 messages.success(
                     request, f'Welcome back, {user.first_name or user.username}!')
 

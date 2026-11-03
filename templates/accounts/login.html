@@ -384,6 +384,15 @@
         });
     });
 
+    // Clear a field's error message as soon as the user edits that field
+    document.querySelectorAll('.form-group input').forEach(function (input) {
+        input.addEventListener('input', function () {
+            var group = this.closest('.form-group');
+            var err = group ? group.querySelector('.error') : null;
+            if (err) err.remove();
+        });
+    });
+
     var loginForm = document.getElementById('loginForm');
     var loginBtn = document.getElementById('loginBtn');
     var loginSpinner = document.getElementById('loginSpinner');
@@ -406,7 +415,7 @@
         });
     }
 
-    // Back button / bfcache: button stuck aagaama irukka
+    // Back button / bfcache: reset the button so it does not stay stuck
     window.addEventListener('pageshow', function (e) {
         if (e.persisted) resetLoginBtn();
     });

@@ -274,13 +274,18 @@
 
     .pager a:hover { background: #1f2937; color: #fff; text-decoration: none; }
 
+    /* ----- You may also like (aligned cards) ----- */
     .related-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         gap: 22px;
+        align-items: stretch;               /* every card in a row gets the same height */
     }
 
     .related-card {
+        display: flex;                      /* column layout so the body can fill the card */
+        flex-direction: column;
+        height: 100%;
         background: #fff;
         border-radius: 16px;
         overflow: hidden;
@@ -296,16 +301,32 @@
     .related-card img {
         width: 100%;
         height: 150px;
+        flex: none;
         object-fit: cover;
         display: block;
     }
 
-    .related-body { padding: 14px; }
-    .related-body h4 { font-size: 1rem; color: #1f2937; margin-bottom: 6px; overflow-wrap: anywhere; }
+    .related-body {
+        display: flex;
+        flex-direction: column;
+        flex: 1;                            /* takes the remaining card height */
+        padding: 14px;
+    }
+
+    .related-body h4 {
+        font-size: 1rem;
+        line-height: 1.3;
+        min-height: 2.6em;                  /* always room for 2 lines, so price + button line up */
+        color: #1f2937;
+        margin-bottom: 6px;
+        overflow-wrap: anywhere;
+    }
+
     .related-price { color: #e63946; font-weight: 800; margin-bottom: 10px; }
 
     .related-body a {
         display: block;
+        margin-top: auto;                   /* View button always sits at the bottom of the card */
         text-align: center;
         padding: 10px 0;
         border: 1.5px solid #1f2937;
@@ -366,6 +387,7 @@
 
     @media (max-width: 380px) {
         .related-grid { grid-template-columns: minmax(0, 1fr); }
+        .related-body h4 { min-height: 0; }   /* single column: no need to reserve 2 lines */
         .detail-actions .btn-cart,
         .detail-actions .btn-cartpage { flex: 1 1 100%; }
     }
