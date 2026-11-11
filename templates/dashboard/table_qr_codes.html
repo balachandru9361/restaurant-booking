@@ -38,7 +38,7 @@
   }
   .print-all-btn:hover { background: #F63A3A; color: #fff; transform: translateY(-2px); }
 
-  /* NEW: website address box (the address inside every QR code) */
+  /* Website address box (the address inside every QR code) */
   .base-box {
     background: #fff;
     border: 1px solid #e5e7eb;
@@ -165,8 +165,6 @@
   }
   .btn-print-one { background: #eef2ff; color: #3730a3; }
   .btn-print-one:hover { background: #3730a3; color: #fff; }
-  .btn-open-link { background: #e0f2f1; color: #0f766e; }
-  .btn-open-link:hover { background: #0f766e; color: #fff; }
 
   .empty-state {
     text-align: center;
@@ -175,19 +173,57 @@
   }
   .empty-state .big-emoji { font-size: 46px; margin-bottom: 10px; }
 
+  /* ---------- PRINTING ----------
+     Print flow: the JS copies the chosen card(s) into #printArea (a direct child of <body>).
+     On print, everything else in <body> is hidden (site header, sidebar, footer, other cards),
+     so only the QR card(s) are printed, centered, one card per page.
+     "@page margin: 0" also removes the browser's date / URL / page-number header and footer. */
+  #printArea { display: none; }
+
   @media print {
-    .qr-header, .print-all-btn, .qr-card-actions, .admin-sidebar, .qr-scan-hint, .base-box { display: none !important; }
-    .qr-grid {
-      display: block !important;
+    @page { size: A4; margin: 0; }
+
+    html, body {
+      background: #fff !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      height: auto !important;
+      overflow: visible !important;
     }
-    .qr-card {
+
+    body > *:not(#printArea) { display: none !important; }
+
+    #printArea { display: block !important; }
+
+    #printArea .print-page {
+      page-break-after: always;
+      break-after: page;
+      padding-top: 40mm;
+      text-align: center;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    #printArea .print-page:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    #printArea .qr-card {
+      display: inline-block;
+      width: 90mm;
+      margin: 0 auto;
+      transform: none !important;
+      transition: none !important;
       box-shadow: none !important;
       border: 2px solid #0d1b2a !important;
-      page-break-after: always;
-      margin: 40px auto;
-      max-width: 320px;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
-    .qr-image-wrap img { width: 260px; height: 260px; }
+    #printArea .qr-image-wrap img {
+      width: 60mm;
+      height: 60mm;
+    }
+    #printArea .qr-scan-hint { color: #374151; }
   }
 </style>
 
@@ -196,10 +232,10 @@
     <h1>📱 Table QR Codes</h1>
     <p>Print and place these on each table — customers scan to order directly from that table.</p>
   </div>
-  <button class="print-all-btn" onclick="window.print()">🖨️ Print All</button>
+  <button class="print-all-btn" onclick="printAll()">🖨️ Print All</button>
 </div>
 
-<!-- NEW: the address that goes inside every QR code -->
+<!-- The address that goes inside every QR code -->
 <div class="base-box">
   <label for="baseUrl">Website address inside the QR codes</label>
   <div class="base-row">
@@ -240,7 +276,6 @@
 
         <div class="qr-card-actions">
           <button class="qr-action-btn btn-print-one" onclick="printSingle(this)">🖨️ Print</button>
-          <a href="{% url 'orders:select_table' table.id %}" target="_blank" class="qr-action-btn btn-open-link">🔗 Test Link</a>
         </div>
       </div>
     {% endfor %}
@@ -252,20 +287,53 @@
   </div>
 {% endif %}
 
+<!-- Print-only area: moved to be a direct child of <body> by the script below -->
+<div id="printArea"></div>
+
 <script>
-  function printSingle(btn) {
-    const card = btn.closest('.qr-card');
-    const allCards = document.querySelectorAll('.qr-card');
-    allCards.forEach(c => { if (c !== card) c.style.display = 'none'; });
-    window.print();
-    allCards.forEach(c => { c.style.display = ''; });
+  // ---- Printing: copy the chosen card(s) into #printArea, then print ----
+  function fillPrintArea(cards) {
+    var area = document.getElementById('printArea');
+    area.innerHTML = '';
+    cards.forEach(function (card) {
+      var page = document.createElement('div');
+      page.className = 'print-page';
+      var copy = card.cloneNode(true);
+      var actions = copy.querySelector('.qr-card-actions');
+      if (actions) actions.remove();
+      page.appendChild(copy);
+      area.appendChild(page);
+    });
   }
 
-  // ---- NEW: editable base address for the QR codes ----
+  function printCards(cards) {
+    if (!cards.length) return;
+    fillPrintArea(cards);
+    window.print();
+  }
+
+  function printSingle(btn) {
+    printCards([btn.closest('.qr-card')]);
+  }
+
+  function printAll() {
+    printCards(Array.prototype.slice.call(document.querySelectorAll('.qr-grid .qr-card')));
+  }
+
+  window.addEventListener('afterprint', function () {
+    var area = document.getElementById('printArea');
+    if (area) area.innerHTML = '';
+  });
+
+  // ---- Editable base address for the QR codes ----
   (function () {
-    const KEY = 'qrBaseUrl';
-    const input = document.getElementById('baseUrl');
-    const warn = document.getElementById('baseWarn');
+    var KEY = 'qrBaseUrl';
+    var input = document.getElementById('baseUrl');
+    var warn = document.getElementById('baseWarn');
+
+    // make #printArea a direct child of <body> so the print CSS can hide everything else
+    var area = document.getElementById('printArea');
+    if (area && area.parentNode !== document.body) document.body.appendChild(area);
 
     function clean(v) {
       v = (v || '').trim().replace(/\/+$/, '');
@@ -274,17 +342,17 @@
     }
 
     function render() {
-      const base = clean(input.value);
+      var base = clean(input.value);
       warn.classList.toggle('show', /\/\/(127\.0\.0\.1|localhost)([:\/]|$)/i.test(base));
-      document.querySelectorAll('.qr-img').forEach(img => {
-        const link = base + img.dataset.path;
+      document.querySelectorAll('.qr-img').forEach(function (img) {
+        var link = base + img.dataset.path;
         img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data=' + encodeURIComponent(link);
       });
     }
 
     // use the address saved earlier in this browser, if any
     try {
-      const saved = localStorage.getItem(KEY);
+      var saved = localStorage.getItem(KEY);
       if (saved) input.value = saved;
     } catch (e) {}
 

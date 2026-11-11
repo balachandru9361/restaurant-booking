@@ -94,6 +94,19 @@
 
 .status-pill { font-size: 0.7rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: #fff4e0; color: #b9740a; transition: all 0.2s ease; }
 
+/* NEW: errors sent back by the server (form validation) */
+.form-errors {
+    margin: 8px 26px 0;
+    background: #fff1f0;
+    border: 1px solid #ffc9c4;
+    color: #c0281b;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+.form-errors p { margin: 3px 0; }
+
 /* CHANGED: less empty space under the last field */
 .booking-form-body { padding: 10px 26px 4px; }
 
@@ -263,6 +276,7 @@
     .progress-steps { grid-template-columns: repeat(2, 1fr); }
     .card-section-title, .booking-form-body, .submit-area { padding-left: 18px; padding-right: 18px; }
     .preview-card { margin-left: 18px; margin-right: 18px; }
+    .form-errors { margin-left: 18px; margin-right: 18px; }
 }
 </style>
 
@@ -296,6 +310,15 @@
                     <h3>Your Details</h3>
                     <span class="status-pill" id="formStatusPill">DRAFT</span>
                 </div>
+
+                {# NEW: errors from the server (past date, past time, bad phone, guests...) #}
+                {% if form.errors %}
+                <div class="form-errors">
+                    {% for field, errs in form.errors.items %}
+                        {% for e in errs %}<p>⚠️ {{ e }}</p>{% endfor %}
+                    {% endfor %}
+                </div>
+                {% endif %}
 
                 <div class="booking-form-body">
                     <form method="post" id="bookingForm">
@@ -381,6 +404,8 @@
                                         <input type="time" name="booking_time" id="fTime" required>
                                     </div>
                                 </div>
+                                {# NEW: shown when the picked date / time is already in the past #}
+                                <div class="field-error" id="slotError"></div>
                             </div>
                         </div>
 
@@ -436,9 +461,52 @@
         updateSummary('rowGuests');
     });
 
-    document.getElementById('fDate').min = new Date().toISOString().split('T')[0];
+    // FIXED: today's date in the customer's LOCAL time.
+    // (new Date().toISOString() is UTC, so in India between 12:00 AM and 5:30 AM
+    //  it returned yesterday, and a past date could be picked.)
+    function localISODate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+    function nowHHMM() {
+        const n = new Date();
+        return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0');
+    }
 
+    const dateInput = document.getElementById('fDate');
     const timeInput = document.getElementById('fTime');
+    const slotError = document.getElementById('slotError');
+    dateInput.min = localISODate(new Date());
+
+    // NEW: past date / past time check (also run again on submit).
+    // Returns true when the picked slot is fine.
+    function checkSlot() {
+        const d = dateInput.value;
+        const t = timeInput.value;
+        const today = localISODate(new Date());
+        let msg = '';
+
+        dateInput.min = today;
+        if (d && d < today) {
+            msg = 'Please choose today or a future date.';
+            timeInput.removeAttribute('min');
+        } else if (d === today) {
+            timeInput.min = nowHHMM();
+            if (t && t <= nowHHMM()) {
+                msg = 'That time has already passed today. Please choose a later time.';
+            }
+        } else {
+            timeInput.removeAttribute('min');
+        }
+
+        slotError.textContent = msg ? '⚠️ ' + msg : '';
+        slotError.classList.toggle('show', !!msg);
+        dateInput.classList.toggle('invalid', !!msg && d < today);
+        timeInput.classList.toggle('invalid', !!msg && d === today);
+        return !msg;
+    }
 
     const zoneInput = document.getElementById('fZone');
     document.querySelectorAll('.zone-card').forEach(card => {
@@ -514,7 +582,7 @@
     function updateSummary(changedRow) {
         const name = document.getElementById('fName').value;
         const phone = phoneInput.value;
-        const date = document.getElementById('fDate').value;
+        const date = dateInput.value;
         const time = timeInput.value;
         const g = parseInt(guestsInput.value || 1);
         const occSelect = document.getElementById('fOccasion');
@@ -546,7 +614,7 @@
         const phoneOk = isValidIndianPhone(phoneDigits);
 
         const pill = document.getElementById('formStatusPill');
-        if (name && phoneOk && date && time) {
+        if (name && phoneOk && date && time && checkSlot()) {
             pill.textContent = 'READY';
             pill.style.background = '#eafaf0';
             pill.style.color = '#1f9d55';
@@ -565,12 +633,13 @@
     // 'change' while typing digit-by-digit into a date/time input, so we
     // listen to both 'input' and 'change' to catch every update live.
     function onDateOrTimeChange() {
+        checkSlot();
         updateSummary('rowDateTime');
     }
-    document.getElementById('fDate').addEventListener('input', onDateOrTimeChange);
-    document.getElementById('fDate').addEventListener('change', onDateOrTimeChange);
-    document.getElementById('fTime').addEventListener('input', onDateOrTimeChange);
-    document.getElementById('fTime').addEventListener('change', onDateOrTimeChange);
+    dateInput.addEventListener('input', onDateOrTimeChange);
+    dateInput.addEventListener('change', onDateOrTimeChange);
+    timeInput.addEventListener('input', onDateOrTimeChange);
+    timeInput.addEventListener('change', onDateOrTimeChange);
 
     guestsInput.addEventListener('input', () => { updateSummary('rowGuests'); });
     guestsInput.addEventListener('change', () => { updateSummary('rowGuests'); });
@@ -587,6 +656,13 @@
             return;
         }
 
+        // NEW: a past date / past time never goes to the server
+        if (!checkSlot()) {
+            e.preventDefault();
+            slotError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+        }
+
         if (submitBtn.disabled) {
             e.preventDefault();
             return;
@@ -596,6 +672,7 @@
     });
 
     window.addEventListener('DOMContentLoaded', () => {
+        checkSlot();
         updateSummary();
     });
 </script>

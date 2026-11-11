@@ -7,19 +7,32 @@ from django.utils import timezone
 # ---------------------------------------------------------------------------
 # Table hold rules
 #
-# There is NO timer that frees a booked table. An approved booking holds its
-# tables from the booked time until the admin clicks "Open Table" (the booking
-# is then marked released). Pending and rejected bookings never hold a table.
+# There is NO timer that frees a table. Nothing expires by time.
+#   - An approved booking holds its tables from the booked time until the admin
+#     clicks "Open Table" (the booking is then marked released).
+#   - An order that has a table holds it until the server taps "Customer Left"
+#     (table_released), the order is cancelled, or the admin opens the table.
+#   - Pending and rejected bookings never hold a table.
+#   - EXCEPTION (seat based seating): an order that belongs to a session that
+#     has SeatAllocation rows does NOT hold the whole table. Its seats are
+#     tracked by SeatAllocation (see booking/seating.py), so other groups can
+#     use the remaining seats of the same table.
+#   - NEW: for WALK-IN SEATING ONLY, an order that has a guest count (Order.guests)
+#     does not block the whole table either. Its guests use that many seats, so
+#     "Table 5: 6 seats, 2 customers, 4 free" can be shown and walk-ins can use the
+#     remaining seats. An old order without a guest count still blocks the whole table.
+#     Everything outside walk-in seating (admin Open Table, QR page, booking
+#     screens) still treats every live order as a whole-table hold.
 #
 # OPEN_ENDED is only a very large number used as the "end" of such a hold so
-# the old code that compares start/end keeps working. It is never shown.
+# the code that compares start/end keeps working. It is never shown.
 # ---------------------------------------------------------------------------
 OPEN_ENDED = timedelta(days=3650)
 HOLD_DURATION = OPEN_ENDED          # kept so old imports do not break; not a real timer
 
 PENDING_HOLD = timedelta(minutes=15)    # unpaid online checkout of an order only
-WALKIN_BUFFER = timedelta(minutes=30)
-STALE_ORDER_LIMIT = timedelta(hours=24)
+WALKIN_BUFFER = timedelta(minutes=30)   # walk-ins are not seated right before a reservation
+STALE_ORDER_LIMIT = timedelta(hours=24) # kept so old imports do not break; no longer used
 
 # Reminder only: after this long a booked table that the admin has not opened
 # is shown as "still held". It never frees the table by itself.
@@ -59,6 +72,12 @@ def _is_confirmed_booking(hold):
     return hold.kind == 'booking' and getattr(hold.obj, 'status', 'approved') == 'approved'
 
 
+def _counts_by_seats(hold):
+    """NEW: True for an order hold that has a guest count. For walk-in seating such an
+    order uses `guests` seats of its table instead of blocking the whole table."""
+    return hold.kind == 'order' and bool(getattr(hold.obj, 'guests', None))
+
+
 def is_overdue(hold):
     """True for a booking hold that started long ago and was never opened by the admin."""
     return hold.kind == 'booking' and timezone.now() - hold.start >= OVERDUE_AFTER
@@ -66,9 +85,13 @@ def is_overdue(hold):
 
 def get_holds():
     """All holds that are still in effect: approved bookings that the admin has not
-    opened yet, and live orders."""
+    opened yet, and live orders. No date or age limit is applied.
+
+    Orders that belong to a seat-managed session (a session with SeatAllocation
+    rows) are skipped: they must not close the whole table, because the seats of
+    that table are shared between customer groups."""
     from orders.models import Order
-    from .models import TableBooking
+    from .models import SeatAllocation, TableBooking
 
     now = timezone.now()
     holds = []
@@ -76,14 +99,11 @@ def get_holds():
     # Only APPROVED bookings hold tables. A pending request holds nothing
     # (the admin chooses the table(s) when approving), and a rejected one never does.
     # A booking for a big party holds its extra tables too.
-    # The date filter looks back one day only: it is a safety guard so old approved
-    # bookings that were never opened (from before this change) do not block tables forever.
     bookings = (
         TableBooking.objects.filter(
             status='approved',
             table__isnull=False,
             released=False,
-            booking_date__gte=timezone.localdate() - timedelta(days=1),
         )
         .select_related('table', 'user')
         .prefetch_related('extra_tables')
@@ -98,6 +118,11 @@ def get_holds():
         for tid in table_ids:
             holds.append(Hold('booking', tid, start, end, b.user_id, label, b))
 
+    # Sessions whose seats are managed seat by seat.
+    seat_managed_sessions = set(
+        SeatAllocation.objects.values_list('session_id', flat=True).distinct()
+    )
+
     # Orders: a table given to an order (by the customer or by the admin) stays
     # closed until the server taps "Customer Left" (table_released), the order is
     # cancelled, or the admin opens it. A served ('delivered') order still holds the table.
@@ -105,12 +130,14 @@ def get_holds():
         Order.objects.filter(
             table__isnull=False,
             table_released=False,
-            created_at__gte=now - STALE_ORDER_LIMIT,
         )
         .exclude(status='cancelled')
         .select_related('user')
     )
     for o in orders:
+        # The Order field is `table_session`, so the attribute is `table_session_id`.
+        if o.table_session_id in seat_managed_sessions:
+            continue
         unpaid_checkout = (o.status == 'pending' and o.payment_status == 'pending')
         if unpaid_checkout:
             # customer still on the payment step: short hold only
@@ -120,7 +147,7 @@ def get_holds():
             end = now + OPEN_ENDED
         if end > now:
             holds.append(Hold('order', o.table_id, o.created_at, end, o.user_id,
-                              f"Order #{o.id} ({(o.user.username if o.user else 'Guest')})", o))
+                              f"Order #{o.id} ({o.customer_name})", o))
     return holds
 
 
@@ -189,6 +216,133 @@ def is_table_busy_now(table_id, user=None, buffer=WALKIN_BUFFER):
             return True
 
     return False
+
+
+def walkin_blocked_table_ids(buffer=WALKIN_BUFFER, holds=None):
+    """Set of table ids that CANNOT be used for seat based walk-in seating right now.
+
+    A table is blocked when a whole-table hold applies to it:
+      - an approved booking whose time has started and was not opened by the admin,
+      - an approved booking that starts within `buffer` from now,
+      - an old style live order on the table that has NO guest count.
+
+    CHANGED: an order that has a guest count (Order.guests) no longer blocks the whole
+    table. Its guests are subtracted from the free seats in walkin_free_seats().
+
+    This does the same checks as is_table_busy_now() but loads the holds only once,
+    so it is cheap to call for the whole restaurant. `holds` can be passed in when
+    the caller already loaded them."""
+    now = timezone.now()
+    holds = get_holds() if holds is None else holds
+    blocked = set()
+
+    for h in active_holds(holds):
+        if h.kind == 'booking' and not _is_confirmed_booking(h):
+            continue
+        if _counts_by_seats(h):
+            continue            # NEW: counted by seats, not by the whole table
+        blocked.add(h.table_id)
+
+    for h in upcoming_holds(holds):
+        if _is_confirmed_booking(h) and h.start - now <= buffer:
+            blocked.add(h.table_id)
+
+    return blocked
+
+
+def _order_guest_seats(holds):
+    """NEW: {table_id: seats} used by live orders that have a guest count.
+
+    One table can have several orders (the same customers order again: juice,
+    dessert). They are the same people, so the table counts the LARGEST guest
+    number among its live orders, not the sum."""
+    seats = {}
+    for h in active_holds(holds):
+        if not _counts_by_seats(h):
+            continue
+        n = int(h.obj.guests)
+        seats[h.table_id] = max(seats.get(h.table_id, 0), n)
+    return seats
+
+
+# Walk-in Seat Availability (read only helpers, nothing is saved here)
+def walkin_free_seats(buffer=WALKIN_BUFFER):
+    """[(Table, free_seats), ...] sorted by table number, for seat based walk-in seating.
+
+    free_seats is 0 when a whole-table hold blocks the table (see walkin_blocked_table_ids).
+    Otherwise it is:
+        capacity
+        - seats of live SeatAllocation rows (occupied, awaiting cleaning, or a hold that
+          has not expired), the same rule Table.seats_taken uses
+        - NEW: guests of live orders that have a guest count (see _order_guest_seats)
+    All tables are counted with ONE query for the seats, and the holds are loaded once."""
+    from django.db.models import Q, Sum
+    from .models import SeatAllocation, Table
+
+    now = timezone.now()
+    holds = get_holds()
+    blocked = walkin_blocked_table_ids(buffer, holds)
+    order_seats = _order_guest_seats(holds)
+
+    taken_rows = (
+        SeatAllocation.objects
+        .filter(
+            Q(status__in=[SeatAllocation.OCCUPIED, SeatAllocation.CLEANING])
+            | Q(status=SeatAllocation.HELD, held_until__gt=now)
+        )
+        .order_by()                      # no default ordering, so the GROUP BY stays on table_id only
+        .values('table_id')
+        .annotate(total=Sum('seats'))
+    )
+    taken = {row['table_id']: row['total'] or 0 for row in taken_rows}
+
+    result = []
+    for t in Table.objects.all().order_by('number'):
+        if t.id in blocked:
+            free = 0
+        else:
+            used = taken.get(t.id, 0) + order_seats.get(t.id, 0)
+            free = max(t.capacity - used, 0)
+        result.append((t, free))
+    return result
+
+
+def suggest_walkin_arrangement(guests, buffer=WALKIN_BUFFER):
+    """Suggest where a walk-in group of `guests` can sit.
+
+    Returns [(Table, seats_to_give), ...] sorted by table number, or None if the
+    restaurant does not have enough free seats right now.
+
+    1. If ONE table has enough free seats, use the smallest such table
+       (so big tables stay free for big groups).
+    2. Otherwise split the group over the FEWEST tables, taking the tables with
+       the most free seats first (example: 7 guests -> Table 10: 4 seats + Table 12: 3 seats).
+
+    Nothing is saved. The caller creates the TableSession and SeatAllocation rows
+    only after the customer accepts and the server confirms."""
+    if guests < 1:
+        return None
+
+    rows = walkin_free_seats(buffer)
+    if sum(free for _, free in rows) < guests:
+        return None
+
+    singles = sorted((r for r in rows if r[1] >= guests), key=lambda r: (r[1], r[0].number))
+    if singles:
+        return [(singles[0][0], guests)]
+
+    ordered = sorted((r for r in rows if r[1] > 0), key=lambda r: (-r[1], r[0].number))
+    remaining = guests
+    picked = []
+    for table, free in ordered:
+        if remaining <= 0:
+            break
+        take = min(free, remaining)
+        picked.append((table, take))
+        remaining -= take
+
+    picked.sort(key=lambda p: p[0].number)
+    return picked if remaining <= 0 else None
 
 
 def _same_local_date(a, b):
@@ -346,12 +500,11 @@ def release_table(table_id):
     Returns how many holds were lifted.
     For a multi-table booking this opens the whole booking (all its tables).
 
-    CHANGED: get_holds() only looks back one day, so an older approved booking that
-    was never opened (example: booked 3 days ago, shown as "Still held - time passed")
-    was not found and Open Table did nothing. Those old bookings are opened here too."""
-    from django.db.models import Q
-    from .models import TableBooking
+    get_holds() has no date limit any more, so every approved booking that was
+    never opened (however old) is found here and can be opened.
 
+    Seat based groups are not affected: their seats are released through
+    TableSession.mark_departed() and TableSession.confirm_cleaning()."""
     now = timezone.now()
     count = 0
     for h in active_holds():
@@ -364,17 +517,5 @@ def release_table(table_id):
         else:
             h.obj.table_released = True
             h.obj.save(update_fields=['table_released'])
-        count += 1
-
-    # Old approved bookings (older than the get_holds look-back day) that were never opened
-    cutoff = timezone.localdate() - timedelta(days=1)
-    stale = (TableBooking.objects
-             .filter(Q(table_id=table_id) | Q(extra_tables__id=table_id),
-                     status='approved', released=False, booking_date__lt=cutoff)
-             .distinct())
-    for b in stale:
-        b.released = True
-        b.released_at = now
-        b.save(update_fields=['released', 'released_at'])
         count += 1
     return count

@@ -1,5 +1,6 @@
 import re
 from django import forms
+from django.utils import timezone
 from .models import TableBooking, Table
 
 # One table seats 6 guests. A bigger party gets several tables.
@@ -15,7 +16,7 @@ def tables_needed(guests):
 class TableBookingForm(forms.ModelForm):
     """Customer booking form.
 
-    CHANGED: the customer no longer picks a table. The booking is saved as
+    The customer does not pick a table. The booking is saved as
     'pending' with no table, and the admin chooses the table(s) when approving.
     """
 
@@ -43,14 +44,40 @@ class TableBookingForm(forms.ModelForm):
             'special_request': forms.Textarea(attrs={'rows': 3}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Past dates cannot be picked in the date box.
+        # Uses the local (TIME_ZONE) date, not the server's UTC date.
+        self.fields['booking_date'].widget.attrs['min'] = timezone.localdate().isoformat()
+
     def clean_phone(self):
-        phone = self.cleaned_data.get('phone', '').strip()
+        phone = (self.cleaned_data.get('phone') or '').strip()
         # Indian mobile numbers: exactly 10 digits, starting with 6, 7, 8, or 9
         if not re.match(r'^[6-9]\d{9}$', phone):
             raise forms.ValidationError(
                 'Please enter a valid 10-digit Indian mobile number.'
             )
         return phone
+
+    # A booking cannot be for a past date
+    def clean_booking_date(self):
+        booking_date = self.cleaned_data.get('booking_date')
+        if booking_date and booking_date < timezone.localdate():
+            raise forms.ValidationError('Please choose today or a future date.')
+        return booking_date
+
+    # For a booking today, the time must not be in the past
+    def clean(self):
+        cleaned = super().clean()
+        booking_date = cleaned.get('booking_date')
+        booking_time = cleaned.get('booking_time')
+        if booking_date and booking_time and booking_date == timezone.localdate():
+            if booking_time <= timezone.localtime().time():
+                self.add_error(
+                    'booking_time',
+                    'That time has already passed today. Please choose a later time.'
+                )
+        return cleaned
 
 
 class TableForm(forms.ModelForm):

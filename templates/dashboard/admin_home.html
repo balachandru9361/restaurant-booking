@@ -200,7 +200,9 @@
       <tr><th>User</th><th>Amount</th><th>Status</th></tr>
       {% for order in recent_orders %}
       <tr>
-        <td>{{ order.user.username }}</td>
+        <!-- FIXED: was {{ order.user.username }} which is blank for guest / QR orders.
+             display_user is set in admin_dashboard (views.py) = customer name or "Guest". -->
+        <td>{{ order.display_user }}</td>
         <td>₹{{ order.total_amount|inr }}</td>
         <td><span class="badge badge-{{ order.status }}">{{ order.status }}</span></td>
       </tr>

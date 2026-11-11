@@ -21,7 +21,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Sum, F, Count, Q, Case, When, Value, IntegerField
+from django.db.models import Sum, F, Count, Q, Case, When, Value, IntegerField, Max
 from django.db.models import ProtectedError
 from django.db.models.functions import TruncDate, TruncMonth
 from django.core.mail import send_mail
@@ -39,7 +39,7 @@ from booking.forms import SEATS_PER_TABLE, tables_needed
 # CHANGED: later_reservations (clash with a later approved booking) and ALLOW_SINGLE_BIG_TABLE added
 from booking.availability import (
     ALLOW_SINGLE_BIG_TABLE, is_table_busy_now, later_reservations,
-    release_table, table_status_map, upcoming_status_map,
+    release_table, table_status_map, upcoming_status_map, walkin_free_seats,
 )
 from orders.models import Order, OrderItem, Coupon
 
@@ -169,6 +169,20 @@ def _store_stock_overview():
 @admin_required
 def admin_dashboard(request):
     store_items, store_low = _store_stock_overview()
+
+    # FIXED: Recent Orders showed an empty USER column.
+    # Guest / QR orders have no user (order.user is None), so {{ order.user.username }} was blank.
+    # select_related('user', 'table') loads the user in the same query, and each row gets
+    # .display_user = order.customer_name (the user's name, or the guest name, never empty).
+    # In admin_home.html the USER cell must be:  {{ order.display_user }}
+    recent_orders = list(
+        Order.objects.visible_to_staff()
+        .select_related('user', 'table')
+        .order_by('-created_at')[:5]
+    )
+    for o in recent_orders:
+        o.display_user = (o.customer_name or '').strip() or 'Guest'
+
     context = {
         'total_menu_items': FoodItem.objects.count(),
         'total_tables': Table.objects.count(),
@@ -176,7 +190,7 @@ def admin_dashboard(request):
         'total_users': User.objects.count(),
         'total_orders': Order.objects.visible_to_staff().count(),   # CHANGED
         'total_sales': Order.objects.visible_to_staff().filter(status__in=PAID_STATUSES).aggregate(Sum('total_amount'))['total_amount__sum'] or 0,   # CHANGED
-        'recent_orders': Order.objects.visible_to_staff().order_by('-created_at')[:5],   # CHANGED
+        'recent_orders': recent_orders,   # FIXED: list with display_user on every row
         'recent_bookings': TableBooking.objects.order_by('-created_at')[:5],
         'notifications': Notification.objects.select_related('order')[:10],
         'unread_notifications': Notification.objects.filter(is_read=False).count(),
@@ -728,8 +742,11 @@ def manage_orders(request):
         response['Content-Disposition'] = 'attachment; filename="orders_%s.csv"' % timezone.localdate()
         writer = csv.writer(response)
         writer.writerow(['Order', 'Customer', 'Phone', 'Table', 'Items', 'Amount', 'Payment', 'Payment Status', 'Status', 'Placed', 'Prepared by', 'Source', 'Taken by'])
-        for o in orders:
-            if o.table:
+        # CHANGED: _mark_groups gives every walk-in group order its group_label ('Tables 1, 2, 4')
+        for o in _mark_groups(orders):
+            if o.group_label:
+                where = o.group_label
+            elif o.table:
                 where = f'Table {o.table.number}'
             elif o.is_takeaway:
                 where = 'Takeaway'
@@ -767,34 +784,52 @@ def manage_orders(request):
 
     page_obj, querystring = _paginate(request, orders, per_page=20)
 
-    # ---- NEW: one combined row per running table ----
+    # ---- NEW: one combined row per running table / per walk-in group ----
     # Orders of the same running table (customer not left yet) become ONE row:
     # one combined amount, one cash button. Example: Table 8 with #17 and #18 -> one row, Rs.4800.
+    # CHANGED: the orders of a walk-in group (Tables 1, 2, 4 for 17 guests) are combined BY GROUP
+    # (all its tables together), and are never mixed into the row of a normal table order that
+    # happens to sit on the group's main table.
     # Every row gets: sitting_orders, sitting_count, sitting_total, sitting_cash_ids,
     # sitting_cash_total, sitting_same_status, sitting_needs_approval, sitting_chefs, sitting_first,
-    # NEW: sitting_servers (names of the servers who took orders on this table).
-    _page_orders = list(page_obj.object_list)
+    # sitting_servers (names of the servers who took orders on this row),
+    # NEW: sitting_guests (people on the table / in the group, None if unknown).
+    # Every order also has group_label / group_guests / group_session_id (see _mark_groups).
+    _page_orders = _mark_groups(page_obj.object_list)
     _live = lambda o: bool(o.table_id) and not o.table_released and o.status != 'cancelled'
-    _tids = {o.table_id for o in _page_orders if _live(o)}
-    _by_table = {}
+    _key = lambda o: ('g', o.group_session_id) if o.group_session_id else ('t', o.table_id)
+
+    _tids = {o.table_id for o in _page_orders if _live(o) and not o.group_session_id}
+    _gids = {o.group_session_id for o in _page_orders if _live(o) and o.group_session_id}
+    _by_key = {}
     if _tids:
-        _running = (Order.objects.visible_to_staff()      # CHANGED
-                    .filter(table_id__in=_tids, table_released=False)
+        _running = (_not_walkin(Order.objects.visible_to_staff()
+                                .filter(table_id__in=_tids, table_released=False))
                     .exclude(status='cancelled')
                     .select_related('user', 'prepared_by', 'table', 'taken_by')
                     .prefetch_related('items__food_item')
                     .order_by('-id'))
-        for g in _running:
-            _by_table.setdefault(g.table_id, []).append(g)
+        for g in _mark_groups(_running):
+            _by_key.setdefault(('t', g.table_id), []).append(g)
+    if _gids:
+        _running = (Order.objects.visible_to_staff()
+                    .filter(table_session_id__in=_gids, table_released=False)
+                    .exclude(status='cancelled')
+                    .select_related('user', 'prepared_by', 'table', 'taken_by')
+                    .prefetch_related('items__food_item')
+                    .order_by('-id'))
+        for g in _mark_groups(_running):
+            _by_key.setdefault(('g', g.table_session_id), []).append(g)
 
     _rows = []
     _seen_sittings = set()
     for o in _page_orders:
-        members = _by_table.get(o.table_id) if _live(o) else None
+        k = _key(o)
+        members = _by_key.get(k) if _live(o) else None
         if members and len(members) > 1:
-            if o.table_id in _seen_sittings:
+            if k in _seen_sittings:
                 continue                      # already shown inside the combined row
-            _seen_sittings.add(o.table_id)
+            _seen_sittings.add(k)
         else:
             members = [o]
 
@@ -828,6 +863,7 @@ def manage_orders(request):
         o.sitting_chefs = chefs
         o.sitting_servers = servers
         o.sitting_first = min(m.created_at for m in members)
+        o.sitting_guests = max((m.guests or 0 for m in members), default=0) or None
         _rows.append(o)
     page_obj.object_list = _rows
 
@@ -911,7 +947,8 @@ def mark_cash_received(request, pk):
     order.save(update_fields=fields)
 
     # NEW: tell the server dashboard (is_read=True so the admin unread badge is not changed)
-    where = f'Table {order.table.number}' if order.table_id else 'Takeaway'
+    grouped = _mark_groups([order])[0]       # NEW: group_label for a walk-in group
+    where = grouped.group_label or (f'Table {order.table.number}' if order.table_id else 'Takeaway')
     Notification.objects.create(
         kind='cash_received',
         order=order,
@@ -1445,8 +1482,9 @@ def _kitchen_order(qs):
     """Kitchen board order: ASAP orders (no arrival_time) always come first.
     ASAP orders: oldest first, so the one waiting longest is on top.
     Scheduled orders (customer gave an arrival time): soonest arrival first.
-    NEW: prepared_by is loaded together, so a card can show the chef name without extra queries."""
-    return qs.select_related('prepared_by').annotate(
+    NEW: prepared_by is loaded together, so a card can show the chef name without extra queries.
+    CHANGED: table is loaded together too (cards show the table number)."""
+    return qs.select_related('prepared_by', 'table').annotate(
         asap_rank=Case(
             When(arrival_time__isnull=True, then=Value(0)),
             default=Value(1),
@@ -1457,10 +1495,15 @@ def _kitchen_order(qs):
 
 @kitchen_required
 def kitchen_dashboard(request):
-    # CHANGED: all three boards start from visible_to_staff()
-    confirmed_orders = _kitchen_order(Order.objects.visible_to_staff().filter(status='confirmed'))
-    preparing_orders = _kitchen_order(Order.objects.visible_to_staff().filter(status='preparing'))
-    ready_orders = _kitchen_order(Order.objects.visible_to_staff().filter(status='ready'))
+    # CHANGED: all three boards start from visible_to_staff().
+    # CHANGED: _mark_groups gives each order of a walk-in group group_label ('Tables 1, 2, 4'),
+    # group_guests (17) and group_session_id. In kitchen.html use:
+    #   {% if order.group_label %}{{ order.group_label }} - {{ order.group_guests }} guests
+    #   {% else %}Table {{ order.table.number }}{% endif %}
+    # NOTE: these are lists now (not querysets), so in the template use |length, not .count
+    confirmed_orders = _mark_groups(_kitchen_order(Order.objects.visible_to_staff().filter(status='confirmed')))
+    preparing_orders = _mark_groups(_kitchen_order(Order.objects.visible_to_staff().filter(status='preparing')))
+    ready_orders = _mark_groups(_kitchen_order(Order.objects.visible_to_staff().filter(status='ready')))
 
     grocery_items, store_low = _store_stock_overview()
     low_stock_count = len(store_low)
@@ -1724,7 +1767,10 @@ def update_order_status(request, pk, new_status):
     name = order.customer_name        # CHANGED: works for a guest too (order.user can be None)
 
     if new_status == 'delivered':
-        if order.table:
+        grouped = _mark_groups([order])[0]       # NEW: group_label for a walk-in group
+        if grouped.group_label:
+            where = grouped.group_label
+        elif order.table:
             where = f'Table {order.table.number}'
         else:
             where = 'takeaway counter'
@@ -1812,30 +1858,147 @@ def _orderable_food_items():
 
 
 def _tables_info():
-    """Table chips for the Take Order popup: free / booked now / occupied by an order."""
+    """Table chips for the Take Order popup: free / booked now / occupied by an order / seats full.
+    CHANGED: each chip also carries
+      capacity    seats of the table (the guests box uses it as the limit)
+      free_seats  seats that are free right now (a seated walk-in group uses seats, see SeatAllocation)
+      full        True when no seat is free and no normal order is running on the table
+                  (for example Tables 2 and 4 of a seated group of 17 on Tables 1, 2, 4)
+    CHANGED: the orders of a walk-in group are not counted as 'held_by', so the main table of a
+    group (Table 1) is shown as full, not as 'Eating, add more' (which would mix a normal order
+    into the group's table)."""
     held = {
         o.table_id: o.id
-        for o in Order.objects.visible_to_staff()      # CHANGED
-                              .filter(table__isnull=False, table_released=False)
-                              .exclude(status='cancelled')
+        for o in _not_walkin(Order.objects.visible_to_staff()
+                             .filter(table__isnull=False, table_released=False))
+                             .exclude(status='cancelled')
     }
-    return [{
-        'id': t.id,
-        'number': t.number,
-        'busy': is_table_busy_now(t.id),
-        'held_by': held.get(t.id),
-    } for t in Table.objects.all().order_by('number')]
+    free_map = {t.id: free for t, free in walkin_free_seats()}
+    chips = []
+    for t in Table.objects.all().order_by('number'):
+        busy = is_table_busy_now(t.id)
+        held_by = held.get(t.id)
+        free = free_map.get(t.id, t.capacity)
+        chips.append({
+            'id': t.id,
+            'number': t.number,
+            'capacity': t.capacity,
+            'busy': busy,
+            'held_by': held_by,
+            'free_seats': free,
+            'full': (not busy) and (not held_by) and free <= 0,
+        })
+    return chips
+
+
+# ---- NEW: walk-in groups on the server boards ----
+# A seated walk-in group (Walk-in Seats -> Confirm Seating) can use several tables, for example
+# Tables 1, 2, 4 for 17 guests. Its orders are saved with Order.table_session = <the group>
+# (see dashboard/seating_views.py), and Order.table is only the MAIN table (Table 1).
+# So that the boards show the whole group instead of just "Table 1", every order of a walk-in
+# group gets these attributes (other orders get empty values, so templates can simply use
+# {% if order.group_label %}):
+#   order.group_session_id   id of the TableSession (None for normal orders)
+#   order.group_label        'Tables 1, 2, 4'
+#   order.group_guests       17
+#   order.group_since        when the group was seated
+def _numbers_text(numbers):
+    """[4, 1, 2] -> 'Tables 1, 2, 4'. One number -> 'Table 1'."""
+    numbers = sorted(numbers)
+    if not numbers:
+        return ''
+    label = 'Table' if len(numbers) == 1 else 'Tables'
+    return f"{label} " + ', '.join(str(n) for n in numbers)
+
+
+def _group_sessions(session_ids):
+    """{session_id: {'label', 'guests', 'started'}} for the WALK-IN groups among these ids.
+    A customer QR table session is not a group, so it is left out."""
+    ids = {i for i in session_ids if i}
+    if not ids:
+        return {}
+    out = {}
+    sessions = (TableSession.objects
+                .filter(pk__in=ids, source=TableSession.SOURCE_WALKIN)
+                .select_related('table')
+                .prefetch_related('allocations__table'))
+    for s in sessions:
+        numbers = {a.table.number for a in s.allocations.all()}
+        out[s.id] = {
+            'label': _numbers_text(numbers) or f'Table {s.table.number}',
+            'guests': s.guests,
+            'started': s.started_at,
+        }
+    return out
+
+
+def _mark_groups(orders):
+    """Returns the orders as a list, each one with group_session_id / group_label /
+    group_guests / group_since (see the note above)."""
+    orders = list(orders)
+    info = _group_sessions(o.table_session_id for o in orders)
+    for o in orders:
+        g = info.get(o.table_session_id)
+        o.group_session_id = o.table_session_id if g else None
+        o.group_label = g['label'] if g else ''
+        o.group_guests = g['guests'] if g else None
+        o.group_since = g['started'] if g else None
+    return orders
+
+
+def _group_session_of(order):
+    """The walk-in group (TableSession) this order belongs to, or None."""
+    if not order.table_session_id:
+        return None
+    session = order.table_session
+    return session if session.source == TableSession.SOURCE_WALKIN else None
+
+
+def _not_walkin(qs):
+    """Leaves out the orders of walk-in groups, so the old 'one card / one bill per table'
+    rules only count normal table orders (a group may share its main table with them)."""
+    return qs.exclude(table_session__source=TableSession.SOURCE_WALKIN)
+
+
+def _add_to_totals(bucket, key, g):
+    """Adds order g to the running total of bucket[key] (a table or a walk-in group)."""
+    t = bucket.setdefault(key, {
+        'total': Decimal('0'), 'due': Decimal('0'), 'count': 0,
+        'servers': [], 'has_qr': False, 'guests': None})
+    t['total'] += g.total_amount
+    t['count'] += 1
+    if g.payment_status != 'paid':
+        t['due'] += g.total_amount
+    if g.taken_by_id:
+        sname = g.taken_by_name
+        if sname not in t['servers']:
+            t['servers'].append(sname)
+    else:
+        t['has_qr'] = True
+    if g.guests:
+        t['guests'] = max(t['guests'] or 0, g.guests)
 
 
 # ---- NEW: combined bill per table ----
 # When the same table orders again while the customer is still seated (Order #13, then #14),
 # the kitchen still gets a separate ticket for each order, but the BILL is ONE per table.
+# CHANGED: a walk-in group gets ONE bill for all its orders (all its tables together), and
+# the group's orders are not mixed into the bill of a normal table order on its main table.
 def _table_bill_orders(order):
-    """All orders of the same sitting: same table, customer not left yet, not cancelled.
-    Takeaway / already-released / cancelled orders get their own single bill."""
-    if order.table_id and not order.table_released and order.status != 'cancelled':
-        return list(Order.objects.visible_to_staff()      # CHANGED
-                    .filter(table_id=order.table_id, table_released=False)
+    """All orders of the same sitting: same walk-in group, or same table, customer not left yet,
+    not cancelled. Takeaway / already-released / cancelled orders get their own single bill."""
+    live = not order.table_released and order.status != 'cancelled'
+    group = _group_session_of(order)
+    if group and live:
+        return list(Order.objects.visible_to_staff()
+                    .filter(table_session_id=group.id, table_released=False)
+                    .exclude(status='cancelled')
+                    .select_related('user', 'table', 'taken_by')
+                    .prefetch_related('items__food_item')
+                    .order_by('created_at', 'id'))
+    if order.table_id and live:
+        return list(_not_walkin(Order.objects.visible_to_staff()      # CHANGED
+                                .filter(table_id=order.table_id, table_released=False))
                     .exclude(status='cancelled')
                     .select_related('user', 'table', 'taken_by')
                     .prefetch_related('items__food_item')
@@ -1856,66 +2019,79 @@ def server_dashboard(request):
                   .prefetch_related('items__food_item')
                   .order_by('-created_at'))
 
-    ready_orders = (Order.objects.visible_to_staff()
-                    .filter(status='ready')
-                    .select_related('table', 'user', 'taken_by').order_by('created_at'))
-    delivered_today = (Order.objects.visible_to_staff()
-                       .filter(status='delivered', created_at__date=timezone.localdate())
-                       .select_related('table', 'taken_by')
-                       .order_by('-created_at'))
+    # CHANGED: ready / served orders of a walk-in group carry group_label ('Tables 1, 2, 4'),
+    # group_guests and group_session_id, so the page can show the whole group instead of "Table 1".
+    ready_orders = _mark_groups(
+        Order.objects.visible_to_staff()
+        .filter(status='ready')
+        .select_related('table', 'user', 'taken_by').order_by('created_at'))
+    delivered_today = _mark_groups(
+        Order.objects.visible_to_staff()
+        .filter(status='delivered', created_at__date=timezone.localdate())
+        .select_related('table', 'taken_by')
+        .order_by('-created_at'))
 
     # Served, but the customer has not left yet (table still held until "Customer Left")
-    dining_orders = list(Order.objects.visible_to_staff()
-                         .filter(status='delivered', table__isnull=False, table_released=False)
-                         .select_related('table', 'user', 'taken_by').order_by('created_at'))
+    dining_all = _mark_groups(
+        Order.objects.visible_to_staff()
+        .filter(status='delivered', table__isnull=False, table_released=False)
+        .select_related('table', 'user', 'taken_by').order_by('created_at'))
 
     # NEW: total / amount due for the WHOLE table (all its running orders), so the Dining Now
     # card can show one combined amount. In the template use:
     #   {{ o.table_total }}  {{ o.table_due }}  {{ o.table_order_count }}
     # NEW: and who took the orders of that table:
     #   {{ o.table_servers }} (list of server names)  {{ o.table_has_qr }} (True if a customer QR order is on the table)
+    # NEW (guests): {{ o.dining_guests }} = people on the table / in the group (empty if unknown)
+    # CHANGED: a walk-in group is its own card: its orders are counted by group (all its tables),
+    # and are not mixed into the card of a normal table order on the group's main table.
     # The bill link is: {% url 'dashboard:server_table_bill' o.id %}
-    _table_totals = {}
-    for g in (Order.objects.visible_to_staff()
-              .filter(table_id__in=[o.table_id for o in dining_orders], table_released=False)
-              .exclude(status='cancelled')
-              .select_related('taken_by')
-              .order_by('created_at', 'id')):
-        t = _table_totals.setdefault(
-            g.table_id,
-            {'total': Decimal('0'), 'due': Decimal('0'), 'count': 0, 'servers': [], 'has_qr': False})
-        t['total'] += g.total_amount
-        t['count'] += 1
-        if g.payment_status != 'paid':
-            t['due'] += g.total_amount
-        if g.taken_by_id:
-            sname = g.taken_by_name
-            if sname not in t['servers']:
-                t['servers'].append(sname)
+    table_ids = {o.table_id for o in dining_all if not o.group_session_id}
+    group_ids = {o.group_session_id for o in dining_all if o.group_session_id}
+
+    table_totals, group_totals = {}, {}
+    if table_ids:
+        for g in (_not_walkin(Order.objects.visible_to_staff()
+                              .filter(table_id__in=table_ids, table_released=False))
+                  .exclude(status='cancelled')
+                  .select_related('taken_by')
+                  .order_by('created_at', 'id')):
+            _add_to_totals(table_totals, g.table_id, g)
+    if group_ids:
+        for g in (Order.objects.visible_to_staff()
+                  .filter(table_session_id__in=group_ids, table_released=False)
+                  .exclude(status='cancelled')
+                  .select_related('taken_by')
+                  .order_by('created_at', 'id')):
+            _add_to_totals(group_totals, g.table_session_id, g)
+
+    # NEW: show ONE Dining Now card per table (or per walk-in group). The first order of it
+    # carries the combined total, so Table 10 with orders #13 and #14 is a single card.
+    dining_orders = []
+    _seen = set()
+    for o in dining_all:
+        if o.group_session_id:
+            key, t = ('group', o.group_session_id), group_totals.get(o.group_session_id)
         else:
-            t['has_qr'] = True
-    for o in dining_orders:
-        t = _table_totals.get(o.table_id, {
-            'total': o.total_amount, 'due': Decimal('0'), 'count': 1,
-            'servers': [o.taken_by_name] if o.taken_by_id else [],
-            'has_qr': not o.taken_by_id,
-        })
+            key, t = ('table', o.table_id), table_totals.get(o.table_id)
+        if key in _seen:
+            continue
+        _seen.add(key)
+        if t is None:
+            t = {
+                'total': o.total_amount, 'due': Decimal('0'), 'count': 1,
+                'servers': [o.taken_by_name] if o.taken_by_id else [],
+                'has_qr': not o.taken_by_id, 'guests': None,
+            }
         o.table_total = t['total']
         o.table_due = t['due']
         o.table_order_count = t['count']
         o.table_servers = t['servers']
         o.table_has_qr = t['has_qr']
-
-    # NEW: show ONE Dining Now card per table (the first order of that table carries the
-    # combined total), so Table 10 with orders #13 and #14 is a single card
-    _seen_tables = set()
-    _one_per_table = []
-    for o in dining_orders:
-        if o.table_id in _seen_tables:
-            continue
-        _seen_tables.add(o.table_id)
-        _one_per_table.append(o)
-    dining_orders = _one_per_table
+        o.dining_guests = o.group_guests if o.group_session_id else t['guests']
+        o.dining_since = o.group_since or o.created_at     # when the table / group was seated
+        dining_orders.append(o)
+    dining_orders.sort(key=lambda x: x.dining_since)
 
     # CHANGED: only APPROVED bookings are shown to the server. A pending or rejected booking
     # has no table chosen, so it showed as "No table assigned" and confused the server.
@@ -1959,7 +2135,8 @@ def server_dashboard(request):
 # NEW: ONE bill page for a whole table (any order id of that table opens the same bill)
 @server_required
 def server_table_bill(request, pk):
-    """pk = any order id of the table. Shows ONE bill with all orders of that table."""
+    """pk = any order id of the table. Shows ONE bill with all orders of that table
+    (or of that walk-in group)."""
     order = get_object_or_404(Order.objects.select_related('table'), pk=pk)
     orders = _table_bill_orders(order)
 
@@ -1980,10 +2157,14 @@ def server_table_bill(request, pk):
     due_total = grand_total - paid_total
     can_collect = any(o.payment_method == 'cash' and o.payment_status != 'paid' for o in orders)
 
+    grouped = _mark_groups([order])[0]       # NEW: group_label / group_guests for a walk-in group
+
     return render(request, 'dashboard/table_bill.html', {
         'order': order,
         'orders': orders,
         'table': order.table,
+        'group_label': grouped.group_label,      # NEW: 'Tables 1, 2, 4' ('' for a normal table)
+        'group_guests': grouped.group_guests,    # NEW
         'lines': list(lines.values()),
         'items_total': items_total,
         'adjustment': grand_total - items_total,   # coupon / discount difference, if any
@@ -1999,10 +2180,16 @@ def server_table_bill(request, pk):
 @server_required
 @require_POST
 def server_table_cash_received(request, pk):
-    """One click: every unpaid cash order of this table is marked paid."""
+    """One click: every unpaid cash order of this table (or of this walk-in group) is marked paid."""
     order = get_object_or_404(Order, pk=pk)
-    if order.table_id and not order.table_released and order.status != 'cancelled':
-        qs = Order.objects.visible_to_staff().filter(table_id=order.table_id, table_released=False)   # CHANGED
+    live = not order.table_released and order.status != 'cancelled'
+    group = _group_session_of(order)
+    if group and live:
+        # CHANGED: only the orders of THIS group, never another group / table on the same main table
+        qs = Order.objects.visible_to_staff().filter(table_session_id=group.id, table_released=False)
+    elif order.table_id and live:
+        qs = _not_walkin(Order.objects.visible_to_staff()      # CHANGED
+                         .filter(table_id=order.table_id, table_released=False))
     else:
         qs = Order.objects.filter(pk=order.pk)
     (qs.filter(payment_method='cash')
@@ -2041,16 +2228,25 @@ def server_reject_order(request, pk):
 def server_free_table(request, pk):
     """Server taps 'Customer Left' (pk = order id). Frees the table for ALL orders on it.
     CHANGED: refused while any order on this table is unpaid or not served yet,
-    so nobody can leave without paying and a new order (extra juice...) is never lost."""
+    so nobody can leave without paying and a new order (extra juice...) is never lost.
+    CHANGED: for an order of a walk-in group this is the same as "Customer Left" in the
+    Walk-in Groups panel (server_seating_departed): the group's seats move to cleaning, and
+    the server taps "Cleaning Done" afterwards. This way the seats and the orders never get
+    out of step (before, only the main table was freed and the other tables stayed occupied)."""
     order = get_object_or_404(Order, pk=pk)
+
+    group = _group_session_of(order)
+    if group:
+        from .seating_views import server_seating_departed
+        return server_seating_departed(request, group.id)
 
     if not order.table_id:
         msg, ok = 'This order has no table.', False
     elif order.table_released:
         msg, ok = f'Table #{order.table.number} is already free.', False
     else:
-        on_table = list(Order.objects.visible_to_staff()      # CHANGED
-                        .filter(table_id=order.table_id, table_released=False)
+        on_table = list(_not_walkin(Order.objects.visible_to_staff()      # CHANGED
+                                    .filter(table_id=order.table_id, table_released=False))
                         .exclude(status='cancelled'))
         unpaid = [o for o in on_table if o.payment_status != 'paid']
         unserved = [o for o in on_table if o.status != 'delivered']
@@ -2063,8 +2259,11 @@ def server_free_table(request, pk):
             Order.objects.filter(pk__in=[o.id for o in on_table]).update(table_released=True)
             # End the dine-in session of this table, so "Order again" from
             # My Orders no longer works after the customer has left.
-            TableSession.objects.filter(table_id=order.table_id, is_active=True).update(
-                is_active=False, closed_at=timezone.now())
+            # CHANGED: a walk-in group that uses this table keeps its own session.
+            (TableSession.objects
+             .filter(table_id=order.table_id, is_active=True)
+             .exclude(source=TableSession.SOURCE_WALKIN)
+             .update(is_active=False, closed_at=timezone.now()))
             msg, ok = f'Table #{order.table.number} is free now.', True
 
     payload = {'ok': ok, 'message': msg, 'table': order.table.number if order.table_id else None}
@@ -2100,7 +2299,14 @@ def server_take_order(request):
     A table whose customer is still eating can take another order (extra juice, dessert...).
     Payment first: this is the ONLY place a cash order is created (customers pay online only).
     NEW: the order is saved with source='server' and taken_by=<this server>, so every dashboard
-    can show WHICH server took it."""
+    can show WHICH server took it.
+    NEW (guests): POST JSON may carry `guests` (people at the table). It is saved in Order.guests,
+    so the dashboard can show "6 seats, 2 customers, 4 free" and walk-ins can use the free seats.
+      - Only for a TABLE order (takeaway ignores it).
+      - 1 .. the seats of that table.
+      - If `guests` is not sent, a table that already has a running order with a guest count
+        keeps that number (the same people ordering again). Otherwise it stays blank
+        (the old behaviour: the whole table is held)."""
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, TypeError):
@@ -2118,8 +2324,54 @@ def server_take_order(request):
             return JsonResponse({'ok': False, 'error': 'Table not found'}, status=400)
         # CHANGED: a table already held by a customer who is still eating can take more orders.
         # Only a booking hold blocks the table.
-        if not _order_holding_table(table.id) and is_table_busy_now(table.id):
+        # CHANGED: the orders of a walk-in group do not count as "a customer eating at this table".
+        own_running = _not_walkin(Order.objects.visible_to_staff()
+                                  .filter(table_id=table.id, table_released=False)
+                                  ).exclude(status='cancelled').exists()
+        if not own_running and is_table_busy_now(table.id):
             return JsonResponse({'ok': False, 'error': f'Table {table.number} is booked right now.'}, status=409)
+
+        # NEW: seats used by a seated walk-in group (SeatAllocation) are not free for a new table order
+        seats_free = {t.id: f for t, f in walkin_free_seats()}.get(table.id, table.capacity)
+        if not own_running and seats_free <= 0:
+            return JsonResponse({
+                'ok': False,
+                'error': f'Table {table.number} has no free seats (a walk-in group is seated there).',
+            }, status=409)
+
+    # NEW (guests): how many people are at this table
+    guests = None
+    if table is not None:
+        # a table that already has its own running order = the same people ordering again,
+        # so the whole table size is the limit. A fresh table can only use its free seats.
+        guest_limit = table.capacity if own_running else min(table.capacity, seats_free)
+        raw_guests = data.get('guests')
+        if raw_guests not in (None, ''):
+            try:
+                guests = int(raw_guests)
+            except (TypeError, ValueError):
+                return JsonResponse({'ok': False, 'error': 'Enter a valid number of guests.'}, status=400)
+            if guests < 1 or guests > guest_limit:
+                if guest_limit < table.capacity:
+                    err = f'Only {guest_limit} seats are free on Table {table.number}.'
+                else:
+                    err = f'Guests must be between 1 and {table.capacity} for Table {table.number}.'
+                return JsonResponse({'ok': False, 'error': err}, status=400)
+        elif not own_running and guest_limit < table.capacity:
+            # part of this table is used by a walk-in group: the guest count is needed,
+            # otherwise this order would hold the whole table
+            return JsonResponse({
+                'ok': False,
+                'error': f'Enter the number of guests ({guest_limit} seats are free on Table {table.number}).',
+            }, status=400)
+        else:
+            # same people ordering again (juice, dessert): keep the guest count of the table
+            known = (Order.objects.visible_to_staff()
+                     .filter(table_id=table.id, table_released=False)
+                     .exclude(status='cancelled')
+                     .aggregate(m=Max('guests'))['m'])
+            if known:
+                guests = known
 
     # Collect lines first so a bad line never leaves a half-made order behind
     lines = []
@@ -2151,6 +2403,7 @@ def server_take_order(request):
             user=request.user,            # server's own account (no migration needed)
             table=table,                  # None => Takeaway
             order_type='dine_in' if table else 'takeaway',
+            guests=guests,                # NEW (guests): people at the table (None for takeaway / unknown)
             total_amount=total,
             status='confirmed',           # Kitchen board reads 'confirmed'
             payment_method='cash',
@@ -2213,6 +2466,65 @@ def server_poll(request):
             {'id': o.id, 'table': o.table.number if o.table else None}
             for o in orders
         ]
+    })
+
+
+# ---- NEW: Walk-in Seat Availability (server enters guests, system suggests tables) ----
+@server_required
+@require_POST
+def server_walkin_check(request):
+    """Server types the number of guests who just walked in.
+    Read only: nothing is saved. It reuses _free_tables() and _suggest_table_ids(),
+    so the same rules as the booking approve screen apply
+    (for example 7 guests -> one 7 seat table if it exists, otherwise full tables first).
+    Returns JSON: ok, available, guests, tables (suggested), seats, free_seats, warnings, message."""
+    try:
+        data = json.loads(request.body)
+        guests = int(data.get('guests', 0))
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return JsonResponse({'ok': False, 'error': 'Enter a valid number of guests.'}, status=400)
+
+    if guests < 1 or guests > 100:
+        return JsonResponse({'ok': False, 'error': 'Guests must be between 1 and 100.'}, status=400)
+
+    all_tables = list(Table.objects.all().order_by('capacity', 'number'))
+    free_ids = {t.id for t in _free_tables()}
+    free_seats = sum(t.capacity for t in all_tables if t.id in free_ids)
+
+    # _suggest_table_ids treats every id in this dict as "not free"
+    blocked = {t.id: 'busy' for t in all_tables if t.id not in free_ids}
+    suggested_ids = set(_suggest_table_ids(guests, blocked, all_tables))
+    chosen = sorted((t for t in all_tables if t.id in suggested_ids), key=lambda t: t.number)
+
+    # Warn if a suggested table is free now but reserved for a booking later today
+    warnings = []
+    upcoming = upcoming_status_map()
+    for t in chosen:
+        up = upcoming.get(t.id)
+        if up:
+            when = timezone.localtime(up.start).strftime('%I:%M %p')
+            warnings.append(f'Table {t.number} is booked at {when}.')
+
+    if chosen:
+        seats = sum(t.capacity for t in chosen)
+        message = f'{_tables_text(chosen)} ({seats} seats) for {guests} guests.'
+    elif free_seats >= guests:
+        seats = 0
+        message = (f'{free_seats} seats are free, but not in a usable arrangement for {guests} guests. '
+                   'Seat them in parts or wait for a table.')
+    else:
+        seats = 0
+        message = f'Only {free_seats} seats are free right now. {guests} guests need more.'
+
+    return JsonResponse({
+        'ok': True,
+        'available': bool(chosen),
+        'guests': guests,
+        'tables': [{'id': t.id, 'number': t.number, 'capacity': t.capacity} for t in chosen],
+        'seats': seats,
+        'free_seats': free_seats,
+        'warnings': warnings,
+        'message': message,
     })
 
 

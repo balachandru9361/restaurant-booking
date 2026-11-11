@@ -112,6 +112,14 @@ class Order(models.Model):
         null=True, blank=True, related_name='orders',
     )
 
+    # NEW: how many people are sitting at the table for this dine-in order.
+    # Used to show "seats, customers, free" for the table on the server dashboard.
+    # Blank for takeaway orders and for old orders made before this field existed.
+    guests = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Number of people at the table for this dine-in order."
+    )
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)

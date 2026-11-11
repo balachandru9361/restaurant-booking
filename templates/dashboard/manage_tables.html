@@ -135,7 +135,7 @@
     align-items: center;
     justify-content: center;
     gap: 5px;
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     position: relative;
     z-index: 1;
   }
@@ -146,6 +146,21 @@
     font-weight: 700;
     color: #555;
   }
+
+  /* NEW: how many seats are used / free on this table */
+  .seat-usage {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+    position: relative;
+    z-index: 1;
+  }
+  .seat-usage.empty   { background: #e3f9ec; color: #1e8e4e; }
+  .seat-usage.partial { background: #fff3d6; color: #b9770e; }
+  .seat-usage.full    { background: #ffe5e5; color: #d63031; }
 
   .table-actions {
     display: flex;
@@ -186,6 +201,10 @@
   .table-card.is-upcoming { border-top-color: #f39c12 !important; background: #fffdf6; }
   .table-card.is-upcoming .table-icon { background: linear-gradient(135deg, #fff3d6, #ffe8b3); box-shadow: 0 6px 16px rgba(243,156,18,0.2); }
 
+  /* NEW: some seats used by customers, some still free */
+  .table-card.is-partial { border-top-color: #f39c12 !important; background: #fffdf6; }
+  .table-card.is-partial .table-icon { background: linear-gradient(135deg, #fff3d6, #ffe8b3); box-shadow: 0 6px 16px rgba(243,156,18,0.2); }
+
   .hold-pill {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 11.5px; font-weight: 800; padding: 4px 12px; border-radius: 20px;
@@ -195,6 +214,7 @@
   }
   .hold-pill.free { background: #e3f9ec; color: #1e8e4e; }
   .hold-pill.held { background: #ffe5e5; color: #d63031; }
+  .hold-pill.partial { background: #fff3d6; color: #b9770e; }
   .hold-pill.upcoming { background: #fff3d6; color: #b9770e; }
   .hold-pill.upcoming .dot {
     width: 6px; height: 6px; border-radius: 50%; background: #f39c12;
@@ -246,6 +266,11 @@
     <div class="emoji">👥</div>
     <div><div class="num">{{ total_capacity|default:"--" }}</div><div class="lbl">Total Seats</div></div>
   </div>
+  {# NEW: seats that are free right now (same number as the Server dashboard) #}
+  <div class="mini-stat" style="border-left-color:#16a085;">
+    <div class="emoji">💺</div>
+    <div><div class="num">{{ free_seats_total }}</div><div class="lbl">Free seats</div></div>
+  </div>
   <div class="mini-stat" style="border-left-color:#e74c3c;">
     <div class="emoji">🔒</div>
     <div><div class="num">{{ booked_count }}</div><div class="lbl">Booked now</div></div>
@@ -263,15 +288,32 @@
 <div class="tables-grid">
   {% for row in rows %}
   {% with table=row.table hold=row.hold upcoming=row.upcoming %}
-  <div class="table-card {% if hold %}is-held{% elif upcoming %}is-upcoming{% endif %}">
+  <div class="table-card {% if hold %}{% if hold.kind == 'order' and hold.obj.guests and row.free_seats > 0 %}is-partial{% else %}is-held{% endif %}{% elif row.used_seats and row.free_seats > 0 %}is-partial{% elif row.used_seats and row.free_seats == 0 and not upcoming %}is-held{% elif upcoming %}is-upcoming{% endif %}">
     <div class="table-icon">🪑</div>
     <div class="table-number">Table {{ table.number }}</div>
     <div class="table-capacity">
       <span class="seat-badge">👥 {{ table.capacity }} seats</span>
     </div>
 
+    {# NEW: seat usage line: customers and free seats (same numbers as the Server dashboard) #}
+    {% if hold and hold.kind == 'booking' %}
+      <div class="seat-usage full">🔒 Whole table booked</div>
+    {% elif hold and hold.kind == 'order' and not hold.obj.guests %}
+      <div class="seat-usage full">🔒 Whole table in use</div>
+    {% elif upcoming and row.free_seats == 0 and not hold %}
+      <div class="seat-usage full">🕒 Held for a reservation</div>
+    {% else %}
+      <div class="seat-usage {% if row.free_seats == 0 %}full{% elif row.used_seats %}partial{% else %}empty{% endif %}">
+        👥 {{ row.used_seats }} customer{{ row.used_seats|pluralize }} · {{ row.free_seats }} free
+      </div>
+    {% endif %}
+
     {% if hold %}
-      <span class="hold-pill held">🔒 Occupied</span>
+      {% if hold.kind == 'order' and hold.obj.guests and row.free_seats > 0 %}
+        <span class="hold-pill partial">🪑 Partly occupied</span>
+      {% else %}
+        <span class="hold-pill held">🔒 Occupied</span>
+      {% endif %}
       <div class="hold-info">
         {{ hold.label }}<br>
         Stays held <strong>until you open it</strong>
@@ -281,6 +323,17 @@
         <input type="hidden" name="next" value="manage_tables">
         <button type="submit" class="open-btn" onclick="return confirm('Open Table {{ table.number }} now?')">🔓 Open Table</button>
       </form>
+    {% elif row.used_seats and row.free_seats > 0 %}
+      {# NEW: a walk-in group uses part of the table (no whole-table hold) #}
+      <span class="hold-pill partial">🪑 Partly occupied</span>
+      <div class="hold-info">
+        {{ row.used_seats }} seat{{ row.used_seats|pluralize }} in use<br>
+        <strong>{{ row.free_seats }}</strong> seat{{ row.free_seats|pluralize }} still free
+      </div>
+    {% elif row.used_seats and row.free_seats == 0 and not upcoming %}
+      {# NEW: every seat of the table is used by a walk-in group #}
+      <span class="hold-pill held">🔒 Full</span>
+      <div class="hold-info">All seats are in use</div>
     {% elif upcoming %}
       <span class="hold-pill upcoming"><span class="dot"></span> Reserved</span>
       <div class="hold-info">

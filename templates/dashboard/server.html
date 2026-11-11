@@ -128,7 +128,7 @@
     background: #ecfdf5; color: #047857; border: 1px solid #10b981;
     font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 20px; white-space: nowrap;
   }
-  /* NEW: "Taken by <server>" (indigo) or "QR Order" (green) */
+  /* "Taken by <server>" (indigo) or "QR Order" (green) */
   .taken-badge {
     display: inline-flex; align-items: center; gap: 3px;
     background: #eef2ff; color: #3730a3; border: 1px solid #c7d2fe;
@@ -195,7 +195,7 @@
   .bill-actions .btn-free-table { flex: 1; min-width: 180px; width: auto; }
   .served-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
 
-  /* NEW: whole-table total shown on the Dining Now card */
+  /* whole-table total shown on the Dining Now card */
   .table-total-box {
     display: flex; justify-content: space-between; align-items: center; gap: 8px;
     background: #eef2ff; border-radius: 10px; padding: 8px 12px; margin-bottom: 10px;
@@ -218,18 +218,12 @@
   .btn-free-table.locked { background: #fef3c7; color: #92400e; opacity: 1; cursor: not-allowed; }
   .btn-free-table.locked:hover { background: #fef3c7; color: #92400e; }
 
-  /* how long the customer has been dining (filled by JS), turns red after 2 hours */
+  /* how long the customer has been dining (information only, there is no time limit) */
   .dining-elapsed {
     display: inline-block; font-size: 12.5px; font-weight: 700;
     color: #3730a3; background: #eef2ff;
     border-radius: 20px; padding: 3px 12px; margin-bottom: 8px;
   }
-  .order-card.dining.overdue { border-left-color: #ef4444; background: #fffafa; }
-  .order-card.dining.overdue .dining-elapsed {
-    color: #b91c1c; background: #fee2e2; animation: warnPulse 1.8s ease-in-out infinite;
-  }
-  /* when overdue and the bill is paid, make the Free Table button stand out */
-  .order-card.dining.overdue .btn-free-table:not(.locked) { background: #3730a3; color: #fff; }
 
   /* Cash Received (server collects the cash at the table / counter) */
   .btn-cash {
@@ -387,6 +381,31 @@
   }
   .to-chip.in-use { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
   .to-chip.in-use.active { border-color: #0f766e; background: #e6f6f4; color: #0f766e; }
+  /* seated walk-in group: the order goes to the group, no table to pick */
+  .to-group {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: #e6f6f4; border: 2px solid #0f766e; color: #0f766e; border-radius: 10px;
+    padding: 10px 14px; margin-bottom: 18px; font-weight: 800; font-size: 14px;
+  }
+  .to-group[hidden] { display: none; }
+  .to-group button {
+    border: 0; cursor: pointer; background: #fff; color: #374151; border-radius: 8px;
+    padding: 6px 12px; font-size: 12px; font-weight: 800;
+  }
+  /* guests at the table (shown when a table is picked, hidden for takeaway / seated group) */
+  .to-guests {
+    margin: 0 0 18px; padding: 12px 14px; background: #f9fafb;
+    border: 1px solid #e5e7eb; border-radius: 10px;
+  }
+  .to-guests[hidden] { display: none; }
+  .to-guests .to-label { display: block; }
+  .to-guests-input {
+    width: 140px; max-width: 100%; padding: 10px 12px; border: 1.5px solid #d1d5db; border-radius: 10px;
+    font-size: 16px; font-weight: 700; font-family: 'Inter', sans-serif; box-sizing: border-box;
+  }
+  .to-guests-input:focus { outline: none; border-color: #0f766e; box-shadow: 0 0 0 4px rgba(15,118,110,0.12); }
+  .to-guests-hint { font-size: 12px; font-weight: 600; color: #6b7280; margin-top: 6px; }
+  .to-guests-hint.bad { color: #b91c1c; }
   .to-search {
     width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px;
     font-size: 14px; margin-bottom: 12px; box-sizing: border-box;
@@ -395,6 +414,18 @@
     display: flex; justify-content: space-between; align-items: center; gap: 10px;
     padding: 10px 12px; border: 1px solid #eef0f3; border-radius: 10px; margin-bottom: 8px;
   }
+  /* dish photo + name + price on the left of each row */
+  .to-item-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .to-thumb {
+    width: 56px; height: 56px; border-radius: 10px; object-fit: cover;
+    flex: 0 0 auto; background: #f3f4f8;
+  }
+  .to-ph {
+    width: 56px; height: 56px; border-radius: 10px; flex: 0 0 auto;
+    background: #f3f4f8; display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+  }
+  .to-item-text { min-width: 0; }
   .to-item-name { font-weight: 700; color: #0d1b2a; font-size: 14px; }
   .to-item-price { font-size: 12.5px; color: #6b7280; }
   .to-qty { display: flex; align-items: center; gap: 10px; }
@@ -458,6 +489,67 @@
   .rj-confirm:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(220,38,38,0.35); }
   .rj-confirm:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
 
+  /* --- Walk-in Seat Availability (server types the guest count, system suggests tables) --- */
+  .btn-walkin {
+    border: 0; cursor: pointer; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 700;
+    background: #0d1b2a; color: #d4af37;
+    padding: 10px 18px; border-radius: 10px; box-shadow: 0 4px 14px rgba(13,27,42,0.25);
+    transition: transform 0.15s ease;
+  }
+  .btn-walkin:hover { transform: translateY(-1px); }
+  .wk-overlay {
+    position: fixed; inset: 0; background: rgba(13,27,42,0.6); z-index: 9400;
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .wk-overlay.open { display: flex; }
+  .wk-modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 480px; max-height: 92vh;
+    overflow-y: auto; box-sizing: border-box; font-family: 'Inter', sans-serif;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  }
+  .wk-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px; background: #0d1b2a; color: #d4af37;
+  }
+  .wk-head h2 { font-family: 'Sora', sans-serif; font-size: 18px; margin: 0; }
+  .wk-close { background: none; border: 0; color: #fff; font-size: 22px; cursor: pointer; }
+  .wk-body { padding: 18px 20px 20px; }
+  .wk-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .wk-input {
+    flex: 1; min-width: 0; padding: 11px 12px; border: 1.5px solid #d1d5db; border-radius: 10px;
+    font-size: 16px; font-weight: 700; font-family: 'Inter', sans-serif; box-sizing: border-box;
+  }
+  .wk-input:focus { outline: none; border-color: #0f766e; box-shadow: 0 0 0 4px rgba(15,118,110,0.12); }
+  .wk-check {
+    border: 0; cursor: pointer; padding: 11px 18px; border-radius: 10px; white-space: nowrap;
+    font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 800;
+    background: #0f766e; color: #fff;
+  }
+  .wk-check:disabled { opacity: 0.6; cursor: not-allowed; }
+  .wk-result { min-height: 20px; }
+  .wk-msg { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+  .wk-msg.ok { color: #166534; }
+  .wk-msg.no { color: #b91c1c; }
+  .wk-tables { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .wk-chip {
+    background: #e6f6f4; border: 2px solid #0f766e; color: #0f766e; border-radius: 10px;
+    padding: 8px 14px; font-weight: 800; font-size: 13px;
+  }
+  .wk-chip small { display: block; font-size: 10.5px; font-weight: 700; margin-top: 2px; color: #0d1b2a; }
+  .wk-warn {
+    background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; border-radius: 8px;
+    padding: 7px 10px; font-size: 12.5px; font-weight: 700; margin-bottom: 8px;
+  }
+  .wk-free { font-size: 12px; color: #6b7280; margin-top: 4px; }
+  .wk-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .wk-actions button {
+    flex: 1; border: 0; cursor: pointer; padding: 11px; border-radius: 10px;
+    font-family: 'Inter', sans-serif; font-size: 13.5px; font-weight: 800;
+  }
+  .wk-actions button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .wk-take { background: linear-gradient(135deg, #d4af37, #f0cd6b); color: #0d1b2a; }
+  .wk-again { background: #eef1f5; color: #374151; }
+
   /* --- Mobile / tablet responsive --- */
   .server-board > * { min-width: 0; }
   @media (max-width: 1100px) {
@@ -471,6 +563,7 @@
     .kitchen-header h1 { font-size: 22px; }
     .header-right { width: 100%; justify-content: space-between; }
     .btn-take-order { flex: 1; padding: 12px 14px; }
+    .btn-walkin { flex: 1; padding: 12px 14px; }
     .kitchen-clock { padding: 10px 12px; white-space: nowrap; }
     .kitchen-stats { gap: 8px; }
     .stat-box { padding: 10px 10px; }
@@ -490,12 +583,16 @@
     .to-modal { max-width: none; max-height: 96vh; border-radius: 16px 16px 0 0; }
     .to-body { padding: 14px; }
     .to-chip { padding: 10px 14px; }
+    .to-thumb, .to-ph { width: 48px; height: 48px; }
     .to-qty button { width: 38px; height: 38px; font-size: 20px; }
     .to-foot { padding: 12px 14px; }
     .btn-place { padding: 14px 16px; font-size: 14px; flex: 1; }
 
     .rj-overlay { padding: 0; align-items: flex-end; }
     .rj-modal { max-width: none; border-radius: 16px 16px 0 0; }
+
+    .wk-overlay { padding: 0; align-items: flex-end; }
+    .wk-modal { max-width: none; border-radius: 16px 16px 0 0; }
   }
 
   /* Keep the modal inside the screen no matter what the page layout does */
@@ -518,22 +615,36 @@
     </div>
     <div class="to-body">
       <p class="to-label">1. Select Table</p>
+      <div class="to-group" id="toGroupBar" hidden></div>
       <div class="to-tables" id="toTables">
         {% for t in tables_info %}
           {% if t.held_by %}
             {# customer is still at this table: the server can add a new order (juice, dessert...) to it #}
-            <button type="button" class="to-chip in-use" data-table="{{ t.id }}" data-label="TABLE {{ t.number }} (add more)">
+            <button type="button" class="to-chip in-use" data-table="{{ t.id }}" data-capacity="{{ t.capacity }}" data-label="TABLE {{ t.number }} (add more)">
               🪑 Table {{ t.number }}<small>🟠 Eating · Order #{{ t.held_by }} · add more</small>
             </button>
           {% elif t.busy %}
             <button type="button" class="to-chip occupied" disabled>
               🪑 Table {{ t.number }}<small>📅 Booked now</small>
             </button>
+          {% elif t.full %}
+            {# every seat is used (for example by a seated walk-in group), so this table cannot take a new order #}
+            <button type="button" class="to-chip occupied" disabled>
+              🪑 Table {{ t.number }}<small>👥 Seats full · seated group</small>
+            </button>
           {% else %}
-            <button type="button" class="to-chip" data-table="{{ t.id }}" data-label="TABLE {{ t.number }}">🪑 Table {{ t.number }}</button>
+            {# data-capacity = the seats that are free right now (the guests box uses it as the limit) #}
+            <button type="button" class="to-chip" data-table="{{ t.id }}" data-capacity="{{ t.free_seats }}" data-label="TABLE {{ t.number }}">🪑 Table {{ t.number }}{% if t.free_seats < t.capacity %}<small>{{ t.free_seats }} seats free</small>{% endif %}</button>
           {% endif %}
         {% endfor %}
         <button type="button" class="to-chip" data-table="takeaway" data-label="TAKEAWAY">🥡 Takeaway</button>
+      </div>
+
+      {# guests at the table: shown only when a table is picked (not for takeaway or a seated group) #}
+      <div class="to-guests" id="toGuestsBox" hidden>
+        <label class="to-label" for="toGuests">How many guests at this table?</label>
+        <input type="number" class="to-guests-input" id="toGuests" min="1" step="1" inputmode="numeric" placeholder="e.g. 4">
+        <div class="to-guests-hint" id="toGuestsHint"></div>
       </div>
 
       <p class="to-label">2. Add Items</p>
@@ -541,9 +652,16 @@
       <div id="toMenu">
         {% for item in food_items %}
           <div class="to-item" data-id="{{ item.id }}" data-price="{{ item.price|stringformat:'s' }}" data-name="{{ item.name|lower }}">
-            <div>
-              <div class="to-item-name">{{ item.name }}</div>
-              <div class="to-item-price">₹{{ item.price|inr }}</div>
+            <div class="to-item-info">
+              {% if item.image %}
+                <img class="to-thumb" src="{{ item.image.url }}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="to-ph" style="display:none" data-n="{{ item.name }}"></span>
+              {% else %}
+                <span class="to-ph" data-n="{{ item.name }}"></span>
+              {% endif %}
+              <div class="to-item-text">
+                <div class="to-item-name">{{ item.name }}</div>
+                <div class="to-item-price">₹{{ item.price|inr }}</div>
+              </div>
             </div>
             <div class="to-qty">
               <button type="button" class="minus">−</button>
@@ -593,16 +711,38 @@
   </div>
 </div>
 
+<!-- Walk-in Seat Availability: server types the number of guests, the system suggests tables -->
+<div class="wk-overlay" id="wkOverlay">
+  <div class="wk-modal" role="dialog" aria-modal="true" aria-labelledby="wkTitle">
+    <div class="wk-head">
+      <h2 id="wkTitle">🪑 Walk-in Seats</h2>
+      <button type="button" class="wk-close" id="wkClose">✕</button>
+    </div>
+    <div class="wk-body">
+      <p class="to-label">How many guests walked in?</p>
+      <div class="wk-row">
+        <input type="number" class="wk-input" id="wkGuests" min="1" max="100" inputmode="numeric" placeholder="e.g. 7">
+        <button type="button" class="wk-check" id="wkCheck">Check seats</button>
+      </div>
+      <div class="wk-result" id="wkResult"></div>
+    </div>
+  </div>
+</div>
+
 <div class="kitchen-header">
   <div>
     <h1>🛎️ Server Dashboard</h1>
     <p>New customer orders come here first. Send them to the kitchen, then serve the table when the kitchen marks them ready — the admin gets the message.</p>
   </div>
   <div class="header-right">
+    <button type="button" class="btn-walkin" id="wkOpen">🪑 Walk-in Seats</button>
     <button type="button" class="btn-take-order" id="toOpen">➕ Take Order</button>
     <div class="kitchen-clock"><span class="dot"></span> <span id="liveClock"></span></div>
   </div>
 </div>
+
+{# Walk-in groups: seated / needs cleaning (outside #liveRegion, it refreshes itself) #}
+{% include 'dashboard/_seating_panel.html' %}
 
 <div id="liveRegion"
      data-new-ids="{% for o in new_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
@@ -654,10 +794,13 @@
             {% endif %}
           </div>
           <div class="order-user">
-            <span>👤 {{ order.user.username }}</span>
+            <span>👤 {{ order.customer_name }}</span>
             {# table / takeaway badge + who took the order (server name, or QR order) #}
             <span class="badge-group">
-              {% if order.table %}
+              {% if order.group_label %}
+                {# walk-in group: show every table of the group, e.g. "Tables 1, 2, 4" #}
+                <span class="order-table-badge">🪑 {{ order.group_label }}</span>
+              {% elif order.table %}
                 <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
               {% elif order.is_takeaway %}
                 <span class="order-table-badge takeaway">🥡 Takeaway</span>
@@ -710,9 +853,12 @@
             {% endif %}
           </div>
           <div class="order-user">
-            <span>👤 {{ order.user.username }}</span>
+            <span>👤 {{ order.customer_name }}</span>
             <span class="badge-group">
-              {% if order.table %}
+              {% if order.group_label %}
+                <span class="order-table-badge">🪑 {{ order.group_label }}</span>
+                {% if order.group_guests %}<span class="taken-badge" title="Guests in this walk-in group">👥 {{ order.group_guests }}</span>{% endif %}
+              {% elif order.table %}
                 <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
               {% else %}
                 {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
@@ -736,7 +882,7 @@
               {% csrf_token %}
               <button type="submit" class="btn-to-delivered">🍽️ Mark Served ✓</button>
             </form>
-            {# CHANGED: opens the combined table bill #}
+            {# opens the combined table bill #}
             <a class="btn-bill" href="{% url 'dashboard:server_table_bill' order.id %}">🧾 Print Bill</a>
           </div>
         </div>
@@ -745,19 +891,21 @@
       {% endfor %}
     </div>
 
-    <!-- customers still eating -> ONE card per table. Server collects the cash for the whole table
-         and frees it (only after the whole bill is paid) -->
+    <!-- customers still eating -> ONE card per table (or per walk-in group). Server collects the cash
+         for the whole table and frees it (only after the whole bill is paid) -->
     <div class="board-col dining-col">
       <div class="board-col-header">
         <h3>🍴 Dining Now — Free Table</h3>
         <span class="board-count">{{ dining_orders|length }}</span>
       </div>
       {% for order in dining_orders %}
+        {# label of this card: "Tables 1, 2, 4" for a walk-in group, "Table 5" for a normal table #}
+        {% with dlabel=order.group_label|default:"" %}
         <div class="order-card dining" data-order-id="{{ order.id }}">
           <div class="order-card-top">
             <div>
-              <span class="order-id">🪑 Table {{ order.table.number }}</span>
-              <div class="order-when">🧾 {{ order.table_order_count }} order{{ order.table_order_count|pluralize }} · seated since {{ order.created_at|time:"h:i A" }}</div>
+              <span class="order-id">🪑 {% if dlabel %}{{ dlabel }}{% else %}Table {{ order.table.number }}{% endif %}</span>
+              <div class="order-when">{% if order.dining_guests %}👥 {{ order.dining_guests }} guest{{ order.dining_guests|pluralize }} · {% endif %}🧾 {{ order.table_order_count }} order{{ order.table_order_count|pluralize }} · seated since {{ order.dining_since|time:"h:i A" }}</div>
             </div>
             {% if order.table_due > 0 %}
               <span class="pay-badge unpaid">⏳ UNPAID</span>
@@ -766,7 +914,7 @@
             {% endif %}
           </div>
           <div class="order-user">
-            <span>👤 {{ order.user.username }}</span>
+            <span>👤 {{ order.customer_name }}</span>
             {# all servers who took orders for this table, plus a QR badge if any order came from the table QR #}
             <span class="badge-group">
               {% for s in order.table_servers %}
@@ -778,37 +926,40 @@
             </span>
           </div>
 
-          {# NEW: combined amount of the whole table #}
+          {# combined amount of the whole table #}
           <div class="table-total-box{% if order.table_due > 0 %} has-due{% endif %}">
-            <span>Table total</span>
+            <span>{% if dlabel %}Group total{% else %}Table total{% endif %}</span>
             <span class="amt">₹{{ order.table_total|inr }}</span>
           </div>
 
-          {# time since the first order was placed; JS keeps it live and turns the card red after 2 hours #}
-          <div class="dining-elapsed" data-since="{{ order.created_at|date:'c' }}">🕒 Dining for {{ order.created_at|timesince }}</div>
+          {# time since the first order was placed (information only, JS keeps it live) #}
+          <div class="dining-elapsed" data-since="{{ order.dining_since|date:'c' }}">🕒 Dining for {{ order.dining_since|timesince }}</div>
           <div class="dining-since">
-            {% if order.table_due > 0 %}Served · collect ₹{{ order.table_due|inr }} for the whole table, then tap Cash Received
-            {% else %}Whole table bill paid, you can free the table after the customer leaves{% endif %}
+            {% if order.table_due > 0 %}Served · collect ₹{{ order.table_due|inr }} for the whole {% if dlabel %}group{% else %}table{% endif %}, then tap Cash Received
+            {% else %}Whole bill paid, you can free {% if dlabel %}the tables{% else %}the table{% endif %} after the customer leaves{% endif %}
           </div>
           <div class="bill-actions">
             {% if order.table_due > 0 %}
-              {# CHANGED: one click marks EVERY unpaid cash order of this table as paid #}
+              {# one click marks EVERY unpaid cash order of this table as paid #}
               <button type="button" class="btn-cash"
                       data-url="{% url 'dashboard:server_table_cash_received' order.id %}"
                       data-order="{{ order.id }}"
                       data-amount="{{ order.table_due|inr }}"
-                      data-table="{{ order.table.number }}">✅ Cash Received · ₹{{ order.table_due|inr }}</button>
+                      data-table="{{ order.table.number }}"
+                      data-label="{% if dlabel %}{{ dlabel }}{% else %}Table {{ order.table.number }}{% endif %}">✅ Cash Received · ₹{{ order.table_due|inr }}</button>
               <button type="button" class="btn-free-table locked" disabled
                       title="Collect the payment first">🔒 Payment pending — collect ₹{{ order.table_due|inr }}</button>
             {% else %}
               <button type="button" class="btn-free-table"
                       data-url="{% url 'dashboard:server_free_table' order.id %}"
                       data-table="{{ order.table.number }}"
-                      data-order="{{ order.id }}">✅ Customer Left — Free Table {{ order.table.number }}</button>
+                      data-label="{% if dlabel %}{{ dlabel }}{% else %}Table {{ order.table.number }}{% endif %}"
+                      data-order="{{ order.id }}">✅ Customer Left — Free {% if dlabel %}{{ dlabel }}{% else %}Table {{ order.table.number }}{% endif %}</button>
             {% endif %}
             <a class="btn-bill" href="{% url 'dashboard:server_table_bill' order.id %}">🧾 Print Bill</a>
           </div>
         </div>
+        {% endwith %}
       {% empty %}
         <div class="empty-col"><span class="empty-icon">🍴</span>No one is dining right now</div>
       {% endfor %}
@@ -860,9 +1011,9 @@
       {% for order in delivered_today %}
         <div class="booking-row">
           <div>
-            <div class="booking-name">Order #{{ order.id }} · {{ order.user.username }}</div>
+            <div class="booking-name">Order #{{ order.id }} · {{ order.customer_name }}</div>
             <div class="booking-meta">
-              {% if order.table %}Table {{ order.table.number }}{% elif order.is_takeaway %}Takeaway{% else %}Dine-in{% endif %} · ₹{{ order.total_amount|inr }} · 🕒 {{ order.created_at|time:"h:i A" }}
+              {% if order.group_label %}{{ order.group_label }}{% if order.group_guests %} · {{ order.group_guests }} guests{% endif %}{% elif order.table %}Table {{ order.table.number }}{% elif order.is_takeaway %}Takeaway{% else %}Dine-in{% endif %} · ₹{{ order.total_amount|inr }} · 🕒 {{ order.created_at|time:"h:i A" }}
             </div>
             <div class="booking-meta" style="margin-top:4px;">
               {% if order.taken_by_name %}
@@ -878,7 +1029,7 @@
             {% else %}
               <span class="pay-badge unpaid">⏳ UNPAID</span>
             {% endif %}
-            {# CHANGED: opens the combined table bill (a table that already left gets its own single bill) #}
+            {# opens the combined table bill (a table that already left gets its own single bill) #}
             <a class="btn-bill mini" href="{% url 'dashboard:server_table_bill' order.id %}">🧾 Bill</a>
           </div>
         </div>
@@ -901,11 +1052,9 @@
   setInterval(updateClock, 1000);
   updateClock();
 
-  // ---- Dining Now elapsed time (live) + overdue highlight ----
-  // A customer who has been dining for this many minutes or more gets a red card,
-  // so the server remembers to check the table and free it after the customer leaves.
-  var OVERDUE_MINUTES = 120;
-
+  // ---- Dining Now elapsed time (live, information only) ----
+  // There is no time limit. The table is freed only when the server taps "Customer Left"
+  // or the admin opens it.
   function updateDining() {
     document.querySelectorAll('.dining-elapsed').forEach(function (el) {
       var started = new Date(el.dataset.since);
@@ -914,12 +1063,34 @@
       var h = Math.floor(mins / 60);
       var m = mins % 60;
       el.textContent = '🕒 Dining for ' + (h ? h + 'h ' : '') + m + 'm';
-      var card = el.closest('.order-card');
-      if (card) card.classList.toggle('overdue', mins >= OVERDUE_MINUTES);
     });
   }
   updateDining();
   setInterval(updateDining, 30000);
+
+  // ---- Dish icons in Take Order when a dish has no photo ----
+  const DISH_ICONS = [
+    [/mojito|juice|crush|shake|soda|drink|lassi|tea|coffee|lime/i, '🍹'],
+    [/fish|meen|nethili|prawn|crab|sura/i, '🐟'],
+    [/biryani|biriyani|briyani|rice|pulao/i, '🍛'],
+    [/chicken|65|tikka|kebab|wings|lollipop/i, '🍗'],
+    [/mutton|kari|lamb|beef|keema|chops/i, '🍖'],
+    [/paneer|veg|mushroom|gobi|aloo/i, '🥘'],
+    [/egg|omelette/i, '🥚'],
+    [/apple|mango|berry|strawberr|fruit|banana/i, '🍎'],
+    [/ice|cake|sweet|dessert|halwa|kulfi/i, '🍨'],
+    [/parotta|naan|roti|bread|dosa|chapati/i, '🫓'],
+    [/soup/i, '🍲']
+  ];
+  function fillDishIcons(root) {
+    root.querySelectorAll('.to-ph').forEach(function (el) {
+      if (el.textContent) return;
+      var n = el.dataset.n || '';
+      var m = DISH_ICONS.find(function (i) { return i[0].test(n); });
+      el.textContent = m ? m[1] : '🍽️';
+    });
+  }
+  fillDishIcons(document);
 
   // ---- Rich bell chime (Web Audio API) - same premium chime as Kitchen ----
   let sharedAudioCtx = null;
@@ -1023,7 +1194,7 @@
   }
 
   // Re-fetches the current page, swaps in the fresh #liveRegion markup.
-  // Also refreshes the Take Order table chips (occupied / free).
+  // Also refreshes the Take Order table chips (occupied / free / seats full).
   function refreshLive() {
     return fetch(window.location.href, { credentials: 'same-origin' })
       .then(r => r.text())
@@ -1076,7 +1247,7 @@
       fetch("{% url 'dashboard:server_poll' %}", { credentials: 'same-origin' })
         .then(r => r.json())
         .then(data => {
-          // NEW: the admin pressed "Mark Received" -> toast + sound on this screen
+          // the admin pressed "Mark Received" -> toast + sound on this screen
           if (knownCashId !== null && data.cash_id > knownCashId) {
             showToast('Cash Received', '💵 Payment done', data.cash_message, '✅');
             beep();
@@ -1095,7 +1266,7 @@
           const removedReady = [...knownReady].some(id => !readyIds.has(id));
           const removedNew = [...knownNew].some(id => !newIds.has(id));
 
-          // NEW: payment / status / table-release changed somewhere (admin or server)
+          // payment / status / table-release changed somewhere (admin or server)
           const sigChanged = knownSig !== null && data.sig && data.sig !== knownSig;
           if (data.sig) knownSig = data.sig;
 
@@ -1288,16 +1459,17 @@
     });
   })();
 
-  // ---- Cash Received (ONE click pays the WHOLE table, Free Table unlocks) ----
+  // ---- Cash Received (ONE click pays the WHOLE table / group, Free Table unlocks) ----
   // The server view marks every unpaid cash order of the table as paid and then redirects
   // to the bill page. fetch() follows that redirect, so we only check that the request worked
   // and then refresh this dashboard.
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('.btn-cash');
     if (!btn || btn.disabled) return;
-    if (!confirm('Received Rs.' + btn.dataset.amount + ' cash for Table ' + btn.dataset.table + '?')) return;
+    const label = btn.dataset.label || ('Table ' + btn.dataset.table);
+    if (!confirm('Received Rs.' + btn.dataset.amount + ' cash for ' + label + '?')) return;
 
-    const label = btn.textContent;
+    const btnText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Saving...';
 
@@ -1308,23 +1480,25 @@
     })
       .then(r => {
         if (!r.ok) throw new Error('Could not mark cash received');
-        showToast('Cash Received', '💵 Rs.' + btn.dataset.amount, 'Table ' + btn.dataset.table + ' · you can free the table when the customer leaves', '✅');
+        showToast('Cash Received', '💵 Rs.' + btn.dataset.amount, label + ' · you can free it when the customer leaves', '✅');
         return refreshLive();
       })
       .catch(err => {
-        showToast('Could not save', err.message, 'Table ' + btn.dataset.table, '⚠️', { error: true });
+        showToast('Could not save', err.message, label, '⚠️', { error: true });
         btn.disabled = false;
-        btn.textContent = label;
+        btn.textContent = btnText;
       });
   });
 
   // ---- Free Table (customer left) ----
+  // For a walk-in group the server view must release EVERY table of the group.
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('.btn-free-table');
     if (!btn || btn.disabled) return;
-    if (!confirm('Free Table ' + btn.dataset.table + '? Has the customer finished eating?')) return;
+    const label = btn.dataset.label || ('Table ' + btn.dataset.table);
+    if (!confirm('Free ' + label + '? Has the customer finished eating?')) return;
 
-    const label = btn.textContent;
+    const btnText = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Freeing...';
 
@@ -1336,17 +1510,19 @@
       .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
       .then(res => {
         if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Could not free table');
-        showToast('Table Free', '🪑 TABLE ' + res.data.table, 'Table ' + btn.dataset.table + ' · ready for new guests', '✅');
-        return refreshLive();
+        showToast('Table Free', '🪑 ' + label.toUpperCase(), label + ' · ready for new guests', '✅');
+        return refreshLive().then(function () {
+          if (window.refreshSeatingPanel) window.refreshSeatingPanel();
+        });
       })
       .catch(err => {
-        showToast('Could not free', err.message, 'Table ' + btn.dataset.table, '⚠️', { error: true });
+        showToast('Could not free', err.message, label, '⚠️', { error: true });
         btn.disabled = false;
-        btn.textContent = label;
+        btn.textContent = btnText;
       });
   });
 
-  // ---- Take Order: server picks table + items, order goes to Kitchen ----
+  // ---- Take Order: server picks table + guests + items, order goes to Kitchen ----
   (function () {
     const overlay = document.getElementById('toOverlay');
     document.body.appendChild(overlay);
@@ -1360,15 +1536,94 @@
     function openModal() { overlay.classList.add('open'); }
     function closeModal() { overlay.classList.remove('open'); }
 
+    const groupBar = document.getElementById('toGroupBar');
+    const tablesBox = document.getElementById('toTables');
+    const guestsBox = document.getElementById('toGuestsBox');
+    const guestsInput = document.getElementById('toGuests');
+    const guestsHint = document.getElementById('toGuestsHint');
+
+    // ---- Guests at the table ----
+    // Needed only for a TABLE order (not takeaway, not a seated walk-in group).
+    // A fresh table needs a guest count (at most the seats that are free on it).
+    // A table whose customer is still eating ("add more") may leave it blank:
+    // the server keeps the same number.
+    function guestsState() {
+      const isTable = selectedTable && selectedTable !== 'takeaway'
+        && String(selectedTable).indexOf('session:') !== 0;
+      if (!isTable) return { needed: false, ok: true, value: null, msg: '', bad: false, cap: 0 };
+
+      const chip = document.querySelector('#toTables .to-chip.active');
+      const cap = chip ? (parseInt(chip.dataset.capacity, 10) || 0) : 0;
+      const inUse = !!(chip && chip.classList.contains('in-use'));
+      const raw = guestsInput.value.trim();
+
+      if (raw === '') {
+        return {
+          needed: true, ok: inUse, value: null, bad: false, cap: cap,
+          msg: inUse
+            ? 'Leave blank if it is the same people as before.'
+            : 'Enter the number of guests to place the order.' + (cap ? ' (Up to ' + cap + ' guests)' : '')
+        };
+      }
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 1) {
+        return { needed: true, ok: false, value: null, bad: true, cap: cap, msg: 'Guests must be 1 or more.' };
+      }
+      if (cap && n > cap) {
+        return { needed: true, ok: false, value: null, bad: true, cap: cap, msg: 'Only ' + cap + ' seats are available on this table.' };
+      }
+      return { needed: true, ok: true, value: n, bad: false, cap: cap, msg: cap ? 'Up to ' + cap + ' guests for this table.' : '' };
+    }
+
+    function updateGuestsUI() {
+      const gs = guestsState();
+      guestsBox.hidden = !gs.needed;
+      guestsHint.textContent = gs.msg;
+      guestsHint.classList.toggle('bad', gs.bad);
+      if (gs.cap) guestsInput.max = gs.cap; else guestsInput.removeAttribute('max');
+      return gs;
+    }
+
+    // Seated walk-in group mode: the order is saved for the group (no table chip needed)
+    function setGroup(g) {
+      if (g) {
+        selectedTable = 'session:' + g.id;
+        selectedLabel = String(g.tables).toUpperCase();
+        groupBar.innerHTML = '';
+        const txt = document.createElement('span');
+        txt.textContent = '🪑 Seated group: ' + g.tables + (g.guests ? ' · ' + g.guests + ' guests' : '');
+        const change = document.createElement('button');
+        change.type = 'button';
+        change.textContent = 'Use a table instead';
+        change.addEventListener('click', function () { setGroup(null); });
+        groupBar.appendChild(txt);
+        groupBar.appendChild(change);
+        groupBar.hidden = false;
+        tablesBox.style.display = 'none';
+        document.querySelectorAll('#toTables .to-chip').forEach(c => c.classList.remove('active'));
+      } else {
+        selectedTable = null;
+        selectedLabel = '';
+        groupBar.hidden = true;
+        tablesBox.style.display = '';
+      }
+      guestsInput.value = '';
+      recalc();
+    }
+    window.openTakeOrderForGroup = function (g) { setGroup(g); openModal(); };
+
     function resetModal() {
       selectedTable = null;
       selectedLabel = '';
+      groupBar.hidden = true;
+      tablesBox.style.display = '';
       Object.keys(qty).forEach(k => delete qty[k]);
       document.querySelectorAll('#toTables .to-chip').forEach(c => c.classList.remove('active'));
       document.querySelectorAll('#toMenu .to-item').forEach(row => {
         row.querySelector('.num').textContent = '0';
       });
       document.getElementById('toSearch').value = '';
+      guestsInput.value = '';
       filterMenu('');
       errBox.style.display = 'none';
       recalc();
@@ -1383,7 +1638,8 @@
       });
       document.getElementById('toTotal').textContent = total.toFixed(2);
       document.getElementById('toCount').textContent = count + ' item' + (count === 1 ? '' : 's') + ' · Cash payment';
-      placeBtn.disabled = !(selectedTable && count > 0);
+      const gs = updateGuestsUI();
+      placeBtn.disabled = !(selectedTable && count > 0 && gs.ok);
     }
 
     function filterMenu(text) {
@@ -1393,19 +1649,26 @@
       });
     }
 
-    document.getElementById('toOpen').addEventListener('click', openModal);
+    document.getElementById('toOpen').addEventListener('click', function () {
+      if (String(selectedTable).indexOf('session:') === 0) setGroup(null);
+      openModal();
+    });
     document.getElementById('toClose').addEventListener('click', closeModal);
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
     document.getElementById('toSearch').addEventListener('input', e => filterMenu(e.target.value));
+    guestsInput.addEventListener('input', recalc);
 
     document.getElementById('toTables').addEventListener('click', e => {
       const chip = e.target.closest('.to-chip');
       if (!chip || chip.disabled) return;   // occupied tables cannot be picked
+      const changedTable = String(selectedTable) !== String(chip.dataset.table);
       document.querySelectorAll('#toTables .to-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       selectedTable = chip.dataset.table;
       selectedLabel = chip.dataset.label;
+      if (changedTable) guestsInput.value = '';   // a different table has a different group
       recalc();
+      if (chip.dataset.table !== 'takeaway' && changedTable) guestsInput.focus();
     });
 
     document.getElementById('toMenu').addEventListener('click', e => {
@@ -1424,15 +1687,27 @@
         .map(id => ({ food_item_id: Number(id), quantity: qty[id] }));
       if (!selectedTable || !items.length) return;
 
+      const gs = guestsState();
+      if (!gs.ok) { recalc(); return; }
+
       placeBtn.disabled = true;
       placeBtn.textContent = 'Placing...';
       errBox.style.display = 'none';
 
-      fetch("{% url 'dashboard:server_take_order' %}", {
+      const isGroup = String(selectedTable).indexOf('session:') === 0;
+      let payload;
+      if (isGroup) {
+        payload = { session_id: Number(String(selectedTable).slice(8)), items: items };
+      } else {
+        payload = { table_id: selectedTable === 'takeaway' ? null : Number(selectedTable), items: items };
+        if (gs.needed && gs.value) payload.guests = gs.value;   // only a table order carries guests
+      }
+
+      fetch(isGroup ? "{% url 'dashboard:server_take_session_order' %}" : "{% url 'dashboard:server_take_order' %}", {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
-        body: JSON.stringify({ table_id: selectedTable === 'takeaway' ? null : Number(selectedTable), items: items })
+        body: JSON.stringify(payload)
       })
         .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
         .then(res => {
@@ -1441,6 +1716,7 @@
           closeModal();
           resetModal();
           refreshLive();   // the table just used now shows as Occupied
+          if (window.refreshSeatingPanel) window.refreshSeatingPanel();
         })
         .catch(err => {
           errBox.textContent = '⚠️ ' + err.message;
@@ -1450,6 +1726,162 @@
           placeBtn.textContent = 'Place Order → Kitchen';
           recalc();
         });
+    });
+  })();
+
+  // ---- Walk-in Seat Availability: type the guest count, check seats, then Confirm Seating ----
+  (function () {
+    const overlay = document.getElementById('wkOverlay');
+    document.body.appendChild(overlay);   // keep it outside the re-rendered liveRegion / page layout
+    const input = document.getElementById('wkGuests');
+    const checkBtn = document.getElementById('wkCheck');
+    const result = document.getElementById('wkResult');
+    const checkUrl = "{% url 'dashboard:server_walkin_check' %}";
+    const confirmUrl = "{% url 'dashboard:server_walkin_confirm' %}";
+
+    function openModal() {
+      result.innerHTML = '';
+      overlay.classList.add('open');
+      input.focus();
+      input.select();
+    }
+    function closeModal() { overlay.classList.remove('open'); }
+
+    function el(tag, cls, text) {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text !== undefined) n.textContent = text;
+      return n;
+    }
+
+    function showMessage(text, ok) {
+      result.innerHTML = '';
+      result.appendChild(el('div', 'wk-msg ' + (ok ? 'ok' : 'no'), text));
+    }
+
+    function render(d) {
+      result.innerHTML = '';
+      result.appendChild(el('div', 'wk-msg ' + (d.available ? 'ok' : 'no'),
+        (d.available ? '✅ ' : '⛔ ') + d.message));
+
+      if (d.available && d.tables && d.tables.length) {
+        const wrap = el('div', 'wk-tables');
+        d.tables.forEach(function (t) {
+          const chip = el('div', 'wk-chip', '🪑 Table ' + t.number);
+          chip.appendChild(el('small', '', t.capacity + ' seats'));
+          wrap.appendChild(chip);
+        });
+        result.appendChild(wrap);
+      }
+
+      (d.warnings || []).forEach(function (w) {
+        result.appendChild(el('div', 'wk-warn', '⚠️ ' + w));
+      });
+
+      result.appendChild(el('div', 'wk-free', d.free_seats + ' seat' + (d.free_seats === 1 ? '' : 's') + ' free in the restaurant right now'));
+
+      const actions = el('div', 'wk-actions');
+      if (d.available) {
+        const seat = el('button', 'wk-take', '✅ Confirm Seating');
+        seat.type = 'button';
+        seat.addEventListener('click', function () { confirmSeating(d, seat); });
+        actions.appendChild(seat);
+      }
+      const again = el('button', 'wk-again', 'Check again');
+      again.type = 'button';
+      again.addEventListener('click', function () {
+        result.innerHTML = '';
+        input.focus();
+        input.select();
+      });
+      actions.appendChild(again);
+      result.appendChild(actions);
+    }
+
+    // The customer accepted the arrangement: the server confirms, the seats are held for this group
+    function confirmSeating(d, btn) {
+      btn.disabled = true;
+      btn.textContent = 'Seating...';
+      fetch(confirmUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({
+          guests: d.guests,
+          plan: d.tables.map(function (t) { return { table_id: t.id, seats: t.seats }; })
+        })
+      })
+        .then(function (r) { return r.json().then(function (x) { return { ok: r.ok, data: x }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Could not seat the group');
+          seated(res.data);
+        })
+        .catch(function (err) { showMessage('⚠️ ' + err.message, false); });
+    }
+
+    function seated(info) {
+      result.innerHTML = '';
+      result.appendChild(el('div', 'wk-msg ok', '✅ Seated: ' + info.tables + ' (' + info.seats + ')'));
+      const actions = el('div', 'wk-actions');
+      const take = el('button', 'wk-take', '➕ Take Order');
+      take.type = 'button';
+      take.addEventListener('click', function () {
+        closeModal();
+        if (typeof window.openTakeOrderForGroup === 'function') {
+          window.openTakeOrderForGroup({ id: info.session_id, tables: info.tables, guests: info.guests });
+        } else {
+          document.getElementById('toOpen').click();
+        }
+      });
+      const done = el('button', 'wk-again', 'Done');
+      done.type = 'button';
+      done.addEventListener('click', function () {
+        input.value = '';
+        closeModal();
+      });
+      actions.appendChild(take);
+      actions.appendChild(done);
+      result.appendChild(actions);
+      if (window.refreshSeatingPanel) window.refreshSeatingPanel();
+      refreshLive();   // the Take Order table chips now show these tables as "Seats full"
+    }
+
+    function check() {
+      const guests = parseInt(input.value, 10);
+      if (!guests || guests < 1) {
+        showMessage('Enter the number of guests (1 or more).', false);
+        return;
+      }
+      checkBtn.disabled = true;
+      checkBtn.textContent = 'Checking...';
+
+      fetch(checkUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
+        body: JSON.stringify({ guests: guests })
+      })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Could not check seats');
+          render(res.data);
+        })
+        .catch(function (err) { showMessage('⚠️ ' + err.message, false); })
+        .finally(function () {
+          checkBtn.disabled = false;
+          checkBtn.textContent = 'Check seats';
+        });
+    }
+
+    document.getElementById('wkOpen').addEventListener('click', openModal);
+    document.getElementById('wkClose').addEventListener('click', closeModal);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    });
+    checkBtn.addEventListener('click', check);
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); check(); }
     });
   })();
 </script>

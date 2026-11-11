@@ -183,7 +183,7 @@
       {% for order in recent_orders %}
       <tr data-amount="{{ order.total_amount|floatformat:'2' }}">
         <td>#{{ order.id }}</td>
-        <td>{{ order.user.get_full_name|default:order.user.username }}</td>
+        <td>{{ order.customer_name|default:"Guest" }}</td>
         <td class="amount">₹{{ order.total_amount|inr }}</td>
         <td>
           {% if order.payment_method == 'cash' %}

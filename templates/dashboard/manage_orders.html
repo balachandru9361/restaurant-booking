@@ -184,7 +184,7 @@ table.orders-table { width:100%; border-collapse:collapse; }
     </thead>
     <tbody id="ordersTableBody">
       {% for order in orders %}
-      {% with cname=order.user.get_full_name|default:order.user.username %}
+      {% with cname=order.customer_name %}
       <tr data-id="{{ order.id }}" class="{% if order.sitting_needs_approval %}needs-approval{% endif %}">
         <td>
           <div class="ids-stack">
@@ -194,8 +194,13 @@ table.orders-table { width:100%; border-collapse:collapse; }
         <td><div class="cust"><span class="av">{{ cname|slice:":1"|upper }}</span>{{ cname }}</div></td>
         <td>
           {# Monitor only: the server assigns tables from the Server Dashboard #}
-          {% if order.table %}
+          {% if order.group_label %}
+          {# Walk-in group: every table of the group, e.g. "Tables 1, 2, 4", and how many guests #}
+          <span class="table-tag" id="tableTag{{ order.id }}">🪑 {{ order.group_label }}</span>
+          {% if order.group_guests %}<div><span class="sitting-tag" title="Guests in this walk-in group">👥 {{ order.group_guests }} guest{{ order.group_guests|pluralize }}</span></div>{% endif %}
+          {% elif order.table %}
           <span class="table-tag" id="tableTag{{ order.id }}">🪑 #{{ order.table.number }}</span>
+          {% if order.sitting_guests %}<div><span class="sitting-tag" title="Guests on this table">👥 {{ order.sitting_guests }} guest{{ order.sitting_guests|pluralize }}</span></div>{% endif %}
           {% elif order.is_takeaway %}
           <span class="table-tag takeaway" id="tableTag{{ order.id }}">🥡 Takeaway</span>
           {% else %}

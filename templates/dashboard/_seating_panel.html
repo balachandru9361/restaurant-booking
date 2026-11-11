@@ -1,0 +1,223 @@
+{# Walk-in seating panel for server.html. Include it once, OUTSIDE liveRegion. #}
+<style>
+  .seat-panel { min-height: 0; margin-bottom: 20px; }
+  .seat-panel .board-col-header { border-bottom-color: #0d1b2a; }
+  .seat-panel .empty-col { padding: 22px 0; }
+  .seat-card {
+    background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid #0f766e;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .seat-card.cleaning { border-left-color: #f59e0b; background: #fffdf5; }
+  .seat-main { min-width: 0; }
+  .seat-tables { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 15px; color: #0d1b2a; }
+  .seat-state {
+    display: inline-block; font-size: 10.5px; font-weight: 800; padding: 2px 8px;
+    border-radius: 999px; margin-left: 6px; vertical-align: middle; white-space: nowrap;
+    background: #dcfce7; color: #166534;
+  }
+  .seat-card.cleaning .seat-state { background: #fef3c7; color: #92400e; }
+  .seat-meta { font-size: 12px; color: #6b7280; margin-top: 3px; }
+  .seat-meta .due { color: #b91c1c; font-weight: 800; }
+  .seat-btn {
+    border: 0; cursor: pointer; padding: 10px 16px; border-radius: 8px; white-space: nowrap;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 800;
+    background: #e0e7ff; color: #3730a3; transition: all 0.2s ease;
+  }
+  .seat-btn:hover { background: #3730a3; color: #fff; }
+  .seat-card.cleaning .seat-btn { background: #fef3c7; color: #92400e; }
+  .seat-card.cleaning .seat-btn:hover { background: #f59e0b; color: #fff; }
+  .seat-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .tbl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+  .tbl-card {
+    background: #fff; border-radius: 12px; padding: 12px 14px; border-left: 4px solid #16a34a;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .tbl-card .tbl-name { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 15px; color: #0d1b2a; }
+  .tbl-card .tbl-line { font-size: 12.5px; color: #374151; margin-top: 4px; font-weight: 600; }
+  .tbl-card .tbl-note { font-size: 11.5px; color: #92400e; margin-top: 4px; font-weight: 700; }
+  .tbl-card.partial { border-left-color: #f59e0b; background: #fffdf5; }
+  .tbl-card.full { border-left-color: #dc2626; background: #fff5f5; }
+  .tbl-card.held { border-left-color: #6366f1; background: #f5f6ff; }
+  .tbl-card .tbl-free { font-weight: 800; color: #166534; }
+  .tbl-card.partial .tbl-free { color: #92400e; }
+  .tbl-card.full .tbl-free { color: #b91c1c; }
+  .seat-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .seat-btn.order { background: #fff4d6; color: #92650a; }
+  .seat-btn.order:hover { background: #d4af37; color: #0d1b2a; }
+  @media (max-width: 640px) { .seat-btns { width: 100%; } .seat-btn { flex: 1; padding: 12px; font-size: 14px; } }
+</style>
+
+<div class="board-col seat-panel" id="tablePanel">
+  <div class="board-col-header">
+    <h3>🍽️ Tables: Seats and Customers</h3>
+    <span class="board-count" id="tableFreeCount">0 free</span>
+  </div>
+  <div class="tbl-grid" id="seatTables"><div class="empty-col">Loading tables...</div></div>
+</div>
+
+<div class="board-col seat-panel" id="seatPanel">
+  <div class="board-col-header">
+    <h3>🪑 Walk-in Groups: Seated and Cleaning</h3>
+    <span class="board-count" id="seatCount">0</span>
+  </div>
+  <div id="seatList"><div class="empty-col"><span class="empty-icon">🪑</span>No walk-in group is seated</div></div>
+</div>
+
+<script>
+  (function () {
+    const panelUrl = "{% url 'dashboard:server_seating_panel' %}";
+    const departedUrl = "{% url 'dashboard:server_seating_departed' 0 %}";
+    const cleanedUrl = "{% url 'dashboard:server_seating_cleaned' 0 %}";
+    const csrf = '{{ csrf_token }}';
+    const list = document.getElementById('seatList');
+    const countEl = document.getElementById('seatCount');
+
+    function el(tag, cls, text) {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (text !== undefined) n.textContent = text;
+      return n;
+    }
+
+    function toast(title, target, sub, icon, isError) {
+      if (typeof showToast === 'function') showToast(title, target, sub, icon, isError ? { error: true } : {});
+    }
+
+    function elapsed(iso) {
+      const t = new Date(iso);
+      if (isNaN(t.getTime())) return '';
+      const mins = Math.max(0, Math.floor((Date.now() - t.getTime()) / 60000));
+      const h = Math.floor(mins / 60);
+      return (h ? h + 'h ' : '') + (mins % 60) + 'm';
+    }
+
+    function render(groups) {
+      countEl.textContent = groups.length;
+      list.innerHTML = '';
+      if (!groups.length) {
+        const empty = el('div', 'empty-col');
+        empty.appendChild(el('span', 'empty-icon', '🪑'));
+        empty.appendChild(document.createTextNode('No walk-in group is seated'));
+        list.appendChild(empty);
+        return;
+      }
+      groups.forEach(function (g) {
+        const cleaning = g.state === 'cleaning';
+        const card = el('div', 'seat-card' + (cleaning ? ' cleaning' : ''));
+
+        const main = el('div', 'seat-main');
+        const title = el('div', 'seat-tables', '🪑 ' + g.tables);
+        title.appendChild(el('span', 'seat-state', cleaning ? '🧹 Needs cleaning' : '🟢 Seated'));
+        main.appendChild(title);
+
+        const meta = el('div', 'seat-meta');
+        let text = g.guests + ' guest' + (g.guests === 1 ? '' : 's') + ' · ' + g.seats;
+        if (g.group_name) text = g.group_name + ' · ' + text;
+        text += cleaning ? ' · waiting ' + elapsed(g.since) : ' · seated ' + elapsed(g.since);
+        if (g.order_count) text += ' · ' + g.order_count + ' order' + (g.order_count === 1 ? '' : 's');
+        meta.appendChild(document.createTextNode(text));
+        if (!cleaning && parseFloat(g.due) > 0) {
+          meta.appendChild(document.createTextNode(' · '));
+          meta.appendChild(el('span', 'due', 'Rs.' + g.due + ' unpaid'));
+        }
+        main.appendChild(meta);
+        card.appendChild(main);
+
+        const btns = el('div', 'seat-btns');
+        if (!cleaning) {
+          const order = el('button', 'seat-btn order', '➕ Take Order');
+          order.type = 'button';
+          order.addEventListener('click', function () {
+            if (typeof window.openTakeOrderForGroup === 'function') {
+              window.openTakeOrderForGroup({ id: g.id, tables: g.tables, guests: g.guests });
+            }
+          });
+          btns.appendChild(order);
+        }
+        const btn = el('button', 'seat-btn', cleaning ? '🧹 Cleaning Done: free seats' : '✅ Customer Left');
+        btn.type = 'button';
+        btn.addEventListener('click', function () { act(g, btn, cleaning); });
+        btns.appendChild(btn);
+        card.appendChild(btns);
+        list.appendChild(card);
+      });
+    }
+
+    function load() {
+      return fetch(panelUrl, { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d && d.ok) render(d.groups || []); })
+        .catch(function () { /* keep the old list, the next refresh will retry */ });
+    }
+
+    function act(g, btn, cleaning) {
+      const question = cleaning
+        ? 'Is ' + g.tables + ' cleaned and ready for the next customer?'
+        : 'Has the group at ' + g.tables + ' left?';
+      if (!confirm(question)) return;
+
+      const label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      const url = (cleaning ? cleanedUrl : departedUrl).replace('/0/', '/' + g.id + '/');
+
+      fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrf } })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Could not save');
+          if (cleaning) toast('Seats Free', '🪑 ' + g.tables, res.data.message, '✅');
+          else toast('Customer Left', '🧹 ' + g.tables, 'Clean the table, then tap Cleaning Done', '🧹');
+          return loadAll();
+        })
+        .catch(function (err) {
+          toast('Could not save', err.message, g.tables, '⚠️', true);
+          btn.disabled = false;
+          btn.textContent = label;
+        });
+    }
+
+    const tablesUrl = "{% url 'dashboard:server_tables_overview' %}";
+    const tablesBox = document.getElementById('seatTables');
+    const freeCount = document.getElementById('tableFreeCount');
+
+    function renderTables(rows, freeTotal) {
+      freeCount.textContent = freeTotal + ' free seat' + (freeTotal === 1 ? '' : 's');
+      tablesBox.innerHTML = '';
+      if (!rows.length) {
+        tablesBox.appendChild(el('div', 'empty-col', 'No tables added yet'));
+        return;
+      }
+      rows.forEach(function (t) {
+        const card = el('div', 'tbl-card ' + t.state);
+        card.appendChild(el('div', 'tbl-name', '🪑 Table ' + t.number));
+        const line = el('div', 'tbl-line');
+        if (t.state === 'held') {
+          line.textContent = t.capacity + ' seats';
+          card.appendChild(line);
+          card.appendChild(el('div', 'tbl-note', t.note));
+        } else {
+          line.appendChild(document.createTextNode(
+            t.capacity + ' seats, ' + t.customers + ' customer' + (t.customers === 1 ? '' : 's') + ', '));
+          line.appendChild(el('span', 'tbl-free', t.free === 0 ? 'full' : t.free + ' free'));
+          card.appendChild(line);
+          if (t.cleaning) card.appendChild(el('div', 'tbl-note', '🧹 ' + t.cleaning + ' seat' + (t.cleaning === 1 ? '' : 's') + ' waiting for cleaning'));
+        }
+        tablesBox.appendChild(card);
+      });
+    }
+
+    function loadTables() {
+      return fetch(tablesUrl, { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d && d.ok) renderTables(d.tables || [], d.free_total || 0); })
+        .catch(function () { /* keep the old cards, the next refresh will retry */ });
+    }
+
+    function loadAll() { return Promise.all([load(), loadTables()]); }
+
+    window.refreshSeatingPanel = loadAll;
+    window.addEventListener('load', loadAll);
+    setInterval(loadAll, 15000);
+  })();
+</script>

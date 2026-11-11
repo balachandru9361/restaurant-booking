@@ -6,9 +6,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.db import transaction
+from django.db.models import Max, Q
 from django.utils import timezone
 from menu.models import FoodItem, Option
-from booking.models import Table, TableSession
+from booking.models import SeatAllocation, Table, TableSession
 from booking.availability import table_status_map, is_table_busy_now, upcoming_holds, WALKIN_BUFFER
 from .models import Order, OrderItem, PAYMENT_HOLD_MINUTES
 
@@ -42,7 +43,10 @@ def _active_table_session(request):
     The session ends when staff close the table (TableSession.close()) or after
     TABLE_SESSION_MAX_HOURS. When it has ended, the table is also removed from this
     browser, so a later order (or "Order again") gets no table until the customer
-    scans the QR again."""
+    scans the QR again.
+
+    A group seated by the server (a session that has SeatAllocation rows) has no
+    time limit here: it ends only when staff mark the group as departed."""
     session_id = request.session.get('table_session_id')
     if not session_id:
         return None
@@ -50,7 +54,9 @@ def _active_table_session(request):
     cutoff = timezone.now() - timedelta(hours=TABLE_SESSION_MAX_HOURS)
     table_session = (
         TableSession.objects.select_related('table')
-        .filter(id=session_id, is_active=True, started_at__gte=cutoff)
+        .filter(id=session_id, is_active=True)
+        .filter(Q(started_at__gte=cutoff) | Q(allocations__isnull=False))
+        .distinct()
         .first()
     )
     if table_session is None:
@@ -80,8 +86,59 @@ def _current_table(request):
         .first()
     )
     if previous:
+        # A group seated by the server that has already left must not get a table
+        # again through "Order again" (its seats are released after cleaning).
+        prev_session = previous.table_session
+        if (prev_session is not None and not prev_session.is_active
+                and prev_session.allocations.exists()):
+            return None, None
         return previous.table, previous.table_session
     return None, None
+
+
+# NEW (guests): the customer is asked "how many guests" only when the order will hold a
+# part of a table by guest count. A customer who joined a group that the server seated
+# (a session with SeatAllocation rows) is NOT asked: that group's seats are already
+# counted by SeatAllocation, and its orders never hold the whole table.
+def _asks_guests(table, table_session):
+    """True when the cart page should ask for the guest count."""
+    if table is None:
+        return False
+    return not (table_session is not None and table_session.allocations.exists())
+
+
+# NEW (guests): the guest count already known for a table that still has a running order
+# (the same people ordering again: juice, dessert). Same rule as the server Take Order screen.
+# CHANGED: same rule as the dashboard: an unpaid online order holds nothing
+# (visible_to_staff), and the orders of a walk-in group are not counted here
+# (their guest count belongs to the group, not to this table's own customers).
+def _known_guests(table):
+    """Highest guest count among the live orders of this table, or None."""
+    value = (Order.objects.visible_to_staff()
+             .filter(table_id=table.id, table_released=False)
+             .exclude(status='cancelled')
+             .exclude(table_session__source=TableSession.SOURCE_WALKIN)
+             .aggregate(m=Max('guests'))['m'])
+    return value or None
+
+
+def _seated_groups_at(table):
+    """Active customer groups that the server seated at this table (they have an
+    occupied SeatAllocation on it), oldest first. A group may sit on several tables,
+    so this looks at the allocations, not at TableSession.table. Groups that are only
+    on a temporary hold are not included.
+    NOTE: this lookup will move into the central seating service (booking/seating.py)
+    so QR ordering and manual ordering share one implementation."""
+    return list(
+        TableSession.objects.filter(
+            is_active=True,
+            allocations__table=table,
+            allocations__status=SeatAllocation.OCCUPIED,
+        )
+        .select_related('table')
+        .distinct()
+        .order_by('started_at')
+    )
 
 
 def _my_orders(request):
@@ -288,7 +345,17 @@ def bulk_add_to_cart(request):
 def select_table(request, table_id):
     """QR code scan lands here. Starts (or joins) the dine-in session of this table,
     stores it in the browser session and shows the welcome animation (qr_welcome),
-    which then opens the HOME page."""
+    which then opens the HOME page.
+
+    A table can be shared by several customer groups (seat based seating):
+      - no group seated by the server here: the customer gets the usual QR session
+        (started now, or the one already running without seat allocations);
+      - exactly one seated group: the customer joins that group's session, so the
+        orders of the group stay together;
+      - several seated groups: we cannot know which one the customer belongs to,
+        so no table is attached and the staff link the order manually (the same
+        way as for a booked table).
+    A browser that already belongs to one of the groups here keeps its group."""
     table = get_object_or_404(Table, id=table_id)
 
     # If the table is held by someone else right now, don't attach it
@@ -300,14 +367,45 @@ def select_table(request, table_id):
         _forget_table(request)
         return redirect('home')
 
-    # A session that staff forgot to close is ended here, so the new customer
-    # starts a fresh one instead of joining the old visit.
     cutoff = timezone.now() - timedelta(hours=TABLE_SESSION_MAX_HOURS)
-    TableSession.objects.filter(
-        table=table, is_active=True, started_at__lt=cutoff
-    ).update(is_active=False, closed_at=timezone.now())
+    with transaction.atomic():
+        # Lock the table row (where the database supports it) so two scans at the
+        # same moment cannot start two sessions or pick different groups.
+        Table.objects.select_for_update().get(id=table.id)
 
-    table_session = TableSession.get_or_start(table)
+        # A QR session that staff forgot to close is ended here, so the new customer
+        # starts a fresh one instead of joining the old visit. Groups seated by the
+        # server (they have seat allocations) are never ended by a timer.
+        TableSession.objects.filter(
+            table=table, is_active=True, started_at__lt=cutoff,
+            allocations__isnull=True,
+        ).update(is_active=False, closed_at=timezone.now())
+
+        groups = _seated_groups_at(table)
+        if groups:
+            current_id = request.session.get('table_session_id')
+            table_session = next((g for g in groups if g.id == current_id), None)
+            if table_session is None and len(groups) == 1:
+                table_session = groups[0]
+        else:
+            # Usual QR visit. Sessions that have seat allocations are skipped here
+            # (for example a group that is still on a temporary hold).
+            table_session = (
+                TableSession.objects.filter(
+                    table=table, is_active=True, allocations__isnull=True
+                )
+                .order_by('-started_at')
+                .first()
+            ) or TableSession.objects.create(table=table, source=TableSession.SOURCE_QR)
+
+    if table_session is None:
+        messages.warning(
+            request,
+            f'More than one group is seated at Table #{table.number}. '
+            'Our staff will link your order to your group.'
+        )
+        _forget_table(request)
+        return redirect('home')
 
     request.session['selected_table'] = table.id
     request.session['table_session_id'] = table_session.id
@@ -527,7 +625,18 @@ def view_cart(request):
 
     # Table from the QR scan (None if the customer did not scan one, or if
     # the table session has ended)
-    selected_table, _ = _current_table(request)
+    # CHANGED (guests): the table session is kept too, to decide if the guest box is needed
+    selected_table, table_session = _current_table(request)
+
+    # NEW (guests): data for the "How many guests?" box on the cart page.
+    #   ask_guests      = True when the box must be shown (a table is attached and the
+    #                     customer did not join a group that the server seated)
+    #   table_capacity  = seats of that table (the most guests allowed)
+    #   known_guests    = people already known at this table (the same group ordering
+    #                     again), the box is filled with this number. None if unknown.
+    ask_guests = _asks_guests(selected_table, table_session)
+    table_capacity = selected_table.capacity if selected_table else None
+    known_guests = _known_guests(selected_table) if (selected_table and ask_guests) else None
 
     context = {
         'cart_items': cart_items,
@@ -535,6 +644,9 @@ def view_cart(request):
         'total': total,
         'suggestions': suggestions,
         'selected_table': selected_table,
+        'ask_guests': ask_guests,
+        'table_capacity': table_capacity,
+        'known_guests': known_guests,
     }
     return render(request, 'orders/cart.html', context)
 
@@ -646,6 +758,15 @@ def confirm_order(request):
     order is remembered in this browser session (guest_order_ids), so only this
     browser can open it (another browser can use Track Order).
 
+    NEW (guests): the cart form may send `guests` (people at the table). It is saved in
+    Order.guests so the server dashboard can show "6 seats, 2 customers, 4 free".
+      - Only for a dine-in order that has a table, and only when the customer did not
+        join a group that the server seated (that group's seats are already counted).
+      - 1 .. the seats of that table, otherwise the customer goes back to the cart.
+      - If `guests` is not sent, a table that already has a running order with a guest
+        count keeps that number (the same people ordering again). Otherwise it stays
+        blank (the old behaviour: the whole table is held).
+
     Only a POST from the cart page creates an order. A plain GET (browser refresh,
     back button, link prefetch) never creates anything, it just opens the cart."""
     if request.method != 'POST':
@@ -708,6 +829,26 @@ def confirm_order(request):
                 selected_table = None
                 table_session = None
 
+    # NEW (guests): how many people are at the table (None = unknown, whole table held)
+    guests = None
+    if selected_table and _asks_guests(selected_table, table_session):
+        raw_guests = request.POST.get('guests', '').strip()
+        if raw_guests:
+            try:
+                guests = int(raw_guests)
+            except ValueError:
+                messages.error(request, 'Enter a valid number of guests.')
+                return redirect('orders:view_cart')
+            if guests < 1 or guests > selected_table.capacity:
+                messages.error(
+                    request,
+                    f'Guests must be between 1 and {selected_table.capacity} for Table #{selected_table.number}.'
+                )
+                return redirect('orders:view_cart')
+        else:
+            # same people ordering again (juice, dessert): keep the guest count of the table
+            guests = _known_guests(selected_table)
+
     # All-or-nothing: if anything fails, no half-created order is left behind
     with transaction.atomic():
         order = Order.objects.create(
@@ -716,6 +857,7 @@ def confirm_order(request):
             guest_phone=guest_phone,
             table=selected_table,
             table_session=table_session,
+            guests=guests,                 # NEW (guests): people at the table (None if unknown / takeaway)
             status='pending',
             coupon=None,
             discount_amount=Decimal('0.00'),

@@ -1,6 +1,7 @@
 from django.views.generic import RedirectView
 from django.urls import path
 from . import views
+from . import seating_views
 
 app_name = 'dashboard'
 
@@ -54,4 +55,13 @@ urlpatterns = [
     path('server/reject/<int:pk>/', views.server_reject_order, name='server_reject_order'),
     path('server/bill/<int:pk>/', views.server_table_bill, name='server_table_bill'),
     path('server/bill/<int:pk>/cash-received/', views.server_table_cash_received, name='server_table_cash_received'),
+
+    # NEW: Walk-in seating (seat based). All of these live in dashboard/seating_views.py
+    path('server/walkin-check/', seating_views.server_walkin_check, name='server_walkin_check'),
+    path('server/walkin-confirm/', seating_views.server_walkin_confirm, name='server_walkin_confirm'),
+    path('server/seating/take-order/', seating_views.server_take_session_order, name='server_take_session_order'),
+    path('server/seating/tables/', seating_views.server_tables_overview, name='server_tables_overview'),
+    path('server/seating/panel/', seating_views.server_seating_panel, name='server_seating_panel'),
+    path('server/seating/<int:pk>/departed/', seating_views.server_seating_departed, name='server_seating_departed'),
+    path('server/seating/<int:pk>/cleaned/', seating_views.server_seating_cleaned, name='server_seating_cleaned'),
 ]

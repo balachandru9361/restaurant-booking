@@ -572,7 +572,10 @@
         </div>
         <div class="order-user">
           <span>👤 {{ order.user.username }}</span>
-          {% if order.table %}
+          {% if order.group_label %}
+            {# walk-in group: show every table of the group, e.g. "Tables 1, 2, 4" #}
+            <span class="order-table-badge">🪑 {{ order.group_label }}{% if order.group_guests %} · 👥 {{ order.group_guests }}{% endif %}</span>
+          {% elif order.table %}
             <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
           {% else %}
             {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
@@ -621,7 +624,9 @@
         </div>
         <div class="order-user">
           <span>👤 {{ order.user.username }}</span>
-          {% if order.table %}
+          {% if order.group_label %}
+            <span class="order-table-badge">🪑 {{ order.group_label }}{% if order.group_guests %} · 👥 {{ order.group_guests }}{% endif %}</span>
+          {% elif order.table %}
             <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
           {% else %}
             {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
@@ -666,7 +671,9 @@
         </div>
         <div class="order-user">
           <span>👤 {{ order.user.username }}</span>
-          {% if order.table %}
+          {% if order.group_label %}
+            <span class="order-table-badge">🪑 {{ order.group_label }}{% if order.group_guests %} · 👥 {{ order.group_guests }}{% endif %}</span>
+          {% elif order.table %}
             <span class="order-table-badge">🪑 Table {{ order.table.number }}</span>
           {% else %}
             {% if order.is_takeaway %}<span class="order-table-badge takeaway">🥡 Takeaway</span>{% else %}<span class="order-table-badge">🍽️ Table not assigned</span>{% endif %}
@@ -795,8 +802,9 @@
     const badge = card.querySelector('.order-table-badge');
     let target = orderType === 'takeaway' ? 'TAKEAWAY' : 'DINE-IN';
     if (orderType !== 'takeaway' && badge) {
-      const m = badge.textContent.match(/Table\s+(\d\S*)/i);
-      if (m) target = 'TABLE ' + m[1];
+      // "Table 5" or a walk-in group "Tables 1, 2, 4 · 17 guests" -> "TABLE 5" / "TABLES 1, 2, 4"
+      const m = badge.textContent.match(/Tables?\s+(\d[\d,\s]*\d|\d)/i);
+      if (m) target = (/Tables/i.test(badge.textContent) ? 'TABLES ' : 'TABLE ') + m[1].trim();
     }
 
     const userSpan = card.querySelector('.order-user span');

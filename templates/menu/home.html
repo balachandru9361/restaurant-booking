@@ -8,7 +8,7 @@
 
 
 <style>
-/* ===== HERO ===== */
+/* ===== HERO (promo-video style) ===== */
 .home-hero {
     text-align: center;
     color: #fff;
@@ -25,19 +25,25 @@
     margin-right: calc(-50vw + 50%);
 }
 
+/* slides: slow crossfade + Ken Burns zoom */
 .hero-slide {
     position: absolute;
     inset: 0;
     background-size: cover;
     background-position: center;
     opacity: 0;
-    transition: opacity 0.5s ease-in-out;
+    transition: opacity 1s ease-in-out;
     z-index: -2;
+    will-change: transform, opacity;
 }
+.hero-slide.active,
+.hero-slide.leaving { animation: heroZoomA 5.5s linear forwards; }
+.hero-slide:nth-child(even).active,
+.hero-slide:nth-child(even).leaving { animation-name: heroZoomB; }
+.hero-slide.active { opacity: 1; }
 
-.hero-slide.active {
-    opacity: 1;
-}
+@keyframes heroZoomA { from { transform: scale(1); }    to { transform: scale(1.16); } }
+@keyframes heroZoomB { from { transform: scale(1.16); } to { transform: scale(1.02); } }
 
 .hero-overlay {
     position: absolute;
@@ -46,10 +52,43 @@
     z-index: -1;
 }
 
+/* cinematic vignette */
+.home-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 45%, rgba(0,0,0,0.55) 100%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* white flash on every slide change */
+.hero-flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 0; pointer-events: none; }
+.hero-flash.on { animation: hFlash .6s ease-out; }
+@keyframes hFlash { from { opacity: .28; } to { opacity: 0; } }
+
+/* floating sparks */
+.hero-spark {
+    position: absolute;
+    bottom: -12px;
+    border-radius: 50%;
+    background: #ffb703;
+    box-shadow: 0 0 10px 3px rgba(255,140,26,.75);
+    opacity: .75;
+    z-index: 1;
+    pointer-events: none;
+    animation: sparkUp linear infinite;
+}
+@keyframes sparkUp { to { transform: translateY(-620px) translateX(30px); opacity: 0; } }
+
+/* content */
 .home-hero .hero-content {
     position: relative;
     z-index: 2;
 }
+
+/* hidden until the intro starts (only when JS is running) */
+.home-hero.js:not(.go) .hero-content > * { opacity: 0; }
 
 .home-hero span.emoji {
     font-size: 3rem;
@@ -86,12 +125,57 @@
     transition: transform 0.2s, box-shadow 0.2s;
     display: inline-block;
     text-decoration: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.home-hero .btn::after {
+    content: "";
+    position: absolute;
+    top: 0; left: -80%;
+    width: 50%; height: 100%;
+    background: linear-gradient(100deg, transparent, rgba(230,57,70,.28), transparent);
+    transform: skewX(-20deg);
 }
 
 .home-hero .btn:hover {
     transform: translateY(-3px);
     box-shadow: 0 10px 22px rgba(0,0,0,0.2);
     text-decoration: none;
+}
+
+/* title letters */
+.home-hero .h-word { display: inline-block; white-space: nowrap; }
+.home-hero.js .h-ch { display: inline-block; opacity: 0; }
+
+/* intro animation (starts when .go is added) */
+.home-hero.go .hero-content span.emoji {
+    animation: hPop .4s cubic-bezier(.2,1.7,.4,1) 0s both, hFloat 3s ease-in-out .5s infinite;
+}
+.home-hero.go .hero-content h1 { animation: hGlow 2.6s ease-in-out .8s infinite; }
+.home-hero.go .h-ch { animation: hCh .35s cubic-bezier(.2,1.6,.4,1) both; }
+.home-hero.go .hero-content p { animation: hRise .4s .6s both; }
+.home-hero.go .hero-content .btn { animation: hPop .4s cubic-bezier(.2,1.7,.4,1) .8s both, hPulse 1.6s ease-in-out 1.4s infinite; }
+.home-hero.go .hero-content .btn::after { animation: hShine 2.8s ease-in-out 1.4s infinite; }
+
+@keyframes hPop   { from { transform: scale(0) rotate(-25deg); opacity: 0; } to { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes hFloat { 50% { transform: translateY(-8px); } }
+@keyframes hRise  { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: .95; } }
+@keyframes hCh    { from { opacity: 0; transform: translateY(46px) scale(.5) rotate(-8deg); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes hGlow  { 50% { text-shadow: 0 2px 12px rgba(0,0,0,.5), 0 0 30px rgba(255,190,70,.6); } }
+@keyframes hPulse { 50% { transform: scale(1.08); } }
+@keyframes hShine { 0% { left: -80%; } 60%, 100% { left: 140%; } }
+
+/* repeat visit in same session: show everything instantly */
+.home-hero.skip .hero-content span.emoji,
+.home-hero.skip .hero-content h1,
+.home-hero.skip .h-ch,
+.home-hero.skip .hero-content p,
+.home-hero.skip .hero-content .btn { animation: none !important; opacity: 1; }
+.home-hero.skip .h-ch { transform: none; filter: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-slide, .hero-spark, .home-hero .btn, .home-hero .btn::after { animation: none !important; }
 }
 
 /* ===== OFFER STRIP ===== */
@@ -275,18 +359,77 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // Hero image slideshow
-    const slides = document.querySelectorAll('.hero-slide');
-    let currentSlide = 0;
 
-    function showNextSlide() {
-        slides[currentSlide].classList.remove('active');
-        currentSlide = (currentSlide + 1) % slides.length;
-        slides[currentSlide].classList.add('active');
-    }
+    // ===== Promo-style hero =====
+    const hero = document.querySelector('.home-hero');
+    if (hero) {
+        const slides = hero.querySelectorAll('.hero-slide');
+        const SLIDE_MS = 3500;          // time each photo stays (3.5 sec)
+        let currentSlide = 0;
+        hero.classList.add('js');
 
-    if (slides.length > 1) {
-        setInterval(showNextSlide, 1000); // changes slide every 1 second
+        // split the title into letters (each letter animates in)
+        const h1 = hero.querySelector('h1');
+        const words = h1.textContent.trim().split(/\s+/);
+        let li = 0;
+        h1.innerHTML = '';
+        words.forEach(function (w, wi) {
+            const wsp = document.createElement('span');
+            wsp.className = 'h-word';
+            w.split('').forEach(function (ch) {
+                const s = document.createElement('span');
+                s.className = 'h-ch';
+                s.textContent = ch;
+                s.style.animationDelay = (0.05 + li * 0.025) + 's';
+                li++;
+                wsp.appendChild(s);
+            });
+            h1.appendChild(wsp);
+            if (wi < words.length - 1) h1.appendChild(document.createTextNode(' '));
+        });
+
+        // flash (dots and progress bar removed)
+        const flash = document.createElement('div');
+        flash.className = 'hero-flash';
+        hero.appendChild(flash);
+
+        // floating sparks
+        for (let i = 0; i < 26; i++) {
+            const sp = document.createElement('span');
+            const z = 2 + Math.random() * 4;
+            sp.className = 'hero-spark';
+            sp.style.cssText = 'left:' + (Math.random() * 100) + '%;width:' + z + 'px;height:' + z + 'px;' +
+                'animation-duration:' + (4 + Math.random() * 5) + 's;animation-delay:' + (-Math.random() * 8) + 's';
+            hero.appendChild(sp);
+        }
+
+        function setSlide(n) {
+            const prev = slides[currentSlide];
+            if (n !== currentSlide) {
+                prev.classList.remove('active');
+                prev.classList.add('leaving');
+                setTimeout(function () { prev.classList.remove('leaving'); }, 1000);
+            }
+            currentSlide = n;
+            slides[n].classList.remove('leaving');
+            slides[n].classList.add('active');
+
+            flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
+        }
+
+        // start after the login welcome animation (if it is showing)
+        const wel = document.getElementById('welcome');
+        let introSeen = false;
+        try { introSeen = sessionStorage.getItem('heroIntroSeen') === '1'; } catch (e) {}
+        if (introSeen) hero.classList.add('skip');
+        try { sessionStorage.setItem('heroIntroSeen', '1'); } catch (e) {}
+        const delay = (wel && wel.classList.contains('show')) ? 1100 : (introSeen ? 0 : 50);
+        setTimeout(function () {
+            hero.classList.add('go');
+            if (slides.length > 1) {
+                setInterval(function () { setSlide((currentSlide + 1) % slides.length); }, SLIDE_MS);
+            }
+        }, delay);
     }
 
     // ===== Footer social icons: open the link on click =====
@@ -389,14 +532,8 @@ document.addEventListener('DOMContentLoaded', function () {
 .w-bar { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: linear-gradient(90deg, #d9a441, #ff6b6b); animation: wBar 1.1s linear forwards; }
 @keyframes wBar { to { width: 100%; } }
 
-/* page content entrance after welcome */
-body.play-intro .home-hero .hero-content > * { opacity: 0; animation: wUp .5s cubic-bezier(.2,.8,.2,1) forwards; }
-body.play-intro .home-hero .hero-content > *:nth-child(1) { animation-delay: .05s; }
-body.play-intro .home-hero .hero-content > *:nth-child(2) { animation-delay: .12s; }
-body.play-intro .home-hero .hero-content > *:nth-child(3) { animation-delay: .2s; }
-body.play-intro .home-hero .hero-content > *:nth-child(4) { animation-delay: .28s; }
+/* header entrance after welcome (hero intro is now handled by the hero script) */
 body.play-intro .site-header { animation: wDrop .5s cubic-bezier(.2,.8,.2,1) both; }
-@keyframes wUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes wDrop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
 
 @media (prefers-reduced-motion: reduce) {

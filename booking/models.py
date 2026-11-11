@@ -1,5 +1,6 @@
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db import models
+from django.db import models, transaction
+from django.db.models import Q, Sum
 from django.contrib.auth.models import User
 from django.utils import timezone
 
@@ -8,44 +9,235 @@ class Table(models.Model):
     number = models.PositiveIntegerField(unique=True)
     capacity = models.PositiveIntegerField()
 
+    # ------------------------------------------------------------------
+    # Live seat availability (read helpers).
+    # Seats are counted from SeatAllocation rows, never stored on the table,
+    # so there is only one source of truth.
+    # NOTE: these do a query per call. For many tables at once, use the
+    # central seating service (annotate / prefetch) instead of looping.
+    # ------------------------------------------------------------------
+    def _live_allocations(self):
+        """Allocations that currently block seats: occupied, awaiting
+        cleaning, or a temporary hold that has not expired yet."""
+        now = timezone.now()
+        return self.allocations.filter(
+            Q(status__in=[SeatAllocation.OCCUPIED, SeatAllocation.CLEANING])
+            | Q(status=SeatAllocation.HELD, held_until__gt=now)
+        )
+
+    @property
+    def seats_taken(self):
+        """Seats that cannot be given to a new group right now."""
+        return self._live_allocations().aggregate(total=Sum('seats'))['total'] or 0
+
+    @property
+    def seats_free(self):
+        return max(self.capacity - self.seats_taken, 0)
+
+    @property
+    def seats_cleaning(self):
+        """Seats of groups that left and are waiting for the cleaning confirmation."""
+        return (
+            self.allocations.filter(status=SeatAllocation.CLEANING)
+            .aggregate(total=Sum('seats'))['total'] or 0
+        )
+
+    @property
+    def seat_status(self):
+        """'available' / 'partial' / 'full' / 'cleaning' for dashboards."""
+        taken = self.seats_taken
+        if taken == 0:
+            return 'available'
+        if self.seats_cleaning and self.seats_cleaning == taken:
+            return 'cleaning'
+        if taken >= self.capacity:
+            return 'full'
+        return 'partial'
+
     def __str__(self):
         return f"Table {self.number} (seats {self.capacity})"
 
 
 class TableSession(models.Model):
-    """One dine-in visit at a table. Starts on QR scan, ends when the table is closed.
-    Orders (and reorders) are allowed only while is_active is True."""
+    """One dine-in visit of ONE customer group.
+
+    Several groups may sit at the same table (each with its own session), so a
+    table can have many active sessions. Orders (and reorders) are allowed only
+    while is_active is True. The seats a group uses live in SeatAllocation.
+    A group may span several tables; `table` is its main table."""
+
+    SOURCE_QR = 'qr'
+    SOURCE_WALKIN = 'walkin'
+    SOURCE_CHOICES = [
+        (SOURCE_QR, 'QR scan'),
+        (SOURCE_WALKIN, 'Walk-in (server)'),
+    ]
+
     table = models.ForeignKey(Table, on_delete=models.PROTECT, related_name='sessions')
     started_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
+    # Customer group details.
+    group_name = models.CharField(max_length=100, blank=True)
+    guests = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_QR)
+    allocated_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='allocated_sessions',
+    )
+    departed_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ['-started_at']
-        constraints = [
-            # A table can have only one active session at a time.
-            models.UniqueConstraint(
-                fields=['table'],
-                condition=models.Q(is_active=True),
-                name='one_active_session_per_table',
-            ),
-        ]
 
     @classmethod
     def get_or_start(cls, table):
-        """Used on QR scan: reuse the active session or start a new one."""
-        session, _ = cls.objects.get_or_create(table=table, is_active=True)
-        return session
+        """Used on QR scan: reuse the latest active session of the table or
+        start a new one. If a table has several active groups, the QR view
+        must pick the correct group instead of relying on this method."""
+        session = (
+            cls.objects.filter(table=table, is_active=True)
+            .order_by('-started_at')
+            .first()
+        )
+        if session:
+            return session
+        return cls.objects.create(table=table, source=cls.SOURCE_QR)
 
     def close(self):
-        """Call this when the table is closed (bill paid / Open Table)."""
+        """Call this when the bill is paid. This stops new orders only.
+        It does NOT release the seats: seats are released only after the
+        group is marked departed and the cleaning is confirmed."""
         self.is_active = False
         self.closed_at = timezone.now()
         self.save(update_fields=['is_active', 'closed_at'])
 
+    # ------------------------------------------------------------------
+    # Seat lifecycle of this group.
+    # ------------------------------------------------------------------
+    @transaction.atomic
+    def occupy(self):
+        """Temporary hold -> seated. Clears the hold expiry."""
+        self.allocations.filter(status=SeatAllocation.HELD).update(
+            status=SeatAllocation.OCCUPIED, held_until=None
+        )
+
+    @transaction.atomic
+    def cancel_hold(self):
+        """Customer declined or cancelled while the seats were only held."""
+        self.allocations.filter(status=SeatAllocation.HELD).update(
+            status=SeatAllocation.CANCELLED, held_until=None
+        )
+        if self.is_active and not self.allocations.exclude(
+            status=SeatAllocation.CANCELLED
+        ).exists():
+            self.close()
+
+    @transaction.atomic
+    def mark_departed(self):
+        """Group finished dining. Seats move to 'awaiting cleaning' (still
+        blocked). Orders are stopped if the session is still active."""
+        now = timezone.now()
+        self.allocations.filter(status=SeatAllocation.OCCUPIED).update(
+            status=SeatAllocation.CLEANING, departed_at=now
+        )
+        self.departed_at = now
+        fields = ['departed_at']
+        if self.is_active:
+            self.is_active = False
+            self.closed_at = now
+            fields += ['is_active', 'closed_at']
+        self.save(update_fields=fields)
+
+    @transaction.atomic
+    def confirm_cleaning(self, user=None):
+        """Server confirms the table area is clean. Seats become available."""
+        self.allocations.filter(status=SeatAllocation.CLEANING).update(
+            status=SeatAllocation.RELEASED,
+            cleaned_at=timezone.now(),
+            cleaned_by=user,
+        )
+
+    @property
+    def live_allocations(self):
+        """Allocations that still block seats (held, occupied, cleaning)."""
+        return self.allocations.filter(
+            status__in=[
+                SeatAllocation.HELD,
+                SeatAllocation.OCCUPIED,
+                SeatAllocation.CLEANING,
+            ]
+        ).select_related('table').order_by('table__number')
+
+    @property
+    def table_numbers(self):
+        """Display text such as 'Tables 10, 12' for this group."""
+        numbers = sorted({a.table.number for a in self.live_allocations})
+        if not numbers:
+            numbers = [self.table.number]
+        label = 'Table' if len(numbers) == 1 else 'Tables'
+        return f"{label} " + ", ".join(str(n) for n in numbers)
+
+    @property
+    def seats_summary(self):
+        """'4 + 3 = 7 seats' style text for dashboards."""
+        seats = [a.seats for a in self.live_allocations]
+        if not seats:
+            return ''
+        if len(seats) == 1:
+            return f"{seats[0]} seats"
+        return " + ".join(str(s) for s in seats) + f" = {sum(seats)} seats"
+
     def __str__(self):
         state = 'active' if self.is_active else 'closed'
         return f"Table {self.table.number} session ({state})"
+
+
+class SeatAllocation(models.Model):
+    """Seats given to one customer group (session) at one table.
+    A group of 7 on Table 10 + Table 12 has two rows: 4 seats and 3 seats.
+
+    Lifecycle: held (optional, temporary) -> occupied -> cleaning -> released.
+    A declined or expired hold becomes 'cancelled'."""
+
+    HELD = 'held'
+    OCCUPIED = 'occupied'
+    CLEANING = 'cleaning'
+    RELEASED = 'released'
+    CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (HELD, 'Temporarily held'),
+        (OCCUPIED, 'Occupied'),
+        (CLEANING, 'Awaiting cleaning'),
+        (RELEASED, 'Released'),
+        (CANCELLED, 'Cancelled'),
+    ]
+
+    session = models.ForeignKey(TableSession, on_delete=models.CASCADE, related_name='allocations')
+    table = models.ForeignKey(Table, on_delete=models.PROTECT, related_name='allocations')
+    seats = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=OCCUPIED, db_index=True)
+
+    held_until = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    departed_at = models.DateTimeField(null=True, blank=True)
+    cleaned_at = models.DateTimeField(null=True, blank=True)
+    cleaned_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='cleaned_allocations',
+    )
+
+    class Meta:
+        ordering = ['table__number', 'id']
+        indexes = [models.Index(fields=['table', 'status'])]
+        constraints = [
+            # CHANGED: Django 5.1+ uses condition= (check= was removed in Django 6.0)
+            models.CheckConstraint(condition=Q(seats__gte=1), name='allocation_seats_positive'),
+        ]
+
+    def __str__(self):
+        return f"Table {self.table.number}: {self.seats} seats ({self.status})"
 
 
 class TableBooking(models.Model):

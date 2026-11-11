@@ -276,6 +276,21 @@
 .guest-fields input:focus { outline:none; border-color:var(--gold); }
 .guest-fields input.shake { animation:shake .4s; border-color:#dc2626; }
 .ci-opts { margin:3px 0 0; font-size:.8rem; color:#6b7280; line-height:1.35; word-break:break-word; }
+
+/* how many guests at the table (shown for a dine-in order at a QR table) */
+.guests-box { margin-top:16px; padding:14px 16px; background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:16px; }
+.guests-box h3 { margin:0 0 10px; font-size:.9rem; color:var(--ink); }
+.guests-input { width:140px; max-width:100%; box-sizing:border-box; border:1.5px solid #e5e7eb; border-radius:12px;
+  padding:10px 14px; font:inherit; font-size:1rem; font-weight:600; background:#fff; }
+.guests-input:focus { outline:none; border-color:var(--coral); }
+.guests-input.shake { animation:shake .4s; border-color:#dc2626; }
+.guests-hint { margin:8px 2px 0; font-size:.82rem; color:var(--muted); }
+.guests-hint.bad { color:#dc2626; font-weight:600; }
+
+/* Confirm Order is locked until the guest count is valid */
+.confirm-btn:disabled { opacity:.55; cursor:not-allowed; animation:none; filter:grayscale(.35); transform:none; box-shadow:none; }
+.confirm-btn:disabled:hover { transform:none; box-shadow:none; }
+.confirm-btn:disabled .arrow { animation:none; }
 </style>
 
 <div class="cart-page">
@@ -325,6 +340,19 @@
         </div>
         {# data-table holds the QR table number (empty if no QR scan) #}
         <p class="hint" id="typeHint" data-table="{% if selected_table %}{{ selected_table.number }}{% endif %}">Our staff will assign your table when you arrive.</p>
+
+        {# How many guests: only for a dine-in order at a QR table (ask_guests comes from the view). #}
+        {# Hidden for Take away. The box is filled when the same table already has a known guest count. #}
+        {% if ask_guests %}
+        <div class="guests-box" id="guestsBox">
+          <h3>👥 How many guests at your table?</h3>
+          <input type="number" class="guests-input" id="guestsInput" name="guests" form="checkoutForm"
+                 min="1" step="1" inputmode="numeric" placeholder="e.g. 4"
+                 {% if table_capacity %}max="{{ table_capacity }}" data-cap="{{ table_capacity }}"{% endif %}
+                 value="{{ known_guests|default_if_none:'' }}">
+          <p class="guests-hint" id="guestsHint"></p>
+        </div>
+        {% endif %}
 
         <h3 id="arrivalTitle">When will you arrive?</h3>
         <div class="chips">
@@ -573,6 +601,51 @@
     });
   });
 
+  // ---- guests at the table ----
+  // The box exists only when the view says so (ask_guests). It is needed for a dine-in
+  // order, hidden for Take away. Confirm Order stays locked until the number is valid
+  // (1 .. the seats of the table).
+  var guestsBox = $('#guestsBox'), guestsInput = $('#guestsInput'), guestsHint = $('#guestsHint');
+
+  function guestsState() {
+    if (!guestsBox) return { ok: true, active: false, msg: '', bad: false };
+    var take = $('input[name=order_type]:checked').value === 'takeaway';
+    if (take) return { ok: true, active: false, msg: '', bad: false };
+
+    var cap = parseInt(guestsInput.dataset.cap, 10) || 0;
+    var tableNo = $('#typeHint').dataset.table;
+    var raw = guestsInput.value.trim();
+    if (raw === '') {
+      return { ok: false, active: true, bad: false,
+        msg: 'Enter how many people are at your table.' + (cap ? ' (This table seats ' + cap + ')' : '') };
+    }
+    var n = Number(raw);
+    if (!Number.isInteger(n) || n < 1) {
+      return { ok: false, active: true, bad: true, msg: 'Guests must be 1 or more.' };
+    }
+    if (cap && n > cap) {
+      return { ok: false, active: true, bad: true,
+        msg: 'Table #' + tableNo + ' seats only ' + cap + '. Please enter ' + cap + ' or less.' };
+    }
+    return { ok: true, active: true, bad: false, msg: cap ? 'This table seats ' + cap + '.' : '' };
+  }
+
+  function updateGuests() {
+    var gs = guestsState();
+    if (guestsBox) {
+      guestsBox.hidden = !gs.active;
+      guestsInput.disabled = !gs.active;     // a disabled box is not sent (Take away)
+      guestsHint.textContent = gs.msg;
+      guestsHint.classList.toggle('bad', gs.bad);
+    }
+    var cb = $('#confirmBtn');
+    if (cb && !cb.classList.contains('is-loading') && !cb.classList.contains('is-done')) {
+      cb.disabled = !gs.ok;
+    }
+    return gs;
+  }
+  if (guestsInput) guestsInput.addEventListener('input', updateGuests);
+
   // ---- order type, arrival time, estimate ----
   var customWrap = $('#customWrap'), customTime = $('#customTime');
   var now = new Date();
@@ -613,6 +686,8 @@
     }
     $('#etaText').textContent = '⏱️ ' + eta;
     $('#sumArrival').textContent = label;
+
+    updateGuests();   // show / hide the guests box and lock or unlock Confirm Order
   }
   document.querySelectorAll('input[name=order_type], input[name=arrival_mode]').forEach(function (i) { i.addEventListener('change', refresh); });
   customTime.addEventListener('input', refresh);
@@ -656,6 +731,16 @@
       customTime.classList.remove('shake'); void customTime.offsetWidth; customTime.classList.add('shake');
       customTime.scrollIntoView({ behavior: 'smooth', block: 'center' });
       customTime.focus();
+      return;
+    }
+
+    // Guest count (dine-in at a QR table). The button is locked while it is wrong,
+    // this is a second check in case the page state is out of date.
+    var gs = updateGuests();
+    if (!gs.ok) {
+      guestsInput.classList.remove('shake'); void guestsInput.offsetWidth; guestsInput.classList.add('shake');
+      guestsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      guestsInput.focus();
       return;
     }
 
