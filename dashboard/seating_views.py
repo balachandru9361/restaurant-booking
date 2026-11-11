@@ -5,6 +5,8 @@ NEW FILE. dashboard/views.py is not changed.
 Flow (seats are tracked by booking.models.SeatAllocation):
     check  -> server_walkin_check     read only, suggests tables (seat based)
     seat   -> server_walkin_confirm   creates TableSession + SeatAllocation (occupied)
+    cancel -> server_seating_cancel   customer changed their mind before ordering,
+                                      seats are freed at once (no cleaning step)
     left   -> server_seating_departed seats move to "cleaning" (still blocked)
     clean  -> server_seating_cleaned  seats are released for the next customer
     order  -> server_take_session_order  server takes an order for a seated group
@@ -205,8 +207,47 @@ def server_seating_panel(request):
             'order_count': len(orders),
             'due': str(due),
             'unserved': unserved,
+            # NEW: the Cancel button is shown only while the group is seated and has no order
+            'can_cancel': seated and not orders,
         })
     return JsonResponse({'ok': True, 'groups': groups})
+
+
+# ---------------------------------------------------------------------------
+# 3b. Cancel Seating  (customer changed their mind before ordering)
+# ---------------------------------------------------------------------------
+@server_required
+@require_POST
+def server_seating_cancel(request, pk):
+    """The group was seated but has not ordered and does not want the seats.
+    The seats are freed at once (no cleaning step) and nothing is kept in sales.
+    Not allowed once the group has an order. Use Customer Left for that."""
+    with transaction.atomic():
+        session = get_object_or_404(TableSession.objects.select_for_update(), pk=pk)
+
+        if not session.allocations.filter(status=SeatAllocation.OCCUPIED).exists():
+            return JsonResponse({'ok': False, 'error': 'This group is not seated.'}, status=400)
+
+        if _session_orders(session).exists():
+            return JsonResponse({
+                'ok': False,
+                'error': 'This group already has an order. Use Customer Left instead.',
+            }, status=400)
+
+        numbers = sorted({a.table.number for a in
+                          session.allocations.select_related('table')})
+
+        # Free the seats. Free seats are counted from the SeatAllocation rows.
+        session.allocations.all().delete()
+
+        # Remove the empty group too, unless an order (even a cancelled one) points to it
+        if not Order.objects.filter(table_session=session).exists():
+            session.delete()
+
+    return JsonResponse({
+        'ok': True,
+        'message': f'{_tables_text(numbers)} are free again.',
+    })
 
 
 # ---------------------------------------------------------------------------

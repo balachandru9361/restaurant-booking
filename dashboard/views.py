@@ -262,23 +262,38 @@ def manage_tables(request):
 
     # CHANGED: no countdown any more (mins_left removed). A table that is held stays
     # held until the admin clicks "Open Table". Only the "starts in N minutes" hint is kept.
+    # NEW: seats used / free per table. This is the SAME source the Server dashboard uses
+    # (_tables_info), so both pages always show the same numbers, for example
+    # "6 seats, 3 customers, 3 free". A table that is missing from the map has all seats free.
+    free_map = {t.id: free for t, free in walkin_free_seats()}
+
     rows = []
+    free_seats_total = 0
+    free_count = 0
     for table in tables:
         hold = holds.get(table.id)
         up = upcoming.get(table.id)
+        free_seats = max(0, min(table.capacity, free_map.get(table.id, table.capacity)))
+        used_seats = table.capacity - free_seats
+        free_seats_total += free_seats
+        if not hold and used_seats == 0:
+            free_count += 1
         rows.append({
             'table': table,
             'hold': hold,
             'upcoming': up,
             'upcoming_in_mins': int((up.start - now).total_seconds() // 60) + 1 if up else 0,
+            'used_seats': used_seats,
+            'free_seats': free_seats,
         })
 
     return render(request, 'dashboard/manage_tables.html', {
         'rows': rows,
         'tables': tables,
         'total_capacity': tables.aggregate(total=Sum('capacity'))['total'] or 0,
+        'free_seats_total': free_seats_total,
         'booked_count': len(holds),
-        'free_count': tables.count() - len(holds),
+        'free_count': free_count,
         'upcoming_count': len(upcoming),
     })
 

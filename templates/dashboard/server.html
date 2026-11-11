@@ -549,6 +549,8 @@
   .wk-actions button:disabled { opacity: 0.6; cursor: not-allowed; }
   .wk-take { background: linear-gradient(135deg, #d4af37, #f0cd6b); color: #0d1b2a; }
   .wk-again { background: #eef1f5; color: #374151; }
+  /* NEW: Cancel seating (customer changed their mind before ordering) */
+  .wk-cancel { background: #fee2e2; color: #b91c1c; }
 
   /* --- Mobile / tablet responsive --- */
   .server-board > * { min-width: 0; }
@@ -1729,6 +1731,32 @@
     });
   })();
 
+  // ---- Cancel Seating: customer changed their mind before ordering ----
+  // Global, so the Walk-in popup and the "Walk-in Groups" row can both use it.
+  // Returns a promise: true when the seats were freed.
+  window.cancelSeatingGroup = function (id, label) {
+    if (!confirm('Cancel seating for ' + label + '? The seats will be free again.')) {
+      return Promise.resolve(false);
+    }
+    const url = "{% url 'dashboard:server_seating_cancel' 0 %}".replace('/0/cancel/', '/' + id + '/cancel/');
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': CSRF_TOKEN }
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+      .then(res => {
+        if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Could not cancel seating');
+        showToast('Seating Cancelled', '🪑 ' + String(label).toUpperCase(), 'Seats are free again', '✅');
+        if (window.refreshSeatingPanel) window.refreshSeatingPanel();
+        return refreshLive().then(() => true);
+      })
+      .catch(err => {
+        showToast('Could not cancel', err.message, label, '⚠️', { error: true });
+        return false;
+      });
+  };
+
   // ---- Walk-in Seat Availability: type the guest count, check seats, then Confirm Seating ----
   (function () {
     const overlay = document.getElementById('wkOverlay');
@@ -1839,8 +1867,17 @@
         input.value = '';
         closeModal();
       });
+      // NEW: the customer changed their mind before ordering, free the seats again
+      const cancel = el('button', 'wk-cancel', 'Cancel');
+      cancel.type = 'button';
+      cancel.addEventListener('click', function () {
+        window.cancelSeatingGroup(info.session_id, info.tables).then(function (ok) {
+          if (ok) { input.value = ''; closeModal(); }
+        });
+      });
       actions.appendChild(take);
       actions.appendChild(done);
+      actions.appendChild(cancel);
       result.appendChild(actions);
       if (window.refreshSeatingPanel) window.refreshSeatingPanel();
       refreshLive();   // the Take Order table chips now show these tables as "Seats full"
