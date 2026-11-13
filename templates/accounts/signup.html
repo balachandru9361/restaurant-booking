@@ -382,6 +382,39 @@
     var signupSpinner = document.getElementById('signupSpinner');
     var signupBtnText = document.getElementById('signupBtnText');
 
+    // Phone field: numbers only, exactly 10 digits
+    var phoneInput = document.querySelector('#signupForm input[name*="phone"]');
+
+    function showPhoneError(message) {
+        var group = phoneInput.closest('.form-group');
+        if (!group) return;
+        var err = group.querySelector('.error');
+        if (!err) {
+            err = document.createElement('p');
+            err.className = 'error';
+            group.appendChild(err);
+        }
+        err.textContent = message;
+    }
+
+    if (phoneInput) {
+        phoneInput.setAttribute('inputmode', 'numeric');
+        phoneInput.setAttribute('autocomplete', 'tel-national');
+        phoneInput.setAttribute('placeholder', '10-digit mobile number');
+
+        phoneInput.addEventListener('input', function () {
+            var digits = this.value.replace(/\D/g, '');
+            // a pasted number like +91 93619 41315 -> drop the country code
+            if (digits.length >= 12 && digits.indexOf('91') === 0) {
+                digits = digits.slice(2);
+            }
+            digits = digits.slice(0, 10);
+            if (this.value !== digits) {
+                this.value = digits;
+            }
+        });
+    }
+
     function resetSignupBtn() {
         signupBtn.disabled = false;
         signupSpinner.style.display = 'none';
@@ -389,7 +422,17 @@
     }
 
     if (signupForm) {
-        signupForm.addEventListener('submit', function () {
+        // Stop the form here when the phone number is not exactly 10 digits
+        signupForm.addEventListener('submit', function (e) {
+            if (phoneInput && !/^[0-9]{10}$/.test(phoneInput.value)) {
+                e.preventDefault();
+                showPhoneError('Enter a valid 10-digit mobile number.');
+                phoneInput.focus();
+            }
+        });
+
+        signupForm.addEventListener('submit', function (e) {
+            if (e.defaultPrevented) return;
             // let the form submit first, then disable the button
             setTimeout(function () {
                 signupBtn.disabled = true;

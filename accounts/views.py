@@ -1,7 +1,10 @@
+from urllib.parse import urlencode
+
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.urls import reverse, NoReverseMatch
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from store.permissions import home_url_for, is_store_staff
@@ -23,6 +26,23 @@ def _is_staff_user(user):
     return user.is_superuser or user.is_staff or is_store_staff(user)
 
 
+def _login_url(next_url=None):
+    """URL of the login page, keeping ?next= so the customer still lands on
+    the page they were going to (cart / confirm order) after logging in."""
+    url = None
+    for name in ('accounts:login', 'login'):
+        try:
+            url = reverse(name)
+            break
+        except NoReverseMatch:
+            continue
+    if url is None:
+        url = '/accounts/login/'
+    if next_url:
+        url = f'{url}?{urlencode({"next": next_url})}'
+    return url
+
+
 def signup_view(request):
     if request.user.is_authenticated:
         return redirect(_safe_next(request) or 'home')
@@ -31,14 +51,16 @@ def signup_view(request):
         form = SignupForm(request.POST)
         if form.is_valid():
             user = form.save()
-            login(request, user)
-            # Lets the welcome splash show "Welcome" instead of
-            # "Welcome back" for a brand new customer.
-            request.session['is_new_signup'] = True
+            # CHANGED: the customer is NOT logged in automatically any more.
+            # After signing up they go to the login page and log in themselves.
+            # Remembers that this is a brand new customer, so the welcome splash
+            # after the first login shows "Welcome" instead of "Welcome back".
+            request.session['new_signup_pending'] = True
             messages.success(
-                request, f'Welcome, {user.first_name}! Your account is ready.')
-            # Continue where the customer left off (e.g. cart / confirm order)
-            return redirect(_safe_next(request) or 'home')
+                request,
+                f'Welcome, {user.first_name}! Your account is ready. '
+                'Please log in to continue.')
+            return redirect(_login_url(_safe_next(request)))
     else:
         form = SignupForm()
 
@@ -64,7 +86,9 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
-                request.session['is_new_signup'] = False
+                # True only for the first login right after signing up
+                request.session['is_new_signup'] = bool(
+                    request.session.pop('new_signup_pending', False))
                 messages.success(
                     request, f'Welcome back, {user.first_name or user.username}!')
 

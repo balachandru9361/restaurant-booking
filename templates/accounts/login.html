@@ -215,6 +215,12 @@
         text-decoration: underline;
     }
 
+    .field-hint {
+        margin: 6px 0 0;
+        font-size: 0.75rem;
+        color: #9aa0a9;
+    }
+
     .error {
         color: #e04e1c;
         font-size: 0.8rem;
@@ -334,13 +340,16 @@
 
             {% for field in form %}
                 <div class="form-group">
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    <label for="{{ field.id_for_label }}">{% if field.name == "username" %}Phone number{% else %}{{ field.label }}{% endif %}</label>
                     <div class="input-wrap">
                         {{ field }}
                         {% if field.field.widget.input_type == "password" %}
                             <button type="button" class="toggle-pw" data-target="{{ field.id_for_label }}" aria-label="Show password">👁️</button>
                         {% endif %}
                     </div>
+                    {% if field.name == "username" %}
+                        <p class="field-hint">Staff? Use your username.</p>
+                    {% endif %}
                     {% if field.errors %}
                         <p class="error">{{ field.errors|join:", " }}</p>
                     {% endif %}
@@ -366,6 +375,12 @@
 </div>
 
 <script>
+    // Phone field: customers log in with their 10-digit mobile number
+    var phoneInput = document.querySelector('#loginForm input[name="username"]');
+    if (phoneInput) {
+        phoneInput.placeholder = '10-digit mobile number';
+    }
+
     document.querySelectorAll('.toggle-pw').forEach(function (btn) {
         btn.addEventListener('click', function () {
             var input = document.getElementById(this.dataset.target);

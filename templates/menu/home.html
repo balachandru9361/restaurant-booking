@@ -547,7 +547,7 @@ body.play-intro .site-header { animation: wDrop .5s cubic-bezier(.2,.8,.2,1) bot
     <span class="w-ring"></span><span class="w-ring"></span><span class="w-ring"></span>
     <img id="wLogo" alt="Chandru Restaurant">
   </div>
-  <div class="w-hello">Welcome back</div>
+  <div class="w-hello">{% if request.session.is_new_signup %}Welcome{% else %}Welcome back{% endif %}</div>
   <div class="w-name" id="wName"></div>
   <div class="w-sub">Hungry? Let's find something delicious 🍽️</div>
   <div class="w-skip">TAP TO SKIP</div>
