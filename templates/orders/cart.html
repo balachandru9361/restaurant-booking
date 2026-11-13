@@ -57,7 +57,7 @@
   .card h2 { font-family:'Sora',sans-serif; font-size:1.1rem; margin:0 0 14px; }
   .card h3 { font-size:.9rem; margin:20px 0 10px; color:var(--ink); }
   .seg { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .seg input, .chips input { position:absolute; opacity:0; pointer-events:none; }
+  .seg input { position:absolute; opacity:0; pointer-events:none; }
   .seg label { display:flex; flex-direction:column; gap:2px; border:2px solid #e5e7eb; border-radius:16px; padding:14px 16px; cursor:pointer; transition:.2s; }
   .seg label .ico { font-size:1.5rem; transition:transform .3s; }
   .seg label small { color:var(--muted); font-size:.78rem; }
@@ -65,16 +65,9 @@
   .seg input:checked + label { border-color:var(--coral); background:#fff5f5; box-shadow:0 8px 20px rgba(255,107,107,.18); }
   .seg input:checked + label .ico { transform:scale(1.25) rotate(-8deg); }
   .hint { color:var(--muted); font-size:.85rem; margin:10px 2px 0; }
-  .chips { display:flex; flex-wrap:wrap; gap:8px; }
-  .chips label { border:1.5px solid #e5e7eb; border-radius:999px; padding:8px 16px; font-size:.85rem; font-weight:500; cursor:pointer; transition:.2s; }
-  .chips label:hover { border-color:var(--coral); }
-  .chips input:checked + label { background:var(--coral); border-color:var(--coral); color:#fff; box-shadow:0 6px 14px rgba(255,107,107,.35); }
-  #customTime { margin-top:12px; border:1.5px solid #e5e7eb; border-radius:12px; padding:10px 14px; font:inherit; }
-  #customTime.shake { animation:shake .4s; border-color:#dc2626; }
   @keyframes shake { 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
-  .eta { margin:12px 0 0; background:#ecfdf5; color:#047857; border-radius:12px; padding:10px 14px; font-size:.88rem; font-weight:500; }
   textarea.note { width:100%; min-height:74px; border:1.5px solid #e5e7eb; border-radius:14px; padding:12px 14px; font:inherit; resize:vertical; box-sizing:border-box; }
-  textarea.note:focus, #customTime:focus { outline:none; border-color:var(--coral); }
+  textarea.note:focus { outline:none; border-color:var(--coral); }
   .quick-notes { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
   .quick-notes button { border:1.5px dashed #d1d5db; background:#fff; border-radius:999px; padding:6px 14px; font:inherit; font-size:.8rem; cursor:pointer; transition:.2s; }
   .quick-notes button:hover { border-color:var(--gold); background:#fffbeb; }
@@ -277,7 +270,7 @@
 .guest-fields input.shake { animation:shake .4s; border-color:#dc2626; }
 .ci-opts { margin:3px 0 0; font-size:.8rem; color:#6b7280; line-height:1.35; word-break:break-word; }
 
-/* how many guests at the table (shown for a dine-in order at a QR table) */
+/* how many guests at the table (required for every dine-in order) */
 .guests-box { margin-top:16px; padding:14px 16px; background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:16px; }
 .guests-box h3 { margin:0 0 10px; font-size:.9rem; color:var(--ink); }
 .guests-input { width:140px; max-width:100%; box-sizing:border-box; border:1.5px solid #e5e7eb; border-radius:12px;
@@ -286,6 +279,7 @@
 .guests-input.shake { animation:shake .4s; border-color:#dc2626; }
 .guests-hint { margin:8px 2px 0; font-size:.82rem; color:var(--muted); }
 .guests-hint.bad { color:#dc2626; font-weight:600; }
+.req-star { color:#dc2626; }
 
 /* Confirm Order is locked until the guest count is valid */
 .confirm-btn:disabled { opacity:.55; cursor:not-allowed; animation:none; filter:grayscale(.35); transform:none; box-shadow:none; }
@@ -341,28 +335,18 @@
         {# data-table holds the QR table number (empty if no QR scan) #}
         <p class="hint" id="typeHint" data-table="{% if selected_table %}{{ selected_table.number }}{% endif %}">Our staff will assign your table when you arrive.</p>
 
-        {# How many guests: only for a dine-in order at a QR table (ask_guests comes from the view). #}
-        {# Hidden for Take away. The box is filled when the same table already has a known guest count. #}
+        {# How many guests: REQUIRED for every dine-in order (ask_guests comes from the view). #}
+        {# Hidden for Take away. Not shown only when the customer joined a group the server seated. #}
         {% if ask_guests %}
         <div class="guests-box" id="guestsBox">
-          <h3>👥 How many guests at your table?</h3>
+          <h3>👥 How many guests? <span class="req-star">*</span></h3>
           <input type="number" class="guests-input" id="guestsInput" name="guests" form="checkoutForm"
-                 min="1" step="1" inputmode="numeric" placeholder="e.g. 4"
+                 min="1" step="1" inputmode="numeric" placeholder="e.g. 4" required
                  {% if table_capacity %}max="{{ table_capacity }}" data-cap="{{ table_capacity }}"{% endif %}
                  value="{{ known_guests|default_if_none:'' }}">
           <p class="guests-hint" id="guestsHint"></p>
         </div>
         {% endif %}
-
-        <h3 id="arrivalTitle">When will you arrive?</h3>
-        <div class="chips">
-          <input type="radio" id="am-asap" name="arrival_mode" value="asap" form="checkoutForm" checked><label for="am-asap">ASAP</label>
-          <input type="radio" id="am-45" name="arrival_mode" value="45" form="checkoutForm"><label for="am-45">In 45 min</label>
-          <input type="radio" id="am-60" name="arrival_mode" value="60" form="checkoutForm"><label for="am-60">In 1 hour</label>
-          <input type="radio" id="am-custom" name="arrival_mode" value="custom" form="checkoutForm"><label for="am-custom">Pick a time</label>
-        </div>
-        <div id="customWrap" hidden><input type="time" id="customTime" name="arrival_custom" form="checkoutForm"></div>
-        <p class="eta" id="etaText"></p>
 
         <h3>Cooking instructions</h3>
         <textarea class="note" id="noteBox" name="note" form="checkoutForm" maxlength="255" placeholder="Anything we should know? Spice level, allergies, packing..."></textarea>
@@ -397,7 +381,6 @@
       <div class="row tip" id="tipRow" hidden><span>Tip (<span id="tipPctText">5</span>%)</span><span>+ ₹<span id="sumTip">0.00</span></span></div>
       <div class="row total"><span>Total</span><span>₹<span id="sumTotal" data-base="{{ total|stringformat:'f' }}">{{ total|inr }}</span></span></div>
       <div class="mini"><span>Order type</span><b id="sumType">Dine-in</b></div>
-      <div class="mini"><span>Arrival</span><b id="sumArrival">ASAP</b></div>
 
       {# Customer details: name and phone are always required (there is no customer login) #}
       <div class="guest-fields">
@@ -460,7 +443,6 @@
 
 <script>
 (function () {
-  var PREP_MINUTES = 25; // rough estimate only; the chef sets the exact time when cooking starts
   var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var form = document.getElementById('checkoutForm');
   if (!form) return;
@@ -601,10 +583,10 @@
     });
   });
 
-  // ---- guests at the table ----
-  // The box exists only when the view says so (ask_guests). It is needed for a dine-in
-  // order, hidden for Take away. Confirm Order stays locked until the number is valid
-  // (1 .. the seats of the table).
+  // ---- guests (REQUIRED for every dine-in order) ----
+  // The box exists only when the view says so (ask_guests). It is hidden for Take away.
+  // Confirm Order stays locked until the number is valid (1 .. seats of the table,
+  // or 1 .. 30 when no table is attached).
   var guestsBox = $('#guestsBox'), guestsInput = $('#guestsInput'), guestsHint = $('#guestsHint');
 
   function guestsState() {
@@ -616,8 +598,8 @@
     var tableNo = $('#typeHint').dataset.table;
     var raw = guestsInput.value.trim();
     if (raw === '') {
-      return { ok: false, active: true, bad: false,
-        msg: 'Enter how many people are at your table.' + (cap ? ' (This table seats ' + cap + ')' : '') };
+      return { ok: false, active: true, bad: true,
+        msg: 'Guest count is required.' + (cap ? ' (Maximum ' + cap + ')' : '') };
     }
     var n = Number(raw);
     if (!Number.isInteger(n) || n < 1) {
@@ -625,9 +607,11 @@
     }
     if (cap && n > cap) {
       return { ok: false, active: true, bad: true,
-        msg: 'Table #' + tableNo + ' seats only ' + cap + '. Please enter ' + cap + ' or less.' };
+        msg: (tableNo ? 'Table #' + tableNo + ' seats only ' + cap : 'Maximum ' + cap + ' guests')
+             + '. Please enter ' + cap + ' or less.' };
     }
-    return { ok: true, active: true, bad: false, msg: cap ? 'This table seats ' + cap + '.' : '' };
+    return { ok: true, active: true, bad: false,
+      msg: (tableNo && cap) ? 'This table seats ' + cap + '.' : '' };
   }
 
   function updateGuests() {
@@ -646,15 +630,9 @@
   }
   if (guestsInput) guestsInput.addEventListener('input', updateGuests);
 
-  // ---- order type, arrival time, estimate ----
-  var customWrap = $('#customWrap'), customTime = $('#customTime');
-  var now = new Date();
-  customTime.min = ('0' + now.getHours()).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
-
-  function fmt(d) { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+  // ---- order type ----
   function refresh() {
     var type = $('input[name=order_type]:checked').value;
-    var mode = $('input[name=arrival_mode]:checked').value;
     var take = type === 'takeaway';
 
     // If the customer scanned a table QR, say so instead of "staff will assign"
@@ -665,32 +643,11 @@
           ? 'Your order will be served at Table #' + tableNo + '.'
           : 'Our staff will assign your table when you arrive.');
 
-    $('#arrivalTitle').textContent = take ? 'When will you pick it up?' : 'When will you arrive?';
     $('#sumType').textContent = take ? 'Take away' : 'Dine-in';
-    customWrap.hidden = mode !== 'custom';
-
-    var eta, label;
-    if (mode === 'asap') {
-      // Shown as an estimate, the chef confirms the exact time later
-      eta = 'Estimated ready time: about ' + PREP_MINUTES + ' minutes. The chef will confirm the exact time once cooking starts.';
-      label = 'ASAP';
-    } else if (mode === 'custom') {
-      if (customTime.value) {
-        var p = customTime.value.split(':'), d = new Date();
-        d.setHours(parseInt(p[0], 10), parseInt(p[1], 10), 0, 0);
-        label = fmt(d); eta = 'We will time your food for ' + label + '.';
-      } else { label = 'Pick a time'; eta = 'Choose the time you will arrive.'; }
-    } else {
-      var at = new Date(Date.now() + parseInt(mode, 10) * 60000);
-      label = fmt(at); eta = 'We will time your food for ' + label + '.';
-    }
-    $('#etaText').textContent = '⏱️ ' + eta;
-    $('#sumArrival').textContent = label;
 
     updateGuests();   // show / hide the guests box and lock or unlock Confirm Order
   }
-  document.querySelectorAll('input[name=order_type], input[name=arrival_mode]').forEach(function (i) { i.addEventListener('change', refresh); });
-  customTime.addEventListener('input', refresh);
+  document.querySelectorAll('input[name=order_type]').forEach(function (i) { i.addEventListener('change', refresh); });
   refresh();
 
   // ---- cooking notes ----
@@ -727,20 +684,15 @@
     e.preventDefault();
     if (btn.classList.contains('is-loading') || btn.classList.contains('is-done')) return;
 
-    if ($('input[name=arrival_mode]:checked').value === 'custom' && !customTime.value) {
-      customTime.classList.remove('shake'); void customTime.offsetWidth; customTime.classList.add('shake');
-      customTime.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      customTime.focus();
-      return;
-    }
-
-    // Guest count (dine-in at a QR table). The button is locked while it is wrong,
+    // Guest count (required for dine-in). The button is locked while it is wrong,
     // this is a second check in case the page state is out of date.
     var gs = updateGuests();
     if (!gs.ok) {
-      guestsInput.classList.remove('shake'); void guestsInput.offsetWidth; guestsInput.classList.add('shake');
-      guestsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      guestsInput.focus();
+      if (guestsInput) {
+        guestsInput.classList.remove('shake'); void guestsInput.offsetWidth; guestsInput.classList.add('shake');
+        guestsInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        guestsInput.focus();
+      }
       return;
     }
 
@@ -812,21 +764,6 @@
     if (ov.classList.contains('show') && !fired) { fired = true; rain(); }
   }).observe(ov, { attributes: true, attributeFilter: ['class'] });
 })();
-</script>
-<script>
-/* custom-time-picker : open the native clock dialog on tap */
-document.addEventListener('DOMContentLoaded', function () {
-  var t = document.getElementById('customTime');
-  if (!t) return;
-  t.setAttribute('type', 'time');
-  function openPicker() {
-    try { if (t.showPicker) t.showPicker(); } catch (e) {}
-  }
-  t.addEventListener('click', openPicker);
-  t.addEventListener('focus', openPicker);
-  var pick = document.getElementById('am-pick');
-  if (pick) pick.addEventListener('change', function () { setTimeout(openPicker, 50); });
-});
 </script>
 
 {% endblock %}

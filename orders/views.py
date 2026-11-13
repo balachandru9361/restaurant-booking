@@ -24,6 +24,10 @@ ALLOWED_TIPS = ('5', '10')
 # the next day.
 TABLE_SESSION_MAX_HOURS = 4
 
+# CHANGED (guests-all): most guests allowed when the customer has NO table attached
+# (no QR scan). The staff assign the table later. Same as MAX_GUESTS in booking/forms.py.
+MAX_GUESTS_NO_TABLE = 30
+
 
 def _is_ajax(request):
     """True when the request comes from fetch() with the X-Requested-With header."""
@@ -100,10 +104,13 @@ def _current_table(request):
 # part of a table by guest count. A customer who joined a group that the server seated
 # (a session with SeatAllocation rows) is NOT asked: that group's seats are already
 # counted by SeatAllocation, and its orders never hold the whole table.
+# CHANGED (guests-all): a customer with NO table (no QR scan) is asked too, because the
+# staff need the guest count to give a table. The box is shown for Dine-in only (the cart
+# page JavaScript hides it for Take away).
 def _asks_guests(table, table_session):
     """True when the cart page should ask for the guest count."""
     if table is None:
-        return False
+        return True
     return not (table_session is not None and table_session.allocations.exists())
 
 
@@ -277,7 +284,7 @@ def add_to_cart(request, item_id):
 @require_POST
 def add_to_order(request, item_id):
     """'Order now' from a dish page. Adds the dish to the cart and opens the cart
-    page, where the customer picks tip / order type / arrival time and presses
+    page, where the customer picks tip / order type and presses
     Confirm. No login is needed to order."""
     quantity = _safe_qty(request.POST.get('quantity', 1))
 
@@ -629,13 +636,15 @@ def view_cart(request):
     selected_table, table_session = _current_table(request)
 
     # NEW (guests): data for the "How many guests?" box on the cart page.
-    #   ask_guests      = True when the box must be shown (a table is attached and the
-    #                     customer did not join a group that the server seated)
-    #   table_capacity  = seats of that table (the most guests allowed)
+    #   ask_guests      = True when the box must be shown (the customer did not join a
+    #                     group that the server seated). CHANGED (guests-all): it is
+    #                     shown even when no table is attached.
+    #   table_capacity  = seats of that table (the most guests allowed). CHANGED
+    #                     (guests-all): MAX_GUESTS_NO_TABLE when there is no table.
     #   known_guests    = people already known at this table (the same group ordering
     #                     again), the box is filled with this number. None if unknown.
     ask_guests = _asks_guests(selected_table, table_session)
-    table_capacity = selected_table.capacity if selected_table else None
+    table_capacity = selected_table.capacity if selected_table else MAX_GUESTS_NO_TABLE
     known_guests = _known_guests(selected_table) if (selected_table and ask_guests) else None
 
     context = {
@@ -720,7 +729,9 @@ def remove_from_cart(request, item_id):
 
 def _parse_arrival(request):
     """Reads the arrival choice from the cart form.
-    Returns a datetime, or None which means 'as soon as possible'."""
+    Returns a datetime, or None which means 'as soon as possible'.
+    CHANGED (guests-required): the cart page no longer has the arrival section, so
+    no arrival_mode is sent and this always returns None (ASAP)."""
     now = timezone.now()
     mode = request.POST.get('arrival_mode', 'asap')
 
@@ -758,14 +769,14 @@ def confirm_order(request):
     order is remembered in this browser session (guest_order_ids), so only this
     browser can open it (another browser can use Track Order).
 
-    NEW (guests): the cart form may send `guests` (people at the table). It is saved in
+    NEW (guests): the cart form sends `guests` (people at the table). It is saved in
     Order.guests so the server dashboard can show "6 seats, 2 customers, 4 free".
-      - Only for a dine-in order that has a table, and only when the customer did not
-        join a group that the server seated (that group's seats are already counted).
-      - 1 .. the seats of that table, otherwise the customer goes back to the cart.
-      - If `guests` is not sent, a table that already has a running order with a guest
-        count keeps that number (the same people ordering again). Otherwise it stays
-        blank (the old behaviour: the whole table is held).
+      - CHANGED (guests-required): REQUIRED for every dine-in order. If it is empty,
+        the customer goes back to the cart.
+      - Not asked when the customer joined a group that the server seated (that
+        group's seats are already counted), and never for Take away.
+      - 1 .. the seats of that table. When no table is attached (no QR scan),
+        1 .. MAX_GUESTS_NO_TABLE. Otherwise the customer goes back to the cart.
 
     Only a POST from the cart page creates an order. A plain GET (browser refresh,
     back button, link prefetch) never creates anything, it just opens the cart."""
@@ -829,9 +840,12 @@ def confirm_order(request):
                 selected_table = None
                 table_session = None
 
-    # NEW (guests): how many people are at the table (None = unknown, whole table held)
+    # NEW (guests): how many people are at the table
+    # CHANGED (guests-all): asked for every dine-in order, with or without a table.
+    # CHANGED (guests-required): the number is mandatory, an empty value is refused.
     guests = None
-    if selected_table and _asks_guests(selected_table, table_session):
+    if order_type == 'dine_in' and _asks_guests(selected_table, table_session):
+        max_guests = selected_table.capacity if selected_table else MAX_GUESTS_NO_TABLE
         raw_guests = request.POST.get('guests', '').strip()
         if raw_guests:
             try:
@@ -839,15 +853,19 @@ def confirm_order(request):
             except ValueError:
                 messages.error(request, 'Enter a valid number of guests.')
                 return redirect('orders:view_cart')
-            if guests < 1 or guests > selected_table.capacity:
-                messages.error(
-                    request,
-                    f'Guests must be between 1 and {selected_table.capacity} for Table #{selected_table.number}.'
-                )
+            if guests < 1 or guests > max_guests:
+                if selected_table:
+                    messages.error(
+                        request,
+                        f'Guests must be between 1 and {max_guests} for Table #{selected_table.number}.'
+                    )
+                else:
+                    messages.error(request, f'Guests must be between 1 and {max_guests}.')
                 return redirect('orders:view_cart')
         else:
-            # same people ordering again (juice, dessert): keep the guest count of the table
-            guests = _known_guests(selected_table)
+            # CHANGED (guests-required): guest count is mandatory for dine-in
+            messages.error(request, 'Please enter how many guests are with you.')
+            return redirect('orders:view_cart')
 
     # All-or-nothing: if anything fails, no half-created order is left behind
     with transaction.atomic():
@@ -857,7 +875,7 @@ def confirm_order(request):
             guest_phone=guest_phone,
             table=selected_table,
             table_session=table_session,
-            guests=guests,                 # NEW (guests): people at the table (None if unknown / takeaway)
+            guests=guests,                 # NEW (guests): people at the table (None if takeaway / group seated by server)
             status='pending',
             coupon=None,
             discount_amount=Decimal('0.00'),
