@@ -6,3 +6,4 @@ db.sqlite3
 *.save
 *.sqlite3
 staticfiles/
+db.sqlite3.backup
