@@ -519,9 +519,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
 /* text */
 .w-hello { font-size: 1.15rem; letter-spacing: 6px; color: #9ca3af; opacity: 0; animation: wFade .3s .2s forwards; text-transform: uppercase; }
+/* Solid gold name (the old gradient-clipped text could turn invisible with the per-letter animation) */
 .w-name { font-family: "Playfair Display", Georgia, serif; font-size: clamp(2.2rem, 7vw, 4.2rem); font-weight: 700; margin: 6px 20px 10px; line-height: 1.1;
-  background: linear-gradient(90deg, #f5c451, #ff6b6b, #f5c451); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent;
-  animation: wShine 1.2s linear infinite; }
+  color: #f5c451; text-shadow: 0 0 24px rgba(245,196,81,.55); }
 .w-name span { display: inline-block; opacity: 0; transform: translateY(40px) scale(.6); animation: wLetter .3s cubic-bezier(.2,1.5,.4,1) forwards; }
 @keyframes wLetter { to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes wShine { to { background-position: 200% center; } }
@@ -557,6 +557,8 @@ body.play-intro .site-header { animation: wDrop .5s cubic-bezier(.2,.8,.2,1) bot
 <script>
 (function () {
   var USER = "{{ user.username|escapejs }}";
+  // Name shown on the splash: the customer's name (staff / old accounts without one show the username)
+  var DISPLAY_NAME = "{% if user.first_name %}{{ user.first_name|escapejs }}{% else %}{{ user.username|escapejs }}{% endif %}";
   var KEY = "welcomeShown:" + USER;
   var el = document.getElementById('welcome');
   if (!el) return;
@@ -577,7 +579,7 @@ body.play-intro .site-header { animation: wDrop .5s cubic-bezier(.2,.8,.2,1) bot
 
   // username letters
   var nameBox = document.getElementById('wName');
-  USER.split('').forEach(function (ch, i) {
+  DISPLAY_NAME.split('').forEach(function (ch, i) {
     var sp = document.createElement('span');
     sp.textContent = ch === ' ' ? '\u00A0' : ch;
     sp.style.animationDelay = (0.35 + i * 0.03) + 's';
