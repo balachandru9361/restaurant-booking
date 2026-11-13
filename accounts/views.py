@@ -51,11 +51,11 @@ def signup_view(request):
         form = SignupForm(request.POST)
         if form.is_valid():
             user = form.save()
-            # CHANGED: the customer is NOT logged in automatically any more.
+            # The customer is NOT logged in automatically.
             # After signing up they go to the login page and log in themselves.
-            # Remembers that this is a brand new customer, so the welcome splash
-            # after the first login shows "Welcome" instead of "Welcome back".
-            request.session['new_signup_pending'] = True
+            # We remember WHICH user just signed up, so the first login of that
+            # same user shows "Welcome" instead of "Welcome back".
+            request.session['new_signup_pending'] = user.username
             messages.success(
                 request,
                 f'Welcome, {user.first_name}! Your account is ready. '
@@ -86,11 +86,17 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
-                # True only for the first login right after signing up
-                request.session['is_new_signup'] = bool(
-                    request.session.pop('new_signup_pending', False))
-                messages.success(
-                    request, f'Welcome back, {user.first_name or user.username}!')
+
+                # True only for the first login of the user who just signed up
+                pending = request.session.pop('new_signup_pending', None)
+                is_new = (pending == user.username)
+                request.session['is_new_signup'] = is_new
+
+                name = user.first_name or user.username
+                if is_new:
+                    messages.success(request, f'Welcome, {name}!')
+                else:
+                    messages.success(request, f'Welcome back, {name}!')
 
                 # Staff / admin / kitchen / server -> their own dashboard
                 if _is_staff_user(user):
