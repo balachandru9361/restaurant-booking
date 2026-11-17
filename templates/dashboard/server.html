@@ -541,6 +541,8 @@
     padding: 7px 10px; font-size: 12.5px; font-weight: 700; margin-bottom: 8px;
   }
   .wk-free { font-size: 12px; color: #6b7280; margin-top: 4px; }
+  /* NEW: seats kept for upcoming bookings (walk-in cannot use them) */
+  .wk-reserved { font-size: 12px; color: #1d4ed8; font-weight: 700; margin-top: 4px; }
   .wk-actions { display: flex; gap: 8px; margin-top: 14px; }
   .wk-actions button {
     flex: 1; border: 0; cursor: pointer; padding: 11px; border-radius: 10px;
@@ -549,8 +551,43 @@
   .wk-actions button:disabled { opacity: 0.6; cursor: not-allowed; }
   .wk-take { background: linear-gradient(135deg, #d4af37, #f0cd6b); color: #0d1b2a; }
   .wk-again { background: #eef1f5; color: #374151; }
-  /* NEW: Cancel seating (customer changed their mind before ordering) */
+  /* Cancel seating (customer changed their mind before ordering) */
   .wk-cancel { background: #fee2e2; color: #b91c1c; }
+
+  /* --- NEW: Tables at a Glance (Available / Occupied / Reserved) --- */
+  .glance {
+    background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06); font-family: 'Inter', sans-serif;
+  }
+  .glance-head {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .glance-head h3 { font-family: 'Sora', sans-serif; font-size: 15px; color: #0d1b2a; margin: 0; }
+  .glance-sub { font-size: 12px; font-weight: 700; color: #6b7280; }
+  .glance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .glance-col { border-radius: 12px; padding: 12px; background: #f9fafb; border-top: 4px solid #d1d5db; min-width: 0; }
+  .glance-col.available { border-top-color: #16a34a; background: #f3fbf5; }
+  .glance-col.occupied { border-top-color: #dc2626; background: #fff6f6; }
+  .glance-col.reserved { border-top-color: #2563eb; background: #f5f9ff; }
+  .glance-col h4 {
+    font-family: 'Sora', sans-serif; font-size: 13px; color: #0d1b2a; margin: 0 0 10px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  }
+  .glance-col h4 span {
+    background: #fff; border-radius: 20px; padding: 1px 9px; font-size: 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+  .glance-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .gl-chip {
+    background: #fff; border: 2px solid #e5e7eb; border-radius: 10px; padding: 6px 12px;
+    font-weight: 800; font-size: 13px; color: #374151; min-width: 78px;
+  }
+  .gl-chip small { display: block; font-size: 10.5px; font-weight: 700; margin-top: 2px; color: #6b7280; }
+  .available .gl-chip { border-color: #86efac; color: #166534; }
+  .occupied .gl-chip { border-color: #fca5a5; color: #b91c1c; }
+  .reserved .gl-chip { border-color: #93c5fd; color: #1d4ed8; }
+  .glance-empty { font-size: 12px; color: #9ca3af; font-weight: 600; padding: 6px 0; }
 
   /* --- Mobile / tablet responsive --- */
   .server-board > * { min-width: 0; }
@@ -559,6 +596,7 @@
   }
   @media (max-width: 900px) {
     .server-board { grid-template-columns: 1fr; }
+    .glance-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 640px) {
     .kitchen-header { flex-direction: column; align-items: stretch; }
@@ -748,6 +786,28 @@
 
 {# Walk-in groups: seated / needs cleaning (outside #liveRegion, it refreshes itself) #}
 {% include 'dashboard/_seating_panel.html' %}
+
+{# NEW: Tables at a Glance. Filled by JS from server_tables_overview (outside #liveRegion) #}
+<div class="glance" id="glance" hidden>
+  <div class="glance-head">
+    <h3>🗺️ Tables at a Glance</h3>
+    <span class="glance-sub" id="glanceSub"></span>
+  </div>
+  <div class="glance-grid">
+    <div class="glance-col available">
+      <h4>🟢 Available <span id="glCountAvailable">0</span></h4>
+      <div class="glance-list" id="glAvailable"></div>
+    </div>
+    <div class="glance-col occupied">
+      <h4>🔴 Occupied <span id="glCountOccupied">0</span></h4>
+      <div class="glance-list" id="glOccupied"></div>
+    </div>
+    <div class="glance-col reserved">
+      <h4>🔵 Reserved (today) <span id="glCountReserved">0</span></h4>
+      <div class="glance-list" id="glReserved"></div>
+    </div>
+  </div>
+</div>
 
 <div id="liveRegion"
      data-new-ids="{% for o in new_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
@@ -1048,8 +1108,12 @@
 
 </div>
 
+{# "as" form: if this url name does not exist the page still works, only the glance section stays hidden #}
+{% url 'dashboard:server_tables_overview' as tables_overview_url %}
+
 <script>
   const CSRF_TOKEN = '{{ csrf_token }}';
+  const TABLES_OVERVIEW_URL = '{{ tables_overview_url }}';
 
   function updateClock() {
     document.getElementById('liveClock').textContent = new Date().toLocaleTimeString();
@@ -1072,6 +1136,78 @@
   }
   updateDining();
   setInterval(updateDining, 30000);
+
+  // ---- NEW: Tables at a Glance (Available / Occupied / Reserved) ----
+  // Reads server_tables_overview. Reserved = a confirmed booking for today is coming.
+  // Walk-in seating never uses a Reserved table.
+  (function () {
+    const box = document.getElementById('glance');
+    if (!box || !TABLES_OVERVIEW_URL) return;   // url name missing: keep the section hidden
+
+    function chip(title, note) {
+      const c = document.createElement('div');
+      c.className = 'gl-chip';
+      c.textContent = '🪑 ' + title;
+      if (note) {
+        const s = document.createElement('small');
+        s.textContent = note;
+        c.appendChild(s);
+      }
+      return c;
+    }
+
+    function fill(listId, countId, items, emptyText) {
+      const list = document.getElementById(listId);
+      list.innerHTML = '';
+      items.forEach(function (c) { list.appendChild(c); });
+      if (!items.length) {
+        const e = document.createElement('div');
+        e.className = 'glance-empty';
+        e.textContent = emptyText;
+        list.appendChild(e);
+      }
+      document.getElementById(countId).textContent = items.length;
+    }
+
+    function render(d) {
+      const available = [], occupied = [], reserved = [];
+      (d.tables || []).forEach(function (t) {
+        const name = 'Table ' + t.number;
+        if (t.state === 'reserved') {
+          let note = t.note || 'Reserved';
+          if (t.customers) note += ' · ' + t.customers + ' seated';
+          reserved.push(chip(name, note));
+        } else if (t.state === 'held') {
+          occupied.push(chip(name, t.note || 'Held'));
+        } else if (t.state === 'full') {
+          let note = 'Full · ' + t.capacity + ' seats';
+          if (t.cleaning) note += ' · ' + t.cleaning + ' cleaning';
+          occupied.push(chip(name, note));
+        } else if (t.state === 'partial') {
+          let note = t.free + ' free of ' + t.capacity;
+          if (t.cleaning) note += ' · ' + t.cleaning + ' cleaning';
+          available.push(chip(name, note));
+        } else {
+          available.push(chip(name, t.capacity + ' seats'));
+        }
+      });
+      fill('glAvailable', 'glCountAvailable', available, 'No free table right now');
+      fill('glOccupied', 'glCountOccupied', occupied, 'No table occupied');
+      fill('glReserved', 'glCountReserved', reserved, 'No booking coming today');
+      document.getElementById('glanceSub').textContent =
+        (d.free_total || 0) + ' seat' + (d.free_total === 1 ? '' : 's') + ' free for walk-in';
+      box.hidden = false;
+    }
+
+    window.refreshTablesGlance = function () {
+      return fetch(TABLES_OVERVIEW_URL, { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d && d.ok) render(d); })
+        .catch(function () { /* keep the old view, next refresh retries */ });
+    };
+    window.refreshTablesGlance();
+    setInterval(window.refreshTablesGlance, 15000);
+  })();
 
   // ---- Dish icons in Take Order when a dish has no photo ----
   const DISH_ICONS = [
@@ -1199,7 +1335,8 @@
   }
 
   // Re-fetches the current page, swaps in the fresh #liveRegion markup.
-  // Also refreshes the Take Order table chips (occupied / free / seats full).
+  // Also refreshes the Take Order table chips (occupied / free / seats full)
+  // and the Tables at a Glance section.
   function refreshLive() {
     return fetch(window.location.href, { credentials: 'same-origin' })
       .then(r => r.text())
@@ -1229,6 +1366,8 @@
             }
           }
         }
+        // Available / Occupied / Reserved view
+        if (window.refreshTablesGlance) window.refreshTablesGlance();
       })
       .catch(() => { /* keep old DOM if refresh fails; next poll will retry */ });
   }
@@ -1809,7 +1948,12 @@
         result.appendChild(el('div', 'wk-warn', '⚠️ ' + w));
       });
 
-      result.appendChild(el('div', 'wk-free', d.free_seats + ' seat' + (d.free_seats === 1 ? '' : 's') + ' free in the restaurant right now'));
+      result.appendChild(el('div', 'wk-free', d.free_seats + ' seat' + (d.free_seats === 1 ? '' : 's') + ' free for walk-in right now'));
+      // NEW: seats kept for today's upcoming bookings (never suggested to walk-in)
+      if (d.reserved_seats) {
+        result.appendChild(el('div', 'wk-reserved',
+          '🔵 ' + d.reserved_seats + ' seat' + (d.reserved_seats === 1 ? '' : 's') + ' reserved for upcoming bookings'));
+      }
 
       const actions = el('div', 'wk-actions');
       if (d.available) {
@@ -1870,7 +2014,7 @@
         input.value = '';
         closeModal();
       });
-      // NEW: the customer changed their mind before ordering, free the seats again
+      // the customer changed their mind before ordering, free the seats again
       const cancel = el('button', 'wk-cancel', 'Cancel');
       cancel.type = 'button';
       cancel.addEventListener('click', function () {
