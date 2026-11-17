@@ -14,9 +14,6 @@ Flow (seats are tracked by booking.models.SeatAllocation):
     page   -> server_table_billing    all bills of one table (QR bill + individual bills)
 
 There is no timer anywhere: seats are freed only by the server's clicks.
-
-RESERVED RULE: a table that has an upcoming confirmed booking is Reserved.
-Walk-in suggestion and walk-in seating never use a Reserved table.
 """
 import json
 from decimal import Decimal
@@ -63,40 +60,6 @@ def _session_orders(session):
             .exclude(status='cancelled'))
 
 
-def _booking_time_text(up):
-    """Upcoming booking start time as '10:00 PM'."""
-    return timezone.localtime(up.start).strftime('%I:%M %p').lstrip('0')
-
-
-def _plan_without_reserved(guests, reserved_ids):
-    """Walk-in plan that never touches a Reserved table.
-    Returns [(Table, seats_to_give), ...] or None.
-
-    1. One table that fits everybody: the smallest fitting table first.
-    2. Otherwise combine tables, biggest free tables first."""
-    blocked = walkin_blocked_table_ids()
-    rows = [(t, f) for t, f in walkin_free_seats()
-            if f > 0 and t.id not in reserved_ids and t.id not in blocked]
-
-    fits = [(t, f) for t, f in rows if f >= guests]
-    if fits:
-        table, _ = min(fits, key=lambda r: (r[1], r[0].number))
-        return [(table, guests)]
-
-    if sum(f for _, f in rows) < guests:
-        return None
-
-    plan = []
-    left = guests
-    for table, free in sorted(rows, key=lambda r: (-r[1], r[0].number)):
-        if left <= 0:
-            break
-        give = min(free, left)
-        plan.append((table, give))
-        left -= give
-    return plan if left == 0 else None
-
-
 # ---------------------------------------------------------------------------
 # 1. Check (read only)
 # ---------------------------------------------------------------------------
@@ -104,7 +67,6 @@ def _plan_without_reserved(guests, reserved_ids):
 @require_POST
 def server_walkin_check(request):
     """Server types the guests who walked in. Nothing is saved.
-    Reserved tables (upcoming booking) are NOT suggested.
     JSON: ok, available, guests, tables [{id, number, seats, capacity}], seats,
     free_seats, warnings, message."""
     try:
@@ -117,22 +79,13 @@ def server_walkin_check(request):
         return JsonResponse(
             {'ok': False, 'error': f'Guests must be between 1 and {MAX_GUESTS}.'}, status=400)
 
-    upcoming = upcoming_status_map()
-    reserved_ids = set(upcoming.keys())
-
-    # Seats that walk-in can really use (Reserved tables are left out)
-    rows = walkin_free_seats()
-    free_seats = sum(free for t, free in rows if t.id not in reserved_ids)
-    reserved_seats = sum(free for t, free in rows if t.id in reserved_ids)
-
+    free_seats = sum(free for _, free in walkin_free_seats())
     plan = suggest_walkin_arrangement(guests)   # [(Table, seats_to_give), ...] or None
-    # The normal planner does not know about Reserved tables, so if it picked one,
-    # plan again without the Reserved tables.
-    if plan and any(table.id in reserved_ids for table, _ in plan):
-        plan = _plan_without_reserved(guests, reserved_ids)
 
+    warnings = []
     tables = []
     if plan:
+        upcoming = upcoming_status_map()
         for table, seats in plan:
             tables.append({
                 'id': table.id,
@@ -141,12 +94,14 @@ def server_walkin_check(request):
                 'capacity': seats,          # the page shows "<capacity> seats" on each chip
                 'table_capacity': table.capacity,
             })
+            up = upcoming.get(table.id)
+            if up:
+                when = timezone.localtime(up.start).strftime('%I:%M %p').lstrip('0')
+                warnings.append(f'Table {table.number} is booked at {when}.')
         message = (f"{_tables_text([t['number'] for t in tables])} "
                    f"({_seats_text([t['seats'] for t in tables])}) for {guests} guests.")
     else:
         message = f'Only {free_seats} seats are free right now. {guests} guests need more.'
-        if reserved_seats:
-            message += f' ({reserved_seats} seats are reserved for upcoming bookings.)'
 
     return JsonResponse({
         'ok': True,
@@ -155,8 +110,7 @@ def server_walkin_check(request):
         'tables': tables,
         'seats': sum(t['seats'] for t in tables),
         'free_seats': free_seats,
-        'reserved_seats': reserved_seats,
-        'warnings': [],                     # Reserved tables are never suggested, so no warning
+        'warnings': warnings,
         'message': message,
     })
 
@@ -170,7 +124,7 @@ def server_walkin_confirm(request):
     """Customer accepted the arrangement, server confirms.
     POST JSON: {guests: 7, plan: [{table_id: 10, seats: 4}, {table_id: 12, seats: 3}], group_name: ''}
     The free seats are checked again inside a transaction, so two servers can never
-    take the same seats. A Reserved table can never be used for walk-in seating."""
+    take the same seats."""
     try:
         data = json.loads(request.body)
         guests = int(data.get('guests', 0))
@@ -191,16 +145,6 @@ def server_walkin_confirm(request):
         tables = {t.id: t for t in Table.objects.select_for_update().filter(id__in=ids)}
         if len(tables) != len(ids):
             return JsonResponse({'ok': False, 'error': 'A table no longer exists.'}, status=400)
-
-        # Reserved table protection
-        upcoming = upcoming_status_map()
-        for tid in ids:
-            if tid in upcoming:
-                return JsonResponse({
-                    'ok': False,
-                    'error': (f'Table {tables[tid].number} is reserved for a booking at '
-                              f'{_booking_time_text(upcoming[tid])}. Please check again.'),
-                }, status=409)
 
         free = {t.id: f for t, f in walkin_free_seats()}
         for tid, seats in plan:
@@ -266,7 +210,7 @@ def server_seating_panel(request):
             'order_count': len(orders),
             'due': str(due),
             'unserved': unserved,
-            # the Cancel button is shown only while the group is seated and has no order
+            # NEW: the Cancel button is shown only while the group is seated and has no order
             'can_cancel': seated and not orders,
         })
     return JsonResponse({'ok': True, 'groups': groups})
@@ -443,7 +387,7 @@ def server_take_session_order(request):
 
 
 # ---------------------------------------------------------------------------
-# 6b. Individual bill = ONE customer, ONE seat, ONE bill
+# 6b. NEW: Individual bill = ONE customer, ONE seat, ONE bill
 # ---------------------------------------------------------------------------
 @server_required
 @require_POST
@@ -507,7 +451,7 @@ def server_individual_bill_create(request):
 
 
 # ---------------------------------------------------------------------------
-# 6c. Table billing page (QR bill + every individual bill of one table)
+# 6c. NEW: Table billing page (QR bill + every individual bill of one table)
 # ---------------------------------------------------------------------------
 def _bill_lines(orders):
     """'2 Apple; 1 Juice' text of all items of these orders."""
@@ -618,19 +562,11 @@ def server_table_billing(request, table_id):
 @server_required
 def server_tables_overview(request):
     """One row per table: capacity, customers seated (from SeatAllocation), free seats.
-
-    state values:
-      free      nobody seated
-      partial   some seats used
-      full      no free seat
-      held      blocked by a whole-table hold (approved booking, or an old style order
-                that has no guest count), the reason is in 'note'
-      reserved  NEW: a confirmed booking is coming ('note' = 'Booking at 10:00 PM').
-                Reserved tables are not counted in free_total and walk-in never uses them."""
+    A table that a whole-table hold blocks (approved booking, or an old style order that
+    has no guest count) is shown as 'held' with the reason."""
     rows = walkin_free_seats()
     blocked = walkin_blocked_table_ids()
     holds = table_status_map()
-    upcoming = upcoming_status_map()
 
     cleaning = {
         r['table_id']: r['total'] or 0
@@ -658,17 +594,6 @@ def server_tables_overview(request):
         taken = max(table.capacity - free, 0)
         waiting = min(cleaning.get(table.id, 0), taken)
         customers = taken - waiting
-
-        up = upcoming.get(table.id)
-        if up is not None:
-            # Reserved for a booking: keep it out of the walk-in free count
-            tables.append({
-                'id': table.id, 'number': table.number, 'capacity': table.capacity,
-                'customers': customers, 'free': free, 'cleaning': waiting,
-                'state': 'reserved', 'note': f'Booking at {_booking_time_text(up)}',
-            })
-            continue
-
         if free == 0:
             state = 'full'
         elif taken > 0:

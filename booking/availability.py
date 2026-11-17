@@ -17,15 +17,12 @@ from django.utils import timezone
 #     has SeatAllocation rows does NOT hold the whole table. Its seats are
 #     tracked by SeatAllocation (see booking/seating.py), so other groups can
 #     use the remaining seats of the same table.
-#   - for WALK-IN SEATING ONLY, an order that has a guest count (Order.guests)
+#   - NEW: for WALK-IN SEATING ONLY, an order that has a guest count (Order.guests)
 #     does not block the whole table either. Its guests use that many seats, so
 #     "Table 5: 6 seats, 2 customers, 4 free" can be shown and walk-ins can use the
 #     remaining seats. An old order without a guest count still blocks the whole table.
 #     Everything outside walk-in seating (admin Open Table, QR page, booking
 #     screens) still treats every live order as a whole-table hold.
-#   - NEW: a table with an approved booking for TODAY that has not started yet is
-#     "Reserved". Walk-in seating never suggests or uses a Reserved table
-#     (see reserved_today_map). Bookings of other days do not matter for walk-in.
 #
 # OPEN_ENDED is only a very large number used as the "end" of such a hold so
 # the code that compares start/end keeps working. It is never shown.
@@ -76,7 +73,7 @@ def _is_confirmed_booking(hold):
 
 
 def _counts_by_seats(hold):
-    """True for an order hold that has a guest count. For walk-in seating such an
+    """NEW: True for an order hold that has a guest count. For walk-in seating such an
     order uses `guests` seats of its table instead of blocking the whole table."""
     return hold.kind == 'order' and bool(getattr(hold.obj, 'guests', None))
 
@@ -183,33 +180,9 @@ def table_status_map(holds=None):
 def upcoming_status_map(holds=None):
     """{table_id: Hold} - the soonest UPCOMING (not yet started) hold for each
     table, so admin can see a table is reserved for later even though it's
-    free right now.
-
-    NOTE: this has no date limit (tomorrow's bookings are included). It is meant for
-    the admin screens. Walk-in seating must use reserved_today_map() instead."""
+    free right now."""
     result = {}
     for h in upcoming_holds(holds):
-        current = result.get(h.table_id)
-        if current is None or h.start < current.start:
-            result[h.table_id] = h
-    return result
-
-
-def reserved_today_map(holds=None):
-    """NEW: {table_id: Hold} for tables that are RESERVED for walk-in purposes:
-    an APPROVED booking, not opened by the admin, that is for TODAY (local date)
-    and has not started yet. If a table has several, the soonest one is returned.
-
-    Bookings of tomorrow or later days are ignored, so they do not block walk-ins today.
-    A booking whose time has already started is not here: it is an active hold and
-    walkin_blocked_table_ids() blocks that table as a whole-table hold."""
-    now = timezone.now()
-    result = {}
-    for h in upcoming_holds(holds):
-        if not _is_confirmed_booking(h):
-            continue
-        if not _same_local_date(h.start, now):
-            continue
         current = result.get(h.table_id)
         if current is None or h.start < current.start:
             result[h.table_id] = h
@@ -253,15 +226,12 @@ def walkin_blocked_table_ids(buffer=WALKIN_BUFFER, holds=None):
       - an approved booking that starts within `buffer` from now,
       - an old style live order on the table that has NO guest count.
 
-    An order that has a guest count (Order.guests) does not block the whole
+    CHANGED: an order that has a guest count (Order.guests) no longer blocks the whole
     table. Its guests are subtracted from the free seats in walkin_free_seats().
 
     This does the same checks as is_table_busy_now() but loads the holds only once,
     so it is cheap to call for the whole restaurant. `holds` can be passed in when
-    the caller already loaded them.
-
-    Reserved tables of today (reserved_today_map) are handled separately by the
-    walk-in suggestion, so they are not added here unless they start within `buffer`."""
+    the caller already loaded them."""
     now = timezone.now()
     holds = get_holds() if holds is None else holds
     blocked = set()
@@ -270,7 +240,7 @@ def walkin_blocked_table_ids(buffer=WALKIN_BUFFER, holds=None):
         if h.kind == 'booking' and not _is_confirmed_booking(h):
             continue
         if _counts_by_seats(h):
-            continue            # counted by seats, not by the whole table
+            continue            # NEW: counted by seats, not by the whole table
         blocked.add(h.table_id)
 
     for h in upcoming_holds(holds):
@@ -281,7 +251,7 @@ def walkin_blocked_table_ids(buffer=WALKIN_BUFFER, holds=None):
 
 
 def _order_guest_seats(holds):
-    """{table_id: seats} used by live orders that have a guest count.
+    """NEW: {table_id: seats} used by live orders that have a guest count.
 
     One table can have several orders (the same customers order again: juice,
     dessert). They are the same people, so the table counts the LARGEST guest
@@ -304,11 +274,8 @@ def walkin_free_seats(buffer=WALKIN_BUFFER):
         capacity
         - seats of live SeatAllocation rows (occupied, awaiting cleaning, or a hold that
           has not expired), the same rule Table.seats_taken uses
-        - guests of live orders that have a guest count (see _order_guest_seats)
-    All tables are counted with ONE query for the seats, and the holds are loaded once.
-
-    NOTE: Reserved tables of today are NOT zeroed here (the tables overview needs their
-    real free seats). Suggestions skip them with suggest_walkin_arrangement(exclude_ids=...)."""
+        - NEW: guests of live orders that have a guest count (see _order_guest_seats)
+    All tables are counted with ONE query for the seats, and the holds are loaded once."""
     from django.db.models import Q, Sum
     from .models import SeatAllocation, Table
 
@@ -340,14 +307,11 @@ def walkin_free_seats(buffer=WALKIN_BUFFER):
     return result
 
 
-def suggest_walkin_arrangement(guests, buffer=WALKIN_BUFFER, exclude_ids=None):
+def suggest_walkin_arrangement(guests, buffer=WALKIN_BUFFER):
     """Suggest where a walk-in group of `guests` can sit.
 
     Returns [(Table, seats_to_give), ...] sorted by table number, or None if the
     restaurant does not have enough free seats right now.
-
-    `exclude_ids` (NEW): table ids that must never be suggested, for example the
-    Reserved tables from reserved_today_map(). Pass set(reserved_today_map()).
 
     1. If ONE table has enough free seats, use the smallest such table
        (so big tables stay free for big groups).
@@ -359,8 +323,7 @@ def suggest_walkin_arrangement(guests, buffer=WALKIN_BUFFER, exclude_ids=None):
     if guests < 1:
         return None
 
-    skip = set(exclude_ids or ())
-    rows = [r for r in walkin_free_seats(buffer) if r[0].id not in skip]
+    rows = walkin_free_seats(buffer)
     if sum(free for _, free in rows) < guests:
         return None
 
