@@ -743,6 +743,9 @@
   </div>
 </div>
 
+{# Individual billing: one bill per customer on a shared table (outside #liveRegion) #}
+{% include 'dashboard/_individual_bill.html' %}
+
 {# Walk-in groups: seated / needs cleaning (outside #liveRegion, it refreshes itself) #}
 {% include 'dashboard/_seating_panel.html' %}
 

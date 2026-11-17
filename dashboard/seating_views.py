@@ -10,6 +10,8 @@ Flow (seats are tracked by booking.models.SeatAllocation):
     left   -> server_seating_departed seats move to "cleaning" (still blocked)
     clean  -> server_seating_cleaned  seats are released for the next customer
     order  -> server_take_session_order  server takes an order for a seated group
+    bill   -> server_individual_bill_create  ONE customer = a 1-seat group with its own bill
+    page   -> server_table_billing    all bills of one table (QR bill + individual bills)
 
 There is no timer anywhere: seats are freed only by the server's clicks.
 """
@@ -19,7 +21,8 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Sum
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -303,6 +306,58 @@ def server_seating_cleaned(request, pk):
 # ---------------------------------------------------------------------------
 # 6. Take Order for a seated group (the order is linked to the group's session)
 # ---------------------------------------------------------------------------
+def _parse_order_lines(rows):
+    """Reads the items sent by the browser. Returns (lines, total, error).
+    lines = [(FoodItem, qty), ...]. Prices always come from the database."""
+    if not rows:
+        return None, None, 'Add at least one item'
+    lines = []
+    total = Decimal('0')
+    for row in rows:
+        try:
+            qty = int(row.get('quantity', 0))
+            food_id = int(row.get('food_item_id'))
+        except (TypeError, ValueError, AttributeError):
+            return None, None, 'Invalid item'
+        if qty < 1:
+            continue
+        food = FoodItem.objects.filter(pk=food_id).first()
+        if not food:
+            return None, None, 'A menu item no longer exists'
+        if not food.is_available:
+            return None, None, f'{food.name} is not available right now.'
+        lines.append((food, qty))
+        total += food.price * qty
+    if not lines:
+        return None, None, 'Add at least one item'
+    return lines, total, None
+
+
+def _create_session_order(request, session, lines, total, guest_name=''):
+    """Creates one kitchen order (cash at the counter) that belongs to this group.
+    Call it inside transaction.atomic()."""
+    from .views import _deduct_stock_for_order
+
+    order = Order.objects.create(
+        user=request.user,
+        guest_name=guest_name,
+        table=session.table,             # main table of the group
+        table_session=session,
+        order_type='dine_in',
+        total_amount=total,
+        status='confirmed',              # the Kitchen board reads 'confirmed'
+        payment_method='cash',
+        payment_status='cash_pending',
+        table_released=False,
+        source='server',
+        taken_by=request.user,
+    )
+    for food, qty in lines:
+        OrderItem.objects.create(order=order, food_item=food, quantity=qty, price=food.price)
+    _deduct_stock_for_order(order)
+    return order
+
+
 @server_required
 @require_POST
 def server_take_session_order(request):
@@ -311,8 +366,6 @@ def server_take_session_order(request):
     Same rules as server_take_order (lands on the Kitchen board, cash at the counter),
     but the order is saved with table_session=<the group>, so it belongs to the group
     and does not close the whole table for other groups."""
-    from .views import _deduct_stock_for_order
-
     try:
         data = json.loads(request.body)
         session_id = int(data.get('session_id'))
@@ -323,51 +376,184 @@ def server_take_session_order(request):
     if not session or not session.allocations.filter(status=SeatAllocation.OCCUPIED).exists():
         return JsonResponse({'ok': False, 'error': 'This group is not seated.'}, status=400)
 
-    rows = data.get('items') or []
-    if not rows:
-        return JsonResponse({'ok': False, 'error': 'Add at least one item'}, status=400)
-
-    # Collect the lines first so a bad line never leaves a half made order behind
-    lines = []
-    total = Decimal('0')
-    for row in rows:
-        try:
-            qty = int(row.get('quantity', 0))
-            food_id = int(row.get('food_item_id'))
-        except (TypeError, ValueError, AttributeError):
-            return JsonResponse({'ok': False, 'error': 'Invalid item'}, status=400)
-        if qty < 1:
-            continue
-        food = FoodItem.objects.filter(pk=food_id).first()
-        if not food:
-            return JsonResponse({'ok': False, 'error': 'A menu item no longer exists'}, status=400)
-        if not food.is_available:
-            return JsonResponse({'ok': False, 'error': f'{food.name} is not available right now.'}, status=400)
-        lines.append((food, qty))
-        total += food.price * qty        # price always comes from the database
-
-    if not lines:
-        return JsonResponse({'ok': False, 'error': 'Add at least one item'}, status=400)
+    lines, total, error = _parse_order_lines(data.get('items') or [])
+    if error:
+        return JsonResponse({'ok': False, 'error': error}, status=400)
 
     with transaction.atomic():
-        order = Order.objects.create(
-            user=request.user,
-            table=session.table,             # main table of the group
-            table_session=session,
-            order_type='dine_in',
-            total_amount=total,
-            status='confirmed',              # the Kitchen board reads 'confirmed'
-            payment_method='cash',
-            payment_status='cash_pending',
-            table_released=False,
-            source='server',
-            taken_by=request.user,
-        )
-        for food, qty in lines:
-            OrderItem.objects.create(order=order, food_item=food, quantity=qty, price=food.price)
-        _deduct_stock_for_order(order)
+        order = _create_session_order(request, session, lines, total, guest_name=session.group_name)
 
     return JsonResponse({'ok': True, 'order_id': order.id})
+
+
+# ---------------------------------------------------------------------------
+# 6b. NEW: Individual bill = ONE customer, ONE seat, ONE bill
+# ---------------------------------------------------------------------------
+@server_required
+@require_POST
+def server_individual_bill_create(request):
+    """Server taps "New Individual Bill" for one customer who sits at a table.
+    POST JSON: {table_id: 5, customer_name: 'Customer A' (optional), items: [...]}
+
+    In ONE transaction:
+      1. the free seats of the table are checked again (at least 1 seat must be free)
+      2. a 1 guest walk-in group (TableSession) + 1 seat (SeatAllocation) is created
+      3. the order (the bill) is saved for that group
+
+    Seats and billing stay separate:
+      - paying the bill does NOT free the seat
+      - the seat is freed only by "Customer Left" and then "Cleaning Done"
+    The bill number is the order id. No migration is needed."""
+    try:
+        data = json.loads(request.body)
+        table_id = int(data.get('table_id'))
+        name = str(data.get('customer_name') or '').strip()[:100]
+    except (json.JSONDecodeError, TypeError, ValueError, AttributeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request'}, status=400)
+
+    lines, total, error = _parse_order_lines(data.get('items') or [])
+    if error:
+        return JsonResponse({'ok': False, 'error': error}, status=400)
+
+    with transaction.atomic():
+        table = Table.objects.select_for_update().filter(pk=table_id).first()
+        if not table:
+            return JsonResponse({'ok': False, 'error': 'Table not found'}, status=400)
+
+        free = {t.id: f for t, f in walkin_free_seats()}.get(table.id, 0)
+        if free < 1:
+            return JsonResponse({
+                'ok': False,
+                'error': f'Table {table.number} has no free seat for a new bill.',
+            }, status=409)
+
+        session = TableSession.objects.create(
+            table=table,
+            guests=1,
+            group_name=name,
+            source=TableSession.SOURCE_WALKIN,
+            allocated_by=request.user,
+        )
+        SeatAllocation.objects.create(
+            session=session, table=table, seats=1, status=SeatAllocation.OCCUPIED)
+
+        order = _create_session_order(
+            request, session, lines, total, guest_name=name or 'Walk-in customer')
+
+    return JsonResponse({
+        'ok': True,
+        'order_id': order.id,
+        'bill_no': order.id,
+        'session_id': session.id,
+        'table_number': table.number,
+        'free_left': free - 1,
+    })
+
+
+# ---------------------------------------------------------------------------
+# 6c. NEW: Table billing page (QR bill + every individual bill of one table)
+# ---------------------------------------------------------------------------
+def _bill_lines(orders):
+    """'2 Apple; 1 Juice' text of all items of these orders."""
+    qty = {}
+    for o in orders:
+        for oi in o.items.all():
+            qty[oi.food_item.name] = qty.get(oi.food_item.name, 0) + oi.quantity
+    return '; '.join(f'{q} {n}' for n, q in qty.items())
+
+
+def _make_bill(kind, label, orders, guests, seats, state, session=None):
+    """One card of the table billing page."""
+    total = sum((o.total_amount for o in orders), Decimal('0'))
+    paid = sum((o.total_amount for o in orders if o.payment_status == 'paid'), Decimal('0'))
+    cash_due = any(o.payment_method == 'cash' and o.payment_status != 'paid' for o in orders)
+    served = bool(orders) and all(o.status == 'delivered' for o in orders)
+    first = orders[0] if orders else None
+    bill = {
+        'kind': kind,
+        'label': label,
+        'state': state,                       # 'seated' or 'cleaning'
+        'guests': guests,
+        'seats': seats,
+        'order_ids': [o.id for o in orders],
+        'bill_no': first.id if first else None,
+        'items': _bill_lines(orders),
+        'total': total,
+        'paid': paid,
+        'due': total - paid,
+        'is_paid': bool(orders) and total == paid,
+        'cash_due': cash_due,
+        'served': served,
+        'has_orders': bool(orders),
+        'bill_url': reverse('dashboard:server_table_bill', args=[first.id]) if first else '',
+        'cash_url': reverse('dashboard:server_table_cash_received', args=[first.id]) if first else '',
+        'left_url': reverse('dashboard:server_free_table', args=[first.id]) if first else '',
+        'cancel_url': '',
+        'cleaned_url': '',
+    }
+    if session is not None:
+        if state == 'cleaning':
+            bill['cleaned_url'] = reverse('dashboard:server_seating_cleaned', args=[session.id])
+        if not orders:
+            bill['cancel_url'] = reverse('dashboard:server_seating_cancel', args=[session.id])
+    return bill
+
+
+@server_required
+def server_table_billing(request, table_id):
+    """Table 5 - Billing Dashboard.
+    One card for the customers who ordered with the table (QR / table orders), and one
+    card for EVERY individual walk-in customer (own bill, own payment, own seat)."""
+    from .views import _not_walkin
+
+    table = get_object_or_404(Table, pk=table_id)
+    free = {t.id: f for t, f in walkin_free_seats()}.get(table.id, table.capacity)
+    live_seat_status = [SeatAllocation.OCCUPIED, SeatAllocation.CLEANING]
+
+    bills = []
+
+    # 1) QR / table orders of this table: ONE combined bill (same rule as the bill page)
+    table_orders = list(
+        _not_walkin(Order.objects.visible_to_staff()
+                    .filter(table_id=table.id, table_released=False))
+        .exclude(status='cancelled')
+        .select_related('taken_by')
+        .prefetch_related('items__food_item')
+        .order_by('created_at', 'id'))
+    if table_orders:
+        guests = max((o.guests or 0 for o in table_orders), default=0) or None
+        source = 'QR Group' if any(not o.taken_by_id for o in table_orders) else 'Table order'
+        bills.append(_make_bill('table', source, table_orders, guests, guests, 'seated'))
+
+    # 2) Every walk-in customer / group that has seats on this table
+    sessions = (TableSession.objects
+                .filter(source=TableSession.SOURCE_WALKIN,
+                        allocations__table=table,
+                        allocations__status__in=live_seat_status)
+                .distinct()
+                .order_by('started_at'))
+    for s in sessions:
+        mine = list(s.allocations.filter(table=table, status__in=live_seat_status))
+        seats = sum(a.seats for a in mine)
+        seated = any(a.status == SeatAllocation.OCCUPIED for a in mine)
+        orders = list(_session_orders(s)
+                      .select_related('taken_by')
+                      .prefetch_related('items__food_item')
+                      .order_by('created_at', 'id'))
+        label = s.group_name or 'Walk-in customer'
+        bills.append(_make_bill('walkin', label, orders, s.guests, seats,
+                                'seated' if seated else 'cleaning', session=s))
+
+    used = max(table.capacity - free, 0)
+    return render(request, 'dashboard/table_billing.html', {
+        'table': table,
+        'capacity': table.capacity,
+        'used_seats': used,
+        'free_seats': free,
+        'bills': bills,
+        'due_total': sum((b['due'] for b in bills), Decimal('0')),
+        'bill_count': sum(1 for b in bills if b['has_orders']),
+    })
 
 
 # ---------------------------------------------------------------------------

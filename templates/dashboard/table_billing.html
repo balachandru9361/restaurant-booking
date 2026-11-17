@@ -1,0 +1,186 @@
+{% extends "dashboard/base_admin.html" %}
+{% block admin_content %}
+<style>
+  .tb-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .tb-header h1 { font-family: 'Sora', sans-serif; font-size: 26px; color: #0d1b2a; margin-bottom: 4px; }
+  .tb-header p { font-family: 'Inter', sans-serif; color: #6b7280; font-size: 14px; }
+  .tb-back {
+    text-decoration: none; background: #eef1f5; color: #0d1b2a; font-weight: 800; font-size: 13px;
+    padding: 10px 16px; border-radius: 10px; font-family: 'Inter', sans-serif;
+  }
+  .tb-back:hover { background: #0d1b2a; color: #fff; }
+
+  .tb-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .tb-stat { background: #fff; border-radius: 12px; padding: 12px 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-left: 4px solid #0f766e; }
+  .tb-stat .n { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 800; color: #0d1b2a; }
+  .tb-stat .l { font-size: 12px; color: #6b7280; margin-top: 2px; font-family: 'Inter', sans-serif; }
+  .tb-stat.due { border-left-color: #dc2626; }
+  .tb-stat.due .n { color: #b91c1c; }
+  .tb-stat.seat { border-left-color: #6366f1; }
+
+  .tb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .tb-card {
+    background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    border-left: 4px solid #6366f1; font-family: 'Inter', sans-serif;
+  }
+  .tb-card.qr { border-left-color: #10b981; }
+  .tb-card.cleaning { border-left-color: #f59e0b; background: #fffdf5; }
+  .tb-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .tb-label { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 16px; color: #0d1b2a; }
+  .tb-bill { font-size: 12px; font-weight: 700; color: #6b7280; margin-top: 2px; }
+  .tb-badge { font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px; white-space: nowrap; background: #fef3c7; color: #92400e; }
+  .tb-badge.paid { background: #dcfce7; color: #166534; }
+  .tb-badge.unpaid { background: #fee2e2; color: #b91c1c; }
+  .tb-badge.cleaning { background: #fef3c7; color: #92400e; }
+  .tb-meta { font-size: 12.5px; color: #4b5563; margin-bottom: 8px; line-height: 1.5; }
+  .tb-items { font-size: 12.5px; color: #374151; margin-bottom: 10px; overflow-wrap: anywhere; }
+  .tb-money { display: flex; justify-content: space-between; align-items: center; background: #f4f6f9; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; font-weight: 700; color: #0d1b2a; }
+  .tb-money .amt { font-family: 'Sora', sans-serif; font-size: 17px; }
+  .tb-money.due { background: #fef2f2; color: #b91c1c; }
+  .tb-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tb-btn {
+    flex: 1; min-width: 120px; border: 0; cursor: pointer; padding: 10px; border-radius: 8px; text-align: center;
+    text-decoration: none; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 800; transition: all 0.2s ease;
+  }
+  .tb-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .tb-btn.bill { background: #eef1f5; color: #0d1b2a; }
+  .tb-btn.bill:hover { background: #0d1b2a; color: #fff; }
+  .tb-btn.cash { background: #dcfce7; color: #166534; }
+  .tb-btn.cash:hover { background: #166534; color: #fff; }
+  .tb-btn.left { background: #e0e7ff; color: #3730a3; }
+  .tb-btn.left:hover { background: #3730a3; color: #fff; }
+  .tb-btn.clean { background: #fef3c7; color: #92400e; }
+  .tb-btn.clean:hover { background: #f59e0b; color: #fff; }
+  .tb-btn.cancel { background: #fee2e2; color: #b91c1c; }
+  .tb-btn.cancel:hover { background: #b91c1c; color: #fff; }
+  .tb-empty { grid-column: 1 / -1; text-align: center; color: #9ca3af; padding: 40px 0; background: #f4f6f9; border-radius: 14px; font-family: 'Inter', sans-serif; }
+  .tb-note { font-size: 12px; color: #6b7280; margin: 14px 2px 0; font-family: 'Inter', sans-serif; }
+  .tb-error {
+    display: none; margin-bottom: 14px; background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
+    padding: 10px 14px; border-radius: 10px; font-weight: 700; font-size: 13px; font-family: 'Inter', sans-serif;
+  }
+</style>
+
+<div class="tb-header">
+  <div>
+    <h1>🧾 Table {{ table.number }}: Billing Dashboard</h1>
+    <p>Seats and bills are separate. Paying a bill does not free the seat. The seat is freed by Customer Left, then Cleaning Done.</p>
+  </div>
+  <a class="tb-back" href="{% url 'dashboard:server_dashboard' %}">← Server Dashboard</a>
+</div>
+
+<div class="tb-error" id="tbError"></div>
+
+<div class="tb-stats">
+  <div class="tb-stat seat"><div class="n">{{ used_seats }}/{{ capacity }}</div><div class="l">Seats occupied</div></div>
+  <div class="tb-stat"><div class="n">{{ free_seats }}</div><div class="l">Seats free</div></div>
+  <div class="tb-stat"><div class="n">{{ bill_count }}</div><div class="l">Bills on this table</div></div>
+  <div class="tb-stat due"><div class="n">₹{{ due_total|inr }}</div><div class="l">Total to collect</div></div>
+</div>
+
+<div class="tb-grid">
+  {% for b in bills %}
+    <div class="tb-card {% if b.kind == 'table' %}qr{% endif %}{% if b.state == 'cleaning' %} cleaning{% endif %}">
+      <div class="tb-top">
+        <div>
+          <div class="tb-label">{% if b.kind == 'table' %}👥{% else %}👤{% endif %} {{ b.label }}</div>
+          <div class="tb-bill">
+            {% if b.has_orders %}Bill #{{ b.bill_no }}{% if b.order_ids|length > 1 %} · {{ b.order_ids|length }} orders{% endif %}{% else %}No order yet{% endif %}
+          </div>
+        </div>
+        {% if b.state == 'cleaning' %}
+          <span class="tb-badge cleaning">🧹 Needs cleaning</span>
+        {% elif b.has_orders and b.is_paid %}
+          <span class="tb-badge paid">✅ PAID</span>
+        {% elif b.has_orders %}
+          <span class="tb-badge unpaid">⏳ UNPAID</span>
+        {% else %}
+          <span class="tb-badge">🟢 Seated</span>
+        {% endif %}
+      </div>
+
+      <div class="tb-meta">
+        {% if b.guests %}{{ b.guests }} guest{{ b.guests|pluralize }}{% else %}guests not entered{% endif %}
+        · {% if b.seats %}{{ b.seats }} seat{{ b.seats|pluralize }} used{% else %}seats from the table{% endif %}
+        {% if b.has_orders %}· {% if b.served %}served{% else %}not served yet{% endif %}{% endif %}
+      </div>
+
+      {% if b.items %}<div class="tb-items">{{ b.items }}</div>{% endif %}
+
+      {% if b.has_orders %}
+        <div class="tb-money{% if b.due > 0 %} due{% endif %}">
+          <span>{% if b.due > 0 %}To collect{% else %}Total (paid){% endif %}</span>
+          <span class="amt">₹{% if b.due > 0 %}{{ b.due|inr }}{% else %}{{ b.total|inr }}{% endif %}</span>
+        </div>
+      {% endif %}
+
+      <div class="tb-actions">
+        {% if b.bill_url %}<a class="tb-btn bill" href="{{ b.bill_url }}">🧾 Bill</a>{% endif %}
+        {% if b.cash_due and b.state == 'seated' %}
+          <button type="button" class="tb-btn cash" data-post="{{ b.cash_url }}"
+                  data-confirm="Received Rs.{{ b.due|inr }} cash for {{ b.label }}?">✅ Cash Received</button>
+        {% endif %}
+        {% if b.has_orders and b.state == 'seated' %}
+          <button type="button" class="tb-btn left" data-post="{{ b.left_url }}"
+                  data-confirm="Has {{ b.label }} left?">🚪 Customer Left</button>
+        {% endif %}
+        {% if b.cancel_url %}
+          <button type="button" class="tb-btn cancel" data-post="{{ b.cancel_url }}"
+                  data-confirm="Cancel seating for {{ b.label }}? The seat will be free again.">✖ Cancel seating</button>
+        {% endif %}
+        {% if b.cleaned_url %}
+          <button type="button" class="tb-btn clean" data-post="{{ b.cleaned_url }}"
+                  data-confirm="Is the seat cleaned and ready for the next customer?">🧹 Cleaning Done</button>
+        {% endif %}
+      </div>
+    </div>
+  {% empty %}
+    <div class="tb-empty">No bills on Table {{ table.number }} right now.<br>Use <b>New Individual Bill</b> on the Server Dashboard.</div>
+  {% endfor %}
+</div>
+
+<p class="tb-note">Customer Left works only after the bill is paid and served. The seat then waits for Cleaning Done.</p>
+
+<script>
+  (function () {
+    const csrf = '{{ csrf_token }}';
+    const errBox = document.getElementById('tbError');
+
+    function showError(msg) {
+      errBox.textContent = '⚠️ ' + msg;
+      errBox.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-post]');
+      if (!btn || btn.disabled) return;
+      if (!confirm(btn.dataset.confirm || 'Are you sure?')) return;
+
+      const label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+      errBox.style.display = 'none';
+
+      fetch(btn.dataset.post, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrf } })
+        .then(function (r) {
+          const isJson = (r.headers.get('content-type') || '').indexOf('json') !== -1;
+          if (!isJson) {                       // cash received redirects to the bill page
+            if (!r.ok) throw new Error('Could not save');
+            return { ok: true };
+          }
+          return r.json().then(function (d) {
+            if (!r.ok || d.ok === false) throw new Error(d.error || d.message || 'Could not save');
+            return d;
+          });
+        })
+        .then(function () { window.location.reload(); })
+        .catch(function (err) {
+          showError(err.message);
+          btn.disabled = false;
+          btn.textContent = label;
+        });
+    });
+  })();
+</script>
+{% endblock %}

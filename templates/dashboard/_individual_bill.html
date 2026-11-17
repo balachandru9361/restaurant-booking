@@ -1,0 +1,286 @@
+{# Individual Billing for server.html. Include it once, OUTSIDE liveRegion, next to _seating_panel.html. #}
+<style>
+  .ib-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); border-left: 4px solid #6366f1;
+    font-family: 'Inter', sans-serif;
+  }
+  .ib-bar .ib-title { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 14px; color: #0d1b2a; margin-right: 4px; }
+  .ib-open {
+    border: 0; cursor: pointer; padding: 10px 16px; border-radius: 10px; font-weight: 800; font-size: 13px;
+    background: linear-gradient(135deg, #d4af37, #f0cd6b); color: #0d1b2a;
+    box-shadow: 0 4px 14px rgba(212,175,55,0.35);
+  }
+  .ib-bar select {
+    padding: 9px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 13px; font-weight: 600;
+    background: #fff; color: #0d1b2a;
+  }
+  .ib-go {
+    border: 0; cursor: pointer; padding: 10px 14px; border-radius: 8px; font-weight: 800; font-size: 13px;
+    background: #e0e7ff; color: #3730a3;
+  }
+  .ib-go:hover { background: #3730a3; color: #fff; }
+  .ib-hint { font-size: 12px; color: #6b7280; }
+
+  .ib-overlay {
+    position: fixed; inset: 0; background: rgba(13,27,42,0.6); z-index: 9450;
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .ib-overlay.open { display: flex; }
+  .ib-modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 640px; max-height: 92vh;
+    display: flex; flex-direction: column; overflow: hidden; font-family: 'Inter', sans-serif;
+    box-sizing: border-box;
+  }
+  .ib-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #0d1b2a; color: #d4af37; }
+  .ib-head h2 { font-family: 'Sora', sans-serif; font-size: 18px; margin: 0; }
+  .ib-close { background: none; border: 0; color: #fff; font-size: 22px; cursor: pointer; }
+  .ib-body { padding: 16px 20px; overflow-y: auto; overflow-x: hidden; flex: 1; }
+  .ib-label { font-size: 12px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px; }
+  .ib-tables { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .ib-chip {
+    border: 2px solid #e5e7eb; background: #fff; border-radius: 10px; padding: 8px 14px;
+    font-weight: 700; font-size: 13px; cursor: pointer; color: #374151; text-align: center;
+  }
+  .ib-chip small { display: block; font-size: 10.5px; font-weight: 700; margin-top: 2px; color: #166534; }
+  .ib-chip.active { border-color: #0f766e; background: #e6f6f4; color: #0f766e; }
+  .ib-chip:disabled { background: #fef2f2; border-color: #fecaca; color: #b91c1c; cursor: not-allowed; }
+  .ib-chip:disabled small { color: #b91c1c; }
+  .ib-name {
+    width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1.5px solid #d1d5db; border-radius: 10px;
+    font-size: 14px; font-weight: 600; margin-bottom: 16px; font-family: 'Inter', sans-serif;
+  }
+  .ib-name:focus { outline: none; border-color: #0f766e; box-shadow: 0 0 0 4px rgba(15,118,110,0.12); }
+  .ib-search {
+    width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px;
+    font-size: 14px; margin-bottom: 10px;
+  }
+  .ib-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 9px 12px; border: 1px solid #eef0f3; border-radius: 10px; margin-bottom: 8px;
+  }
+  .ib-item-name { font-weight: 700; color: #0d1b2a; font-size: 14px; overflow-wrap: anywhere; }
+  .ib-item-price { font-size: 12.5px; color: #6b7280; }
+  .ib-qty { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .ib-qty button { width: 32px; height: 32px; border-radius: 8px; border: 0; cursor: pointer; font-size: 18px; font-weight: 700; background: #eef1f5; color: #0d1b2a; }
+  .ib-qty button.plus { background: #0f766e; color: #fff; }
+  .ib-qty .num { min-width: 22px; text-align: center; font-weight: 700; }
+  .ib-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid #e5e7eb; background: #f9fafb; }
+  .ib-total { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 18px; color: #0d1b2a; }
+  .ib-total small { display: block; font-family: 'Inter', sans-serif; font-size: 11.5px; font-weight: 600; color: #6b7280; }
+  .ib-place { border: 0; cursor: pointer; padding: 12px 22px; border-radius: 10px; font-weight: 700; font-size: 14px; background: #0f766e; color: #fff; }
+  .ib-place:disabled { background: #9ca3af; cursor: not-allowed; }
+  .ib-error { color: #b91c1c; font-size: 13px; font-weight: 600; margin-top: 8px; display: none; }
+  @media (max-width: 640px) {
+    .ib-overlay { padding: 0; align-items: flex-end; }
+    .ib-modal { max-width: none; max-height: 96vh; border-radius: 16px 16px 0 0; }
+    .ib-open { flex: 1; padding: 12px; }
+  }
+</style>
+
+<div class="ib-bar">
+  <span class="ib-title">🧾 Billing</span>
+  <button type="button" class="ib-open" id="ibOpen">➕ New Individual Bill</button>
+  <select id="ibBillTable" aria-label="Table billing">
+    <option value="">Table billing...</option>
+    {% for t in tables_info %}<option value="{{ t.id }}">Table {{ t.number }}</option>{% endfor %}
+  </select>
+  <button type="button" class="ib-go" id="ibBillGo">Open</button>
+  <span class="ib-hint">One customer = one seat = one bill. Paying a bill does not free the seat.</span>
+</div>
+
+<div class="ib-overlay" id="ibOverlay">
+  <div class="ib-modal" role="dialog" aria-modal="true" aria-labelledby="ibTitle">
+    <div class="ib-head">
+      <h2 id="ibTitle">🧾 New Individual Bill</h2>
+      <button type="button" class="ib-close" id="ibClose">✕</button>
+    </div>
+    <div class="ib-body">
+      <p class="ib-label">1. Select Table</p>
+      <div class="ib-tables" id="ibTables"><span class="ib-hint">Loading tables...</span></div>
+
+      <p class="ib-label">2. Customer name (optional)</p>
+      <input type="text" class="ib-name" id="ibName" maxlength="100" placeholder="e.g. Customer A (leave blank if not needed)">
+
+      <p class="ib-label">3. Add Items</p>
+      <input type="text" class="ib-search" id="ibSearch" placeholder="🔍 Search menu...">
+      <div id="ibMenu">
+        {% for item in food_items %}
+          <div class="ib-item" data-id="{{ item.id }}" data-price="{{ item.price|stringformat:'s' }}" data-name="{{ item.name|lower }}">
+            <div>
+              <div class="ib-item-name">{{ item.name }}</div>
+              <div class="ib-item-price">₹{{ item.price|inr }}</div>
+            </div>
+            <div class="ib-qty">
+              <button type="button" class="minus">−</button>
+              <span class="num">0</span>
+              <button type="button" class="plus">+</button>
+            </div>
+          </div>
+        {% empty %}
+          <div class="ib-hint">No menu items available</div>
+        {% endfor %}
+      </div>
+      <div class="ib-error" id="ibError"></div>
+    </div>
+    <div class="ib-foot">
+      <div class="ib-total"><small id="ibCount">0 items · Cash payment</small>₹<span id="ibTotal">0</span></div>
+      <button type="button" class="ib-place" id="ibPlace" disabled>Create Bill → Kitchen</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const overlay = document.getElementById('ibOverlay');
+    document.body.appendChild(overlay);          // keep it outside the page layout
+    const tablesBox = document.getElementById('ibTables');
+    const nameInput = document.getElementById('ibName');
+    const placeBtn = document.getElementById('ibPlace');
+    const errBox = document.getElementById('ibError');
+    const csrf = '{{ csrf_token }}';
+    const overviewUrl = "{% url 'dashboard:server_tables_overview' %}";
+    const createUrl = "{% url 'dashboard:server_individual_bill_create' %}";
+    const billingUrl = "{% url 'dashboard:server_table_billing' 0 %}";
+    let tableId = null;
+    let tableNumber = '';
+    const qty = {};
+
+    function toast(title, target, sub, icon, isError) {
+      if (typeof showToast === 'function') showToast(title, target, sub, icon, isError ? { error: true } : {});
+    }
+
+    function recalc() {
+      let total = 0, count = 0;
+      document.querySelectorAll('#ibMenu .ib-item').forEach(function (row) {
+        const q = qty[row.dataset.id] || 0;
+        total += q * parseFloat(row.dataset.price || 0);
+        count += q;
+      });
+      document.getElementById('ibTotal').textContent = total.toFixed(2);
+      document.getElementById('ibCount').textContent = count + ' item' + (count === 1 ? '' : 's') + ' · Cash payment';
+      placeBtn.disabled = !(tableId && count > 0);
+    }
+
+    function loadTables() {
+      tablesBox.innerHTML = '<span class="ib-hint">Loading tables...</span>';
+      return fetch(overviewUrl, { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          tablesBox.innerHTML = '';
+          (d.tables || []).forEach(function (t) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'ib-chip';
+            b.dataset.id = t.id;
+            b.dataset.number = t.number;
+            const small = document.createElement('small');
+            if (t.state === 'held') { b.disabled = true; small.textContent = 'Booked'; }
+            else if (t.free < 1) { b.disabled = true; small.textContent = 'Full'; }
+            else { small.textContent = t.free + ' free'; }
+            b.appendChild(document.createTextNode('🪑 Table ' + t.number));
+            b.appendChild(small);
+            if (String(t.id) === String(tableId) && !b.disabled) b.classList.add('active');
+            tablesBox.appendChild(b);
+          });
+          recalc();
+        })
+        .catch(function () {
+          tablesBox.innerHTML = '<span class="ib-hint">Could not load tables. Close and try again.</span>';
+        });
+    }
+
+    function reset() {
+      tableId = null; tableNumber = '';
+      Object.keys(qty).forEach(function (k) { delete qty[k]; });
+      document.querySelectorAll('#ibMenu .ib-item .num').forEach(function (n) { n.textContent = '0'; });
+      nameInput.value = '';
+      document.getElementById('ibSearch').value = '';
+      document.querySelectorAll('#ibMenu .ib-item').forEach(function (r) { r.style.display = ''; });
+      errBox.style.display = 'none';
+      recalc();
+    }
+
+    function openModal() { reset(); overlay.classList.add('open'); loadTables(); }
+    function closeModal() { overlay.classList.remove('open'); }
+
+    document.getElementById('ibOpen').addEventListener('click', openModal);
+    document.getElementById('ibClose').addEventListener('click', closeModal);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    });
+
+    tablesBox.addEventListener('click', function (e) {
+      const chip = e.target.closest('.ib-chip');
+      if (!chip || chip.disabled) return;
+      tablesBox.querySelectorAll('.ib-chip').forEach(function (c) { c.classList.remove('active'); });
+      chip.classList.add('active');
+      tableId = chip.dataset.id;
+      tableNumber = chip.dataset.number;
+      recalc();
+    });
+
+    document.getElementById('ibSearch').addEventListener('input', function (e) {
+      const t = e.target.value.trim().toLowerCase();
+      document.querySelectorAll('#ibMenu .ib-item').forEach(function (row) {
+        row.style.display = row.dataset.name.indexOf(t) !== -1 ? '' : 'none';
+      });
+    });
+
+    document.getElementById('ibMenu').addEventListener('click', function (e) {
+      const row = e.target.closest('.ib-item');
+      if (!row) return;
+      const id = row.dataset.id;
+      if (e.target.classList.contains('plus')) qty[id] = (qty[id] || 0) + 1;
+      else if (e.target.classList.contains('minus')) qty[id] = Math.max(0, (qty[id] || 0) - 1);
+      else return;
+      row.querySelector('.num').textContent = qty[id];
+      recalc();
+    });
+
+    placeBtn.addEventListener('click', function () {
+      const items = Object.keys(qty).filter(function (id) { return qty[id] > 0; })
+        .map(function (id) { return { food_item_id: Number(id), quantity: qty[id] }; });
+      if (!tableId || !items.length) return;
+
+      placeBtn.disabled = true;
+      placeBtn.textContent = 'Creating...';
+      errBox.style.display = 'none';
+
+      fetch(createUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+        body: JSON.stringify({ table_id: Number(tableId), customer_name: nameInput.value.trim(), items: items })
+      })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.data.ok) throw new Error(res.data.error || 'Could not create the bill');
+          toast('Bill #' + res.data.bill_no, '🪑 TABLE ' + res.data.table_number,
+                res.data.free_left + ' seat(s) still free · sent to kitchen', '🧾');
+          closeModal();
+          reset();
+          if (typeof refreshLive === 'function') refreshLive();
+          if (window.refreshSeatingPanel) window.refreshSeatingPanel();
+        })
+        .catch(function (err) {
+          errBox.textContent = '⚠️ ' + err.message;
+          errBox.style.display = 'block';
+          loadTables();      // the free seats may have changed
+        })
+        .finally(function () {
+          placeBtn.textContent = 'Create Bill → Kitchen';
+          recalc();
+        });
+    });
+
+    // Table billing dashboard link
+    document.getElementById('ibBillGo').addEventListener('click', function () {
+      const id = document.getElementById('ibBillTable').value;
+      if (!id) { toast('Choose a table', 'Table billing', 'Select a table first', '⚠️', true); return; }
+      window.location.href = billingUrl.replace('/0/', '/' + id + '/');
+    });
+  })();
+</script>

@@ -62,6 +62,8 @@ urlpatterns = [
     path('server/seating/take-order/', seating_views.server_take_session_order, name='server_take_session_order'),
     path('server/seating/tables/', seating_views.server_tables_overview, name='server_tables_overview'),
     path('server/seating/panel/', seating_views.server_seating_panel, name='server_seating_panel'),
+    path('server/seating/individual-bill/', seating_views.server_individual_bill_create, name='server_individual_bill_create'),   # NEW: one customer = one bill
+    path('server/billing/<int:table_id>/', seating_views.server_table_billing, name='server_table_billing'),   # NEW: Table billing dashboard
     path('server/seating/<int:pk>/cancel/', seating_views.server_seating_cancel, name='server_seating_cancel'),   # NEW: customer changed their mind
     path('server/seating/<int:pk>/departed/', seating_views.server_seating_departed, name='server_seating_departed'),
     path('server/seating/<int:pk>/cleaned/', seating_views.server_seating_cleaned, name='server_seating_cleaned'),
