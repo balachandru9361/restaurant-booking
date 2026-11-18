@@ -6,8 +6,32 @@ from django.utils import timezone
 
 
 class Table(models.Model):
+    # Table types: normal tables are used for walk-in guests,
+    # booking tables are used only for customer reservations.
+    NORMAL = 'normal'
+    BOOKING = 'booking'
+    TYPE_CHOICES = [
+        (NORMAL, 'Normal Table'),
+        (BOOKING, 'Booking Table'),
+    ]
+
     number = models.PositiveIntegerField(unique=True)
     capacity = models.PositiveIntegerField()
+    # Existing tables get 'normal' automatically through the default.
+    table_type = models.CharField(
+        max_length=10,
+        choices=TYPE_CHOICES,
+        default=NORMAL,
+        db_index=True,
+    )
+
+    @property
+    def is_booking_table(self):
+        return self.table_type == self.BOOKING
+
+    @property
+    def is_normal_table(self):
+        return self.table_type == self.NORMAL
 
     # ------------------------------------------------------------------
     # Live seat availability (read helpers).

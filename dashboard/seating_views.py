@@ -14,6 +14,11 @@ Flow (seats are tracked by booking.models.SeatAllocation):
     page   -> server_table_billing    all bills of one table (QR bill + individual bills)
 
 There is no timer anywhere: seats are freed only by the server's clicks.
+
+Table types: walk-in seating uses NORMAL tables only (table_type='normal').
+A Booking Table (table_type='booking') is kept for customer reservations. It is never
+suggested, never seated by confirm, and never given an individual bill here. The
+dashboard overview shows it as a separate "held" row so the server still sees it.
 """
 import json
 from decimal import Decimal
@@ -67,6 +72,7 @@ def _session_orders(session):
 @require_POST
 def server_walkin_check(request):
     """Server types the guests who walked in. Nothing is saved.
+    Only Normal tables are suggested (walkin_free_seats lists Normal tables only).
     JSON: ok, available, guests, tables [{id, number, seats, capacity}], seats,
     free_seats, warnings, message."""
     try:
@@ -124,7 +130,7 @@ def server_walkin_confirm(request):
     """Customer accepted the arrangement, server confirms.
     POST JSON: {guests: 7, plan: [{table_id: 10, seats: 4}, {table_id: 12, seats: 3}], group_name: ''}
     The free seats are checked again inside a transaction, so two servers can never
-    take the same seats."""
+    take the same seats. A Booking Table is refused even if the request names it."""
     try:
         data = json.loads(request.body)
         guests = int(data.get('guests', 0))
@@ -145,6 +151,16 @@ def server_walkin_confirm(request):
         tables = {t.id: t for t in Table.objects.select_for_update().filter(id__in=ids)}
         if len(tables) != len(ids):
             return JsonResponse({'ok': False, 'error': 'A table no longer exists.'}, status=400)
+
+        # NEW: walk-ins can sit only at Normal tables
+        booking_tables = sorted(t.number for t in tables.values() if t.table_type != 'normal')
+        if booking_tables:
+            return JsonResponse({
+                'ok': False,
+                'error': (f'{_tables_text(booking_tables)} '
+                          f'{"is a Booking Table" if len(booking_tables) == 1 else "are Booking Tables"} '
+                          'and cannot be used for walk-ins. Please check again.'),
+            }, status=400)
 
         free = {t.id: f for t, f in walkin_free_seats()}
         for tid, seats in plan:
@@ -403,7 +419,9 @@ def server_individual_bill_create(request):
     Seats and billing stay separate:
       - paying the bill does NOT free the seat
       - the seat is freed only by "Customer Left" and then "Cleaning Done"
-    The bill number is the order id. No migration is needed."""
+    The bill number is the order id. No migration is needed.
+
+    A Booking Table is refused: individual bills are for walk-in seats (Normal tables)."""
     try:
         data = json.loads(request.body)
         table_id = int(data.get('table_id'))
@@ -419,6 +437,13 @@ def server_individual_bill_create(request):
         table = Table.objects.select_for_update().filter(pk=table_id).first()
         if not table:
             return JsonResponse({'ok': False, 'error': 'Table not found'}, status=400)
+
+        # NEW: individual walk-in bills are for Normal tables only
+        if table.table_type != 'normal':
+            return JsonResponse({
+                'ok': False,
+                'error': f'Table {table.number} is a Booking Table. Choose a Normal table.',
+            }, status=400)
 
         free = {t.id: f for t, f in walkin_free_seats()}.get(table.id, 0)
         if free < 1:
@@ -563,7 +588,11 @@ def server_table_billing(request, table_id):
 def server_tables_overview(request):
     """One row per table: capacity, customers seated (from SeatAllocation), free seats.
     A table that a whole-table hold blocks (approved booking, or an old style order that
-    has no guest count) is shown as 'held' with the reason."""
+    has no guest count) is shown as 'held' with the reason.
+
+    NEW: walkin_free_seats() lists Normal tables only. Booking Tables are added here as
+    separate 'held' rows ("Booking Table") so the server still sees them, but their seats
+    are NOT counted in free_total because walk-ins cannot use them."""
     rows = walkin_free_seats()
     blocked = walkin_blocked_table_ids()
     holds = table_status_map()
@@ -607,4 +636,22 @@ def server_tables_overview(request):
             'state': state, 'note': '',
         })
 
+    # NEW: Booking Tables, shown as 'held' rows (not available to walk-ins, not in free_total)
+    upcoming = upcoming_status_map()
+    for table in Table.objects.filter(table_type='booking').order_by('number'):
+        hold = holds.get(table.id)
+        up = upcoming.get(table.id)
+        if hold is not None:
+            note = f'Booking Table: {hold.label}'
+        elif up is not None:
+            when = timezone.localtime(up.start).strftime('%I:%M %p').lstrip('0')
+            note = f'Booking Table: booked at {when}'
+        else:
+            note = 'Booking Table: kept for reservations'
+        tables.append({
+            'id': table.id, 'number': table.number, 'capacity': table.capacity,
+            'customers': None, 'free': 0, 'cleaning': 0, 'state': 'held', 'note': note,
+        })
+
+    tables.sort(key=lambda t: t['number'])
     return JsonResponse({'ok': True, 'tables': tables, 'free_total': free_total})

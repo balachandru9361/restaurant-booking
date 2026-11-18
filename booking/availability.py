@@ -23,6 +23,8 @@ from django.utils import timezone
 #     remaining seats. An old order without a guest count still blocks the whole table.
 #     Everything outside walk-in seating (admin Open Table, QR page, booking
 #     screens) still treats every live order as a whole-table hold.
+#   - NEW: WALK-IN SEATING USES NORMAL TABLES ONLY. A table with table_type='booking'
+#     is kept for customer reservations and is never suggested to a walk-in group.
 #
 # OPEN_ENDED is only a very large number used as the "end" of such a hold so
 # the code that compares start/end keeps working. It is never shown.
@@ -269,6 +271,10 @@ def _order_guest_seats(holds):
 def walkin_free_seats(buffer=WALKIN_BUFFER):
     """[(Table, free_seats), ...] sorted by table number, for seat based walk-in seating.
 
+    NEW: only NORMAL tables (table_type='normal') are listed. Booking Tables are kept
+    for customer reservations and never appear here, so they are never suggested to
+    a walk-in group.
+
     free_seats is 0 when a whole-table hold blocks the table (see walkin_blocked_table_ids).
     Otherwise it is:
         capacity
@@ -297,7 +303,8 @@ def walkin_free_seats(buffer=WALKIN_BUFFER):
     taken = {row['table_id']: row['total'] or 0 for row in taken_rows}
 
     result = []
-    for t in Table.objects.all().order_by('number'):
+    # NEW: Normal tables only (Booking Tables are never used for walk-ins)
+    for t in Table.objects.filter(table_type='normal').order_by('number'):
         if t.id in blocked:
             free = 0
         else:
@@ -312,6 +319,8 @@ def suggest_walkin_arrangement(guests, buffer=WALKIN_BUFFER):
 
     Returns [(Table, seats_to_give), ...] sorted by table number, or None if the
     restaurant does not have enough free seats right now.
+
+    Only Normal tables are used (see walkin_free_seats).
 
     1. If ONE table has enough free seats, use the smallest such table
        (so big tables stay free for big groups).

@@ -81,6 +81,25 @@ class TableBookingForm(forms.ModelForm):
 
 
 class TableForm(forms.ModelForm):
+    """Admin form for Add New Table / Edit Table.
+    CHANGED: table_type added (Normal Table for walk-ins, Booking Table for reservations).
+    A new table starts as a Normal Table unless the admin chooses otherwise."""
+
     class Meta:
         model = Table
-        fields = ['number', 'capacity']
+        fields = ['number', 'capacity', 'table_type']
+        labels = {
+            'number': 'Table Number',
+            'capacity': 'Seat Capacity',
+            'table_type': 'Table Type',
+        }
+        widgets = {
+            'table_type': forms.Select(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Show the two types without a blank "---------" choice
+        self.fields['table_type'].choices = Table.TYPE_CHOICES
+        if not self.instance.pk:
+            self.fields['table_type'].initial = Table.NORMAL

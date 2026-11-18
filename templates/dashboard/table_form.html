@@ -38,15 +38,19 @@
     position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
     font-size: 16px; opacity: 0.6; pointer-events: none;
   }
-  .tf-input-wrap input {
+  .tf-input-wrap input,
+  .tf-input-wrap select {
     width: 100%; box-sizing: border-box; padding: 13px 14px 13px 42px;
     border: 1.5px solid #e6e6ee; border-radius: 12px; background: #fff;
     font-size: 16px; font-weight: 700; color: #1a1a2e; transition: all 0.15s ease;
   }
-  .tf-input-wrap input:focus {
+  .tf-input-wrap select { cursor: pointer; }
+  .tf-input-wrap input:focus,
+  .tf-input-wrap select:focus {
     outline: none; border-color: #F63A3A; box-shadow: 0 0 0 4px rgba(246,58,58,0.1);
   }
-  .tf-field.has-error .tf-input-wrap input { border-color: #e74c3c; background: #fffafa; }
+  .tf-field.has-error .tf-input-wrap input,
+  .tf-field.has-error .tf-input-wrap select { border-color: #e74c3c; background: #fffafa; }
   .tf-help { font-size: 12px; color: #9ca3af; margin-top: 6px; }
   .tf-error { font-size: 12.5px; font-weight: 700; color: #e74c3c; margin-top: 6px; }
   .tf-nonfield {
@@ -97,7 +101,7 @@
   <div class="tf-card">
     <div class="tf-head">
       <h2>{% if form.instance.pk %}🪑 Edit Table {{ form.instance.number }}{% else %}🪑 Add New Table{% endif %}</h2>
-      <p>Table number and how many guests it can seat.</p>
+      <p>Table number, how many guests it can seat, and what it is used for.</p>
     </div>
 
     <form method="post" class="tf-body" novalidate>
@@ -127,6 +131,17 @@
         <div class="tf-help">How many guests can sit at this table.</div>
       </div>
 
+      {# Table type: Normal Table (walk-in guests) or Booking Table (reservations only) #}
+      <div class="tf-field{% if form.table_type.errors %} has-error{% endif %}">
+        <label for="{{ form.table_type.id_for_label }}">Table type</label>
+        <div class="tf-input-wrap">
+          <span class="tf-icon">🏷️</span>
+          {{ form.table_type }}
+        </div>
+        {% for e in form.table_type.errors %}<div class="tf-error">{{ e }}</div>{% endfor %}
+        <div class="tf-help">Normal Table is used for walk-in guests. Booking Table is kept only for customer reservations.</div>
+      </div>
+
       <div class="tf-preview">
         <div class="tf-preview-top">
           <span>Preview</span>
@@ -147,6 +162,7 @@
   (function () {
     var numInput = document.getElementById('{{ form.number.id_for_label }}');
     var capInput = document.getElementById('{{ form.capacity.id_for_label }}');
+    var typeInput = document.getElementById('{{ form.table_type.id_for_label }}');
     var seatsBox = document.getElementById('tfSeats');
     var summary = document.getElementById('tfSummary');
     if (!numInput || !capInput) return;
@@ -157,6 +173,11 @@
     capInput.setAttribute('max', '30');
     numInput.setAttribute('inputmode', 'numeric');
     capInput.setAttribute('inputmode', 'numeric');
+
+    function typeLabel() {
+      if (!typeInput || typeInput.selectedIndex < 0) return '';
+      return typeInput.options[typeInput.selectedIndex].text;
+    }
 
     function render() {
       var cap = parseInt(capInput.value, 10);
@@ -174,11 +195,14 @@
         s.textContent = '\uD83E\uDE91';
         seatsBox.appendChild(s);
       }
-      summary.textContent = (num ? 'Table ' + num + ' \u00b7 ' : '') + cap + ' seat' + (cap === 1 ? '' : 's');
+      var label = typeLabel();
+      summary.textContent = (num ? 'Table ' + num + ' \u00b7 ' : '') + cap + ' seat' + (cap === 1 ? '' : 's')
+        + (label ? ' \u00b7 ' + label : '');
     }
 
     numInput.addEventListener('input', render);
     capInput.addEventListener('input', render);
+    if (typeInput) typeInput.addEventListener('change', render);
     render();
   })();
 </script>

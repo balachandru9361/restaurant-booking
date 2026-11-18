@@ -34,7 +34,8 @@ from .models import Notification, GroceryItem, RecipeIngredient
 from accounts.forms import StaffCreationForm
 from menu.models import Category, FoodItem, FoodItemImage
 from menu.forms import MenuItemForm
-from booking.models import Table, TableBooking, TableSession
+# CHANGED: SeatAllocation added (used by _start_cleaning_for_table)
+from booking.models import SeatAllocation, Table, TableBooking, TableSession
 from booking.forms import SEATS_PER_TABLE, tables_needed
 # CHANGED: later_reservations (clash with a later approved booking) and ALLOW_SINGLE_BIG_TABLE added
 from booking.availability import (
@@ -342,12 +343,14 @@ def _tables_text(tables):
     return f'Table {numbers}' if len(tables) == 1 else f'Tables {numbers}'
 
 
-def _slot_conflicts(booking):
-    """{table_id: 'Held by ...'} - tables that clash with this booking.
-    Two kinds of clash (both are only a warning for the admin, who can still choose such a table):
-      1. still held by something that started before (or at) this booking's time
+def _booking_slot_conflicts(booking):
+    """{table_id: 'Held by ...'} - tables that clash with ANOTHER approved booking.
+    NEW: split out of _slot_conflicts, because this kind of clash is never allowed
+    (a table that already has another confirmed booking cannot be given again).
+    Two kinds of clash:
+      1. still held by an approved booking that started before (or at) this booking's time
          and has not been opened by the admin yet.
-      2. CHANGED: already reserved by a LATER approved booking the same day
+      2. already reserved by a LATER approved booking the same day
          (example: this booking is 4:00 PM, Table 1 is approved for 4:50 PM).
          This booking keeps its tables until the admin opens them, so the later one would clash."""
     d, t = booking.booking_date, booking.booking_time
@@ -371,6 +374,17 @@ def _slot_conflicts(booking):
         when = timezone.localtime(hold.start).strftime('%I:%M %p')
         conflicts.setdefault(table_id, f'Reserved for later booking #{hold.obj.pk} ({when})')
 
+    return conflicts
+
+
+def _slot_conflicts(booking):
+    """{table_id: 'Held by ...'} - tables that clash with this booking.
+    Booking clashes come from _booking_slot_conflicts (never allowed on approve).
+    A table held by a running order is only a warning for the admin, who can still
+    choose such a table with force."""
+    d = booking.booking_date
+    conflicts = _booking_slot_conflicts(booking)
+
     # Running orders only matter when the booking is for today (or already past)
     if d <= timezone.localdate():
         running = (Order.objects.visible_to_staff()      # CHANGED: an unpaid order holds no table
@@ -384,9 +398,10 @@ def _slot_conflicts(booking):
 
 def _suggest_table_ids(guests, conflicts, tables_by_capacity):
     """Pre-selected tables for the approve screen: free tables only.
+    NOTE: tables_by_capacity must already contain only Booking Tables (the caller filters).
     Up to 6 guests = the smallest free table that fits.
     7+ guests = ONE free table when it has enough seats for the whole party
-    (example: a 7 seat table for 7 guests, see ALLOW_SINGLE_BIG_TABLE), otherwise as many
+    (example: a 23 seat table for 19 guests, see ALLOW_SINGLE_BIG_TABLE), otherwise as many
     free tables as needed (full 6-seat tables first). Returns [] if there are not enough free tables."""
     free = [t for t in tables_by_capacity if t.id not in conflicts]
     if guests <= SEATS_PER_TABLE:
@@ -459,7 +474,9 @@ def manage_bookings(request):
     # The helper attributes start with ui_ so they never clash with model properties.
     bookings = list(page_obj.object_list)
     now = timezone.now()
-    tables_by_capacity = list(Table.objects.all().order_by('capacity', 'number'))
+    # CHANGED: the approve screen offers Booking Tables only (Normal Tables are for walk-ins)
+    tables_by_capacity = list(
+        Table.objects.filter(table_type=Table.BOOKING).order_by('capacity', 'number'))
     tables_by_number = sorted(tables_by_capacity, key=lambda t: t.number)
 
     for b in bookings:
@@ -1881,7 +1898,11 @@ def _tables_info():
                   (for example Tables 2 and 4 of a seated group of 17 on Tables 1, 2, 4)
     CHANGED: the orders of a walk-in group are not counted as 'held_by', so the main table of a
     group (Table 1) is shown as full, not as 'Eating, add more' (which would mix a normal order
-    into the group's table)."""
+    into the group's table).
+    CHANGED: a Booking Table is never shown as 'Booked now'. The booked customer sits there and
+    the server must be able to take their order, so it is always selectable and has all its
+    seats free. A running order on it still shows 'Eating, add more' like a normal table.
+    Normal tables keep the old 'Booked now' / 'full' checks."""
     held = {
         o.table_id: o.id
         for o in _not_walkin(Order.objects.visible_to_staff()
@@ -1891,9 +1912,16 @@ def _tables_info():
     free_map = {t.id: free for t, free in walkin_free_seats()}
     chips = []
     for t in Table.objects.all().order_by('number'):
-        busy = is_table_busy_now(t.id)
         held_by = held.get(t.id)
-        free = free_map.get(t.id, t.capacity)
+        if t.is_booking_table:
+            # CHANGED: Booking Tables are not part of walk-in seating, so no busy / full check
+            busy = False
+            free = t.capacity
+            full = False
+        else:
+            busy = is_table_busy_now(t.id)
+            free = free_map.get(t.id, t.capacity)
+            full = (not busy) and (not held_by) and free <= 0
         chips.append({
             'id': t.id,
             'number': t.number,
@@ -1901,7 +1929,7 @@ def _tables_info():
             'busy': busy,
             'held_by': held_by,
             'free_seats': free,
-            'full': (not busy) and (not held_by) and free <= 0,
+            'full': full,
         })
     return chips
 
@@ -2237,6 +2265,32 @@ def server_reject_order(request, pk):
     return JsonResponse(payload, status=code)
 
 
+# NEW: seats of a normal table order (QR / Take Order) go to CLEANING when the customer leaves
+def _start_cleaning_for_table(table, on_table, user):
+    """Normal table order (QR / Take Order): when the customer leaves, the seats they used
+    go to 'cleaning' (still blocked) exactly like a walk-in group, so the server sees the
+    group in 'Walk-in Groups: Seated and Cleaning' and taps 'Cleaning Done'.
+    Booking Tables are not part of walk-in seating, so they are skipped.
+    Returns the number of seats put to cleaning (0 = nothing)."""
+    if table.is_booking_table:
+        return 0
+    live = (SeatAllocation.objects
+            .filter(table=table,
+                    status__in=[SeatAllocation.OCCUPIED, SeatAllocation.CLEANING])
+            .aggregate(s=Sum('seats'))['s'] or 0)
+    guests = max((o.guests or 0 for o in on_table), default=0) or table.capacity
+    seats = min(guests, table.capacity - live)
+    if seats < 1:
+        return 0
+    session = TableSession.objects.create(
+        table=table, guests=seats, group_name='',
+        source=TableSession.SOURCE_WALKIN, allocated_by=user)
+    SeatAllocation.objects.create(
+        session=session, table=table, seats=seats, status=SeatAllocation.OCCUPIED)
+    session.mark_departed()          # OCCUPIED -> CLEANING (same as Customer Left for a group)
+    return seats
+
+
 # Always returns JSON (the server.html "Customer Left" button reads it)
 @server_required
 @require_POST
@@ -2247,7 +2301,9 @@ def server_free_table(request, pk):
     CHANGED: for an order of a walk-in group this is the same as "Customer Left" in the
     Walk-in Groups panel (server_seating_departed): the group's seats move to cleaning, and
     the server taps "Cleaning Done" afterwards. This way the seats and the orders never get
-    out of step (before, only the main table was freed and the other tables stayed occupied)."""
+    out of step (before, only the main table was freed and the other tables stayed occupied).
+    NEW: a normal table order (QR / Take Order) now also moves its seats to cleaning
+    (see _start_cleaning_for_table), so every flow shows 'Needs cleaning'."""
     order = get_object_or_404(Order, pk=pk)
 
     group = _group_session_of(order)
@@ -2271,15 +2327,21 @@ def server_free_table(request, pk):
         elif unserved:
             msg, ok = f'Order #{unserved[0].id} is not served yet.', False
         else:
-            Order.objects.filter(pk__in=[o.id for o in on_table]).update(table_released=True)
-            # End the dine-in session of this table, so "Order again" from
-            # My Orders no longer works after the customer has left.
-            # CHANGED: a walk-in group that uses this table keeps its own session.
-            (TableSession.objects
-             .filter(table_id=order.table_id, is_active=True)
-             .exclude(source=TableSession.SOURCE_WALKIN)
-             .update(is_active=False, closed_at=timezone.now()))
-            msg, ok = f'Table #{order.table.number} is free now.', True
+            with transaction.atomic():
+                Order.objects.filter(pk__in=[o.id for o in on_table]).update(table_released=True)
+                # End the dine-in session of this table, so "Order again" from
+                # My Orders no longer works after the customer has left.
+                # CHANGED: a walk-in group that uses this table keeps its own session.
+                (TableSession.objects
+                 .filter(table_id=order.table_id, is_active=True)
+                 .exclude(source=TableSession.SOURCE_WALKIN)
+                 .update(is_active=False, closed_at=timezone.now()))
+                # NEW: seats go to cleaning (QR / Take Order tables, same as walk-in groups)
+                cleaning_seats = _start_cleaning_for_table(order.table, on_table, request.user)
+            if cleaning_seats:
+                msg, ok = f'Table #{order.table.number}: waiting for cleaning.', True
+            else:
+                msg, ok = f'Table #{order.table.number} is free now.', True
 
     payload = {'ok': ok, 'message': msg, 'table': order.table.number if order.table_id else None}
     if not ok:
@@ -2343,10 +2405,12 @@ def server_take_order(request):
         own_running = _not_walkin(Order.objects.visible_to_staff()
                                   .filter(table_id=table.id, table_released=False)
                                   ).exclude(status='cancelled').exists()
-        if not own_running and is_table_busy_now(table.id):
+        # CHANGED: a Booking Table is never refused as "booked right now" (the booked customer is there)
+        if not own_running and not table.is_booking_table and is_table_busy_now(table.id):
             return JsonResponse({'ok': False, 'error': f'Table {table.number} is booked right now.'}, status=409)
 
         # NEW: seats used by a seated walk-in group (SeatAllocation) are not free for a new table order
+        # (a Booking Table is not in walkin_free_seats(), so it gets its full capacity here)
         seats_free = {t.id: f for t, f in walkin_free_seats()}.get(table.id, table.capacity)
         if not own_running and seats_free <= 0:
             return JsonResponse({
@@ -2492,6 +2556,8 @@ def server_walkin_check(request):
     Read only: nothing is saved. It reuses _free_tables() and _suggest_table_ids(),
     so the same rules as the booking approve screen apply
     (for example 7 guests -> one 7 seat table if it exists, otherwise full tables first).
+    CHANGED: only Normal Tables are used for walk-ins. Booking Tables are never suggested,
+    even when they are empty.
     Returns JSON: ok, available, guests, tables (suggested), seats, free_seats, warnings, message."""
     try:
         data = json.loads(request.body)
@@ -2502,7 +2568,7 @@ def server_walkin_check(request):
     if guests < 1 or guests > 100:
         return JsonResponse({'ok': False, 'error': 'Guests must be between 1 and 100.'}, status=400)
 
-    all_tables = list(Table.objects.all().order_by('capacity', 'number'))
+    all_tables = list(Table.objects.filter(table_type=Table.NORMAL).order_by('capacity', 'number'))
     free_ids = {t.id for t in _free_tables()}
     free_seats = sum(t.capacity for t in all_tables if t.id in free_ids)
 
@@ -2576,7 +2642,8 @@ def admin_poll(request):
         staff=Count('id', filter=Q(is_staff=True)),
     )
     menu = list(FoodItem.objects.order_by('id').values_list('id', 'is_available', 'price'))
-    tables = list(Table.objects.order_by('id').values_list('id', 'number', 'capacity'))
+    # CHANGED: table_type is part of the signature, so the admin pages refresh when a type changes
+    tables = list(Table.objects.order_by('id').values_list('id', 'number', 'capacity', 'table_type'))
 
     latest_note = Notification.objects.first()
     _items, low = _store_stock_overview()
@@ -2689,14 +2756,16 @@ def approve_booking(request, pk):
 
     POST fields:
       tables = one or more table ids (checkboxes / multi-select named 'tables')
-      force  = '1' to approve even if a chosen table clashes with another booking/order
+      force  = '1' to approve even if a chosen table is held by a running order
 
     Rules:
       - at least one table (a booking that already has tables from the old flow keeps them)
-      - chosen seats must cover the guests (so one 7 seat table is enough for 7 guests)
-      - CHANGED: a table that clashes is refused unless force=1. A clash is either
-        "still held by an earlier booking/order" or "reserved for a LATER approved booking
-        the same day" (see _slot_conflicts)
+      - CHANGED: only Booking Tables can be used for a reservation (Normal Tables are for walk-ins)
+      - chosen seats must cover the guests (so one 23 seat table is enough for 19 guests)
+      - CHANGED: a table that already has another confirmed booking that clashes is ALWAYS refused
+        (force does not override it). A clash is either "still held by an earlier approved booking"
+        or "reserved for a LATER approved booking the same day" (see _booking_slot_conflicts)
+      - a table held by a running order is only refused unless force=1
     The first table (lowest number) is the main table, the rest are extra tables."""
     force = request.POST.get('force') == '1'
     try:
@@ -2725,11 +2794,31 @@ def approve_booking(request, pk):
                 messages.error(request, f'Choose at least one table for booking #{booking.pk}.')
                 return redirect('dashboard:manage_bookings')
 
+        # CHANGED: reservations use Booking Tables only
+        wrong_type = [t for t in tables if not t.is_booking_table]
+        if wrong_type:
+            names = ', '.join(f'Table {t.number}' for t in wrong_type)
+            messages.error(
+                request,
+                f'Cannot approve: {names} is a Normal Table. '
+                'Only Booking Tables can be used for reservations.')
+            return redirect('dashboard:manage_bookings')
+
         seats = sum(t.capacity for t in tables)
         if seats < booking.guests:
             messages.error(
                 request,
                 f'Selected {seats} seats, but {booking.guests} guests are coming. Choose more tables.')
+            return redirect('dashboard:manage_bookings')
+
+        # CHANGED: another confirmed booking on the same table is never allowed
+        booking_clash = _booking_slot_conflicts(booking)
+        clashed = [f'Table {t.number} ({booking_clash[t.id]})' for t in tables if t.id in booking_clash]
+        if clashed:
+            messages.error(
+                request,
+                'Cannot approve: ' + '; '.join(clashed)
+                + '. This table already has a confirmed booking. Choose a different table.')
             return redirect('dashboard:manage_bookings')
 
         conflicts = _slot_conflicts(booking)
