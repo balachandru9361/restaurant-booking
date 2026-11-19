@@ -1955,21 +1955,28 @@ def _numbers_text(numbers):
 
 
 def _group_sessions(session_ids):
-    """{session_id: {'label', 'guests', 'started'}} for the WALK-IN groups among these ids.
-    A customer QR table session is not a group, so it is left out."""
+    """{session_id: {'label', 'guests', 'started'}} for QR and walk-in sessions."""
     ids = {i for i in session_ids if i}
     if not ids:
         return {}
     out = {}
     sessions = (TableSession.objects
-                .filter(pk__in=ids, source=TableSession.SOURCE_WALKIN)
+                .filter(pk__in=ids,
+                        source__in=[TableSession.SOURCE_WALKIN, TableSession.SOURCE_QR])
                 .select_related('table')
                 .prefetch_related('allocations__table'))
     for s in sessions:
-        numbers = {a.table.number for a in s.allocations.all()}
+        numbers = (
+            {a.table.number for a in s.allocations.all()}
+            if s.source == TableSession.SOURCE_WALKIN
+            else {s.table.number}
+        )
+        label = _numbers_text(numbers) or f'Table {s.table.number}'
+        if s.source == TableSession.SOURCE_QR:
+            label = f'QR group at {label}'
         out[s.id] = {
-            'label': _numbers_text(numbers) or f'Table {s.table.number}',
-            'guests': s.guests,
+            'label': label,
+            'guests': s.guest_count or s.guests,
             'started': s.started_at,
         }
     return out
@@ -2035,6 +2042,17 @@ def _table_bill_orders(order):
     if group and live:
         return list(Order.objects.visible_to_staff()
                     .filter(table_session_id=group.id, table_released=False)
+                    .exclude(status='cancelled')
+                    .select_related('user', 'table', 'taken_by')
+                    .prefetch_related('items__food_item')
+                    .order_by('created_at', 'id'))
+    if (
+        order.table_session_id
+        and order.table_session.source == TableSession.SOURCE_QR
+        and live
+    ):
+        return list(Order.objects.visible_to_staff()
+                    .filter(table_session_id=order.table_session_id, table_released=False)
                     .exclude(status='cancelled')
                     .select_related('user', 'table', 'taken_by')
                     .prefetch_related('items__food_item')
@@ -2230,6 +2248,15 @@ def server_table_cash_received(request, pk):
     if group and live:
         # CHANGED: only the orders of THIS group, never another group / table on the same main table
         qs = Order.objects.visible_to_staff().filter(table_session_id=group.id, table_released=False)
+    elif (
+        order.table_session_id
+        and order.table_session.source == TableSession.SOURCE_QR
+        and live
+    ):
+        qs = Order.objects.visible_to_staff().filter(
+            table_session_id=order.table_session_id,
+            table_released=False,
+        )
     elif order.table_id and live:
         qs = _not_walkin(Order.objects.visible_to_staff()      # CHANGED
                          .filter(table_id=order.table_id, table_released=False))
@@ -2311,14 +2338,26 @@ def server_free_table(request, pk):
         from .seating_views import server_seating_departed
         return server_seating_departed(request, group.id)
 
+    qr_group = (
+        order.table_session
+        if order.table_session_id
+        and order.table_session.source == TableSession.SOURCE_QR
+        else None
+    )
     if not order.table_id:
         msg, ok = 'This order has no table.', False
     elif order.table_released:
         msg, ok = f'Table #{order.table.number} is already free.', False
     else:
-        on_table = list(_not_walkin(Order.objects.visible_to_staff()      # CHANGED
-                                    .filter(table_id=order.table_id, table_released=False))
-                        .exclude(status='cancelled'))
+        if qr_group is not None:
+            on_table_qs = Order.objects.visible_to_staff().filter(
+                table_session_id=qr_group.id,
+                table_released=False,
+            )
+        else:
+            on_table_qs = _not_walkin(Order.objects.visible_to_staff()
+                                      .filter(table_id=order.table_id, table_released=False))
+        on_table = list(on_table_qs.exclude(status='cancelled'))
         unpaid = [o for o in on_table if o.payment_status != 'paid']
         unserved = [o for o in on_table if o.status != 'delivered']
         if unpaid:
@@ -2329,13 +2368,20 @@ def server_free_table(request, pk):
         else:
             with transaction.atomic():
                 Order.objects.filter(pk__in=[o.id for o in on_table]).update(table_released=True)
-                # End the dine-in session of this table, so "Order again" from
-                # My Orders no longer works after the customer has left.
-                # CHANGED: a walk-in group that uses this table keeps its own session.
-                (TableSession.objects
-                 .filter(table_id=order.table_id, is_active=True)
-                 .exclude(source=TableSession.SOURCE_WALKIN)
-                 .update(is_active=False, closed_at=timezone.now()))
+                if qr_group is not None:
+                    TableSession.objects.filter(pk=qr_group.pk).update(
+                        is_active=False, closed_at=timezone.now()
+                    )
+                    qr_group.bills.update(
+                        is_billed=True, is_closed=True, closed_at=timezone.now()
+                    )
+                else:
+                    # End the dine-in session of this table, so "Order again" from
+                    # My Orders no longer works after the customer has left.
+                    (TableSession.objects
+                     .filter(table_id=order.table_id, is_active=True)
+                     .exclude(source=TableSession.SOURCE_WALKIN)
+                     .update(is_active=False, closed_at=timezone.now()))
                 # NEW: seats go to cleaning (QR / Take Order tables, same as walk-in groups)
                 cleaning_seats = _start_cleaning_for_table(order.table, on_table, request.user)
             if cleaning_seats:

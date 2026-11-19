@@ -98,6 +98,7 @@ class TableSession(models.Model):
     ]
 
     table = models.ForeignKey(Table, on_delete=models.PROTECT, related_name='sessions')
+    qr_token = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     started_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -105,6 +106,7 @@ class TableSession(models.Model):
     # Customer group details.
     group_name = models.CharField(max_length=100, blank=True)
     guests = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    guest_count = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1)])
     source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_QR)
     allocated_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
@@ -136,6 +138,7 @@ class TableSession(models.Model):
         self.is_active = False
         self.closed_at = timezone.now()
         self.save(update_fields=['is_active', 'closed_at'])
+        self.bills.update(is_billed=True, is_closed=True, closed_at=self.closed_at)
 
     # ------------------------------------------------------------------
     # Seat lifecycle of this group.
@@ -173,6 +176,7 @@ class TableSession(models.Model):
             self.closed_at = now
             fields += ['is_active', 'closed_at']
         self.save(update_fields=fields)
+        self.bills.update(is_billed=True, is_closed=True, closed_at=now)
 
     @transaction.atomic
     def confirm_cleaning(self, user=None):

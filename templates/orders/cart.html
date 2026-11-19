@@ -273,7 +273,7 @@
 /* how many guests at the table (required for every dine-in order) */
 .guests-box { margin-top:16px; padding:14px 16px; background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:16px; }
 .guests-box h3 { margin:0 0 10px; font-size:.9rem; color:var(--ink); }
-.guests-input { width:140px; max-width:100%; box-sizing:border-box; border:1.5px solid #e5e7eb; border-radius:12px;
+.guests-input { width:160px; max-width:100%; box-sizing:border-box; border:1.5px solid #e5e7eb; border-radius:12px;
   padding:10px 14px; font:inherit; font-size:1rem; font-weight:600; background:#fff; }
 .guests-input:focus { outline:none; border-color:var(--coral); }
 .guests-input.shake { animation:shake .4s; border-color:#dc2626; }
@@ -335,15 +335,21 @@
         {# data-table holds the QR table number (empty if no QR scan) #}
         <p class="hint" id="typeHint" data-table="{% if selected_table %}{{ selected_table.number }}{% endif %}">Our staff will assign your table when you arrive.</p>
 
-        {# How many guests: REQUIRED for every dine-in order (ask_guests comes from the view). #}
-        {# Hidden for Take away. Not shown only when the customer joined a group the server seated. #}
+        {# How many guests: each QR session reserves its own share of the available seats. #}
         {% if ask_guests %}
         <div class="guests-box" id="guestsBox">
           <h3>👥 How many guests? <span class="req-star">*</span></h3>
-          <input type="number" class="guests-input" id="guestsInput" name="guests" form="checkoutForm"
-                 min="1" step="1" inputmode="numeric" placeholder="e.g. 4" required
-                 {% if table_capacity %}max="{{ table_capacity }}" data-cap="{{ table_capacity }}"{% endif %}
-                 value="{{ known_guests|default_if_none:'' }}">
+          {% if available_seats %}
+          <select class="guests-input" id="guestsInput" name="guests" form="checkoutForm" required
+                  data-cap="{{ available_seats }}">
+            <option value="">Select guests</option>
+            {% for count in guest_options %}
+            <option value="{{ count }}" {% if known_guests == count %}selected{% endif %}>{{ count }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <p class="guests-hint bad" id="noSeatsMessage">No seats available.</p>
+          {% endif %}
           <p class="guests-hint" id="guestsHint"></p>
         </div>
         {% endif %}
@@ -593,13 +599,16 @@
     if (!guestsBox) return { ok: true, active: false, msg: '', bad: false };
     var take = $('input[name=order_type]:checked').value === 'takeaway';
     if (take) return { ok: true, active: false, msg: '', bad: false };
+    if (!guestsInput) {
+      return { ok: false, active: true, msg: 'No seats available.', bad: true };
+    }
 
     var cap = parseInt(guestsInput.dataset.cap, 10) || 0;
     var tableNo = $('#typeHint').dataset.table;
     var raw = guestsInput.value.trim();
     if (raw === '') {
       return { ok: false, active: true, bad: true,
-        msg: 'Guest count is required.' + (cap ? ' (Maximum ' + cap + ')' : '') };
+        msg: 'Guest count is required.' + (cap ? ' (' + cap + ' seat(s) available)' : '') };
     }
     var n = Number(raw);
     if (!Number.isInteger(n) || n < 1) {
@@ -607,18 +616,18 @@
     }
     if (cap && n > cap) {
       return { ok: false, active: true, bad: true,
-        msg: (tableNo ? 'Table #' + tableNo + ' seats only ' + cap : 'Maximum ' + cap + ' guests')
+        msg: (tableNo ? 'Table #' + tableNo + ' has only ' + cap + ' seat(s) available' : 'Maximum ' + cap + ' guests')
              + '. Please enter ' + cap + ' or less.' };
     }
     return { ok: true, active: true, bad: false,
-      msg: (tableNo && cap) ? 'This table seats ' + cap + '.' : '' };
+      msg: (tableNo && cap) ? cap + ' seat(s) currently available at this table.' : '' };
   }
 
   function updateGuests() {
     var gs = guestsState();
     if (guestsBox) {
       guestsBox.hidden = !gs.active;
-      guestsInput.disabled = !gs.active;     // a disabled box is not sent (Take away)
+      if (guestsInput) guestsInput.disabled = !gs.active;
       guestsHint.textContent = gs.msg;
       guestsHint.classList.toggle('bad', gs.bad);
     }

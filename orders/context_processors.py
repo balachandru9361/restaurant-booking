@@ -1,6 +1,9 @@
+from .cart_state import get_cart
+
+
 def cart_summary(request):
     """Adds cart_count (total quantity) to every template."""
-    cart = request.session.get('cart', {}) or {}
+    cart = get_cart(request) or {}
     count = 0
     for v in cart.values():
         if isinstance(v, dict):

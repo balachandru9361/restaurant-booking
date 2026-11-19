@@ -494,6 +494,7 @@ def _make_bill(kind, label, orders, guests, seats, state, session=None):
     cash_due = any(o.payment_method == 'cash' and o.payment_status != 'paid' for o in orders)
     served = bool(orders) and all(o.status == 'delivered' for o in orders)
     first = orders[0] if orders else None
+    persisted_bill = session.bills.first() if session is not None else None
     bill = {
         'kind': kind,
         'label': label,
@@ -502,6 +503,8 @@ def _make_bill(kind, label, orders, guests, seats, state, session=None):
         'seats': seats,
         'order_ids': [o.id for o in orders],
         'bill_no': first.id if first else None,
+        'persisted_bill_id': persisted_bill.id if persisted_bill else None,
+        'is_billed': persisted_bill.is_billed if persisted_bill else False,
         'items': _bill_lines(orders),
         'total': total,
         'paid': paid,
@@ -537,7 +540,8 @@ def server_table_billing(request, table_id):
 
     bills = []
 
-    # 1) QR / table orders of this table: ONE combined bill (same rule as the bill page)
+    # 1) QR orders: one bill per QR session. Legacy orders without sessions keep
+    # the previous single table bill.
     table_orders = list(
         _not_walkin(Order.objects.visible_to_staff()
                     .filter(table_id=table.id, table_released=False))
@@ -545,10 +549,24 @@ def server_table_billing(request, table_id):
         .select_related('taken_by')
         .prefetch_related('items__food_item')
         .order_by('created_at', 'id'))
-    if table_orders:
-        guests = max((o.guests or 0 for o in table_orders), default=0) or None
-        source = 'QR Group' if any(not o.taken_by_id for o in table_orders) else 'Table order'
-        bills.append(_make_bill('table', source, table_orders, guests, guests, 'seated'))
+    qr_sessions = (TableSession.objects
+                   .filter(source=TableSession.SOURCE_QR,
+                           orders__table_id=table.id,
+                           orders__table_released=False)
+                   .prefetch_related('bills')
+                   .distinct()
+                   .order_by('started_at'))
+    for session in qr_sessions:
+        orders = [o for o in table_orders if o.table_session_id == session.id]
+        if not orders:
+            continue
+        guests = session.guest_count or max((o.guests or 0 for o in orders), default=0) or None
+        bills.append(_make_bill('table', 'QR Group', orders, guests, guests, 'seated', session=session))
+    legacy_orders = [o for o in table_orders if o.table_session_id is None]
+    if legacy_orders:
+        guests = max((o.guests or 0 for o in legacy_orders), default=0) or None
+        source = 'QR Group' if any(not o.taken_by_id for o in legacy_orders) else 'Table order'
+        bills.append(_make_bill('table', source, legacy_orders, guests, guests, 'seated'))
 
     # 2) Every walk-in customer / group that has seats on this table
     sessions = (TableSession.objects

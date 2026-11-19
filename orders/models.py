@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import User
 from django.utils import timezone
 from menu.models import FoodItem
@@ -35,6 +36,35 @@ class Coupon(models.Model):
         if self.usage_limit and self.times_used >= self.usage_limit:
             return False
         return True
+
+
+class Bill(models.Model):
+    """Persistent billing group for a seating session.
+
+    The line items and totals remain derived from that session's Orders so
+    existing payment and dashboard behavior stays authoritative.
+    """
+
+    table_session = models.ForeignKey(
+        TableSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='bills',
+    )
+    is_billed = models.BooleanField(default=False)
+    is_closed = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['table_session'],
+                condition=Q(table_session__isnull=False),
+                name='unique_bill_per_table_session',
+            ),
+        ]
 
 
 class OrderQuerySet(models.QuerySet):

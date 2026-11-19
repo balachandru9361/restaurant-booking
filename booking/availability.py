@@ -17,12 +17,10 @@ from django.utils import timezone
 #     has SeatAllocation rows does NOT hold the whole table. Its seats are
 #     tracked by SeatAllocation (see booking/seating.py), so other groups can
 #     use the remaining seats of the same table.
-#   - NEW: for WALK-IN SEATING ONLY, an order that has a guest count (Order.guests)
-#     does not block the whole table either. Its guests use that many seats, so
-#     "Table 5: 6 seats, 2 customers, 4 free" can be shown and walk-ins can use the
-#     remaining seats. An old order without a guest count still blocks the whole table.
-#     Everything outside walk-in seating (admin Open Table, QR page, booking
-#     screens) still treats every live order as a whole-table hold.
+#   - QR groups reserve seats through their active TableSession.guest_count; their
+#     orders never create a whole-table hold.
+#   - WALK-IN SEATING also counts guest-counted orders and SeatAllocation rows so
+#     the remaining seats can be offered to another group.
 #   - NEW: WALK-IN SEATING USES NORMAL TABLES ONLY. A table with table_type='booking'
 #     is kept for customer reservations and is never suggested to a walk-in group.
 #
@@ -89,9 +87,9 @@ def get_holds():
     """All holds that are still in effect: approved bookings that the admin has not
     opened yet, and live orders. No date or age limit is applied.
 
-    Orders that belong to a seat-managed session (a session with SeatAllocation
-    rows) are skipped: they must not close the whole table, because the seats of
-    that table are shared between customer groups."""
+    Orders belonging to QR sessions or seat-managed sessions are skipped. QR
+    guests and allocated walk-in seats are counted separately from whole-table
+    order holds."""
     from orders.models import Order
     from .models import SeatAllocation, TableBooking
 
@@ -134,10 +132,12 @@ def get_holds():
             table_released=False,
         )
         .exclude(status='cancelled')
-        .select_related('user')
+        .select_related('user', 'table_session')
     )
     for o in orders:
         # The Order field is `table_session`, so the attribute is `table_session_id`.
+        if o.table_session_id and o.table_session.source == o.table_session.SOURCE_QR:
+            continue
         if o.table_session_id in seat_managed_sessions:
             continue
         unpaid_checkout = (o.status == 'pending' and o.payment_status == 'pending')
@@ -220,6 +220,28 @@ def is_table_busy_now(table_id, user=None, buffer=WALKIN_BUFFER):
     return False
 
 
+def is_table_reserved_now(table_id, user=None, buffer=WALKIN_BUFFER):
+    """True only for an approved booking hold, ignoring existing orders."""
+    now = timezone.now()
+    for hold in active_holds():
+        if (
+            hold.kind == 'booking'
+            and _is_confirmed_booking(hold)
+            and hold.table_id == table_id
+            and not (user is not None and hold.user_id == user.id)
+        ):
+            return True
+    for hold in upcoming_holds():
+        if (
+            hold.table_id == table_id
+            and _is_confirmed_booking(hold)
+            and hold.start - now <= buffer
+            and not (user is not None and hold.user_id == user.id)
+        ):
+            return True
+    return False
+
+
 def walkin_blocked_table_ids(buffer=WALKIN_BUFFER, holds=None):
     """Set of table ids that CANNOT be used for seat based walk-in seating right now.
 
@@ -253,7 +275,7 @@ def walkin_blocked_table_ids(buffer=WALKIN_BUFFER, holds=None):
 
 
 def _order_guest_seats(holds):
-    """NEW: {table_id: seats} used by live orders that have a guest count.
+    """{table_id: seats} used by non-QR live orders that have a guest count.
 
     One table can have several orders (the same customers order again: juice,
     dessert). They are the same people, so the table counts the LARGEST guest
@@ -265,6 +287,78 @@ def _order_guest_seats(holds):
         n = int(h.obj.guests)
         seats[h.table_id] = max(seats.get(h.table_id, 0), n)
     return seats
+
+
+def _legacy_qr_session_seats(table_id=None):
+    """Seat counts for pre-token QR sessions whose guest_count is not populated."""
+    from django.db.models import Max, Q, Sum
+    from orders.models import Order
+    from .models import TableSession
+
+    orders = (
+        Order.objects.filter(
+            table_session__source=TableSession.SOURCE_QR,
+            table_session__is_active=True,
+            table_session__closed_at__isnull=True,
+            table_session__departed_at__isnull=True,
+            table_session__guest_count__isnull=True,
+            table_released=False,
+        )
+        .exclude(status='cancelled')
+        .filter(
+            Q(table_session__bills__isnull=True)
+            | Q(table_session__bills__is_billed=False,
+                table_session__bills__is_closed=False)
+        )
+    )
+    if table_id is not None:
+        orders = orders.filter(table_id=table_id)
+    rows = (orders.order_by()
+            .values('table_id', 'table_session_id')
+            .annotate(guests=Max('guests')))
+    seats = {}
+    for row in rows:
+        seats[row['table_id']] = seats.get(row['table_id'], 0) + (row['guests'] or 0)
+    return seats
+
+
+def table_available_seats(table):
+    """Seats available to a new QR group at one table.
+
+    QR groups reserve their guest_count once per active TableSession. Existing
+    walk-in seat allocations and legacy live orders continue to count as before.
+    """
+    from django.db.models import Q, Sum
+    from .models import SeatAllocation, TableSession
+
+    now = timezone.now()
+    allocations = (
+        SeatAllocation.objects
+        .filter(
+            Q(status__in=[SeatAllocation.OCCUPIED, SeatAllocation.CLEANING])
+            | Q(status=SeatAllocation.HELD, held_until__gt=now),
+            table=table,
+        )
+        .aggregate(total=Sum('seats'))['total'] or 0
+    )
+    qr_sessions = TableSession.objects.filter(
+        table=table,
+        source=TableSession.SOURCE_QR,
+        is_active=True,
+        closed_at__isnull=True,
+        departed_at__isnull=True,
+        guest_count__isnull=False,
+    ).filter(
+        Q(bills__isnull=True)
+        | Q(bills__is_billed=False, bills__is_closed=False)
+    )
+    qr_guests = qr_sessions.aggregate(total=Sum('guest_count'))['total'] or 0
+    legacy_qr_guests = _legacy_qr_session_seats(table.id).get(table.id, 0)
+    legacy_guests = _order_guest_seats(get_holds()).get(table.id, 0)
+    return max(
+        table.capacity - allocations - qr_guests - legacy_qr_guests - legacy_guests,
+        0,
+    )
 
 
 # Walk-in Seat Availability (read only helpers, nothing is saved here)
@@ -280,15 +374,37 @@ def walkin_free_seats(buffer=WALKIN_BUFFER):
         capacity
         - seats of live SeatAllocation rows (occupied, awaiting cleaning, or a hold that
           has not expired), the same rule Table.seats_taken uses
-        - NEW: guests of live orders that have a guest count (see _order_guest_seats)
+        - active QR session guest counts
+        - guests of other live orders that have a guest count
     All tables are counted with ONE query for the seats, and the holds are loaded once."""
     from django.db.models import Q, Sum
-    from .models import SeatAllocation, Table
+    from .models import SeatAllocation, Table, TableSession
 
     now = timezone.now()
     holds = get_holds()
     blocked = walkin_blocked_table_ids(buffer, holds)
     order_seats = _order_guest_seats(holds)
+
+    qr_taken_rows = (
+        TableSession.objects
+        .filter(
+            source=TableSession.SOURCE_QR,
+            is_active=True,
+            closed_at__isnull=True,
+            departed_at__isnull=True,
+            guest_count__isnull=False,
+        )
+        .filter(
+            Q(bills__isnull=True)
+            | Q(bills__is_billed=False, bills__is_closed=False)
+        )
+        .order_by()
+        .values('table_id')
+        .annotate(total=Sum('guest_count'))
+    )
+    qr_taken = {row['table_id']: row['total'] or 0 for row in qr_taken_rows}
+    for table_id, seats in _legacy_qr_session_seats().items():
+        qr_taken[table_id] = qr_taken.get(table_id, 0) + seats
 
     taken_rows = (
         SeatAllocation.objects
@@ -308,7 +424,7 @@ def walkin_free_seats(buffer=WALKIN_BUFFER):
         if t.id in blocked:
             free = 0
         else:
-            used = taken.get(t.id, 0) + order_seats.get(t.id, 0)
+            used = taken.get(t.id, 0) + order_seats.get(t.id, 0) + qr_taken.get(t.id, 0)
             free = max(t.capacity - used, 0)
         result.append((t, free))
     return result
