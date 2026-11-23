@@ -5,13 +5,11 @@ from django.db import close_old_connections, connection
 from django.test import Client, TransactionTestCase
 from django.urls import reverse
 
-from booking.models import SeatAllocation, Table, TableSession
+from booking.models import Table, TableSession
 from dashboard.views import _table_bill_orders
 from menu.models import Category, FoodItem
 from .cart_state import QR_SESSION_COOKIE
-from .models import Bill, Order, OrderItem
-from django.contrib.auth.models import User
-from accounts.models import Profile
+from .models import Bill, Order
 
 
 class QRGuestSessionTests(TransactionTestCase):
@@ -113,74 +111,6 @@ class QRGuestSessionTests(TransactionTestCase):
         self.assertEqual(Bill.objects.filter(table_session__table=self.table).count(), 3)
         self.assertEqual(Bill.objects.filter(table_session=session_a).count(), 1)
         self.assertEqual(Bill.objects.filter(table_session=session_b).count(), 1)
-
-    def test_two_server_sessions_remain_billed_and_paid_separately(self):
-        waiter = User.objects.create_user('waiter-groups', password='x', is_staff=True)
-        Profile.objects.create(user=waiter, role='server')
-        self.client.force_login(waiter)
-
-        session_a = TableSession.objects.create(
-            table=self.table, group_name='Group A', guests=3, guest_count=3,
-            source=TableSession.SOURCE_WALKIN, allocated_by=waiter,
-        )
-        session_b = TableSession.objects.create(
-            table=self.table, group_name='Group B', guests=3, guest_count=3,
-            source=TableSession.SOURCE_WALKIN, allocated_by=waiter,
-        )
-        SeatAllocation.objects.create(
-            session=session_a, table=self.table, seats=3, status=SeatAllocation.OCCUPIED)
-        SeatAllocation.objects.create(
-            session=session_b, table=self.table, seats=3, status=SeatAllocation.OCCUPIED)
-        Bill.objects.create(table_session=session_a)
-        Bill.objects.create(table_session=session_b)
-
-        def take(session, quantity):
-            response = self.client.post(
-                reverse('dashboard:server_take_order'),
-                data={
-                    'session_id': session.id,
-                    'items': [{'food_item_id': self.food.id, 'quantity': quantity}],
-                },
-                content_type='application/json',
-            )
-            self.assertEqual(response.status_code, 200)
-            self.assertTrue(response.json()['ok'])
-            return Order.objects.get(pk=response.json()['order_id'])
-
-        order_a = take(session_a, 1)
-        order_b = take(session_b, 2)
-        self.assertEqual(order_a.table_session_id, session_a.id)
-        self.assertEqual(order_b.table_session_id, session_b.id)
-
-        self.assertEqual(
-            [o.id for o in _table_bill_orders(order_a)],
-            [order_a.id],
-        )
-        self.assertEqual(
-            [o.id for o in _table_bill_orders(order_b)],
-            [order_b.id],
-        )
-
-        cash_url = reverse('dashboard:server_table_cash_received', args=[order_a.id])
-        self.assertEqual(self.client.post(cash_url).status_code, 302)
-        order_a.refresh_from_db()
-        order_b.refresh_from_db()
-        self.assertEqual(order_a.payment_status, 'paid')
-        self.assertEqual(order_b.payment_status, 'cash_pending')
-
-        session_a.mark_departed()
-        session_a.refresh_from_db()
-        session_b.refresh_from_db()
-        self.assertFalse(session_a.is_active)
-        self.assertTrue(session_b.is_active)
-        session_a.confirm_cleaning(waiter)
-        self.assertEqual(
-            sum(a.seats for a in SeatAllocation.objects.filter(
-                table=self.table,
-                status__in=[SeatAllocation.OCCUPIED, SeatAllocation.CLEANING],
-            )),
-            3,
-        )
 
     def test_only_one_concurrent_order_can_reserve_the_last_seats(self):
         if connection.vendor != 'postgresql':

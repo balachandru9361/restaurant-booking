@@ -353,9 +353,6 @@ def _create_session_order(request, session, lines, total, guest_name=''):
     """Creates one kitchen order (cash at the counter) that belongs to this group.
     Call it inside transaction.atomic()."""
     from .views import _deduct_stock_for_order
-    from orders.models import Bill
-
-    Bill.objects.get_or_create(table_session=session)
 
     order = Order.objects.create(
         user=request.user,
@@ -564,8 +561,7 @@ def server_table_billing(request, table_id):
         if not orders:
             continue
         guests = session.guest_count or max((o.guests or 0 for o in orders), default=0) or None
-        label = session.display_name
-        bills.append(_make_bill('table', f'{label} · {session.display_id}', orders, guests, guests, 'seated', session=session))
+        bills.append(_make_bill('table', 'QR Group', orders, guests, guests, 'seated', session=session))
     legacy_orders = [o for o in table_orders if o.table_session_id is None]
     if legacy_orders:
         guests = max((o.guests or 0 for o in legacy_orders), default=0) or None
@@ -587,8 +583,7 @@ def server_table_billing(request, table_id):
                       .select_related('taken_by')
                       .prefetch_related('items__food_item')
                       .order_by('created_at', 'id'))
-        label = s.display_name
-        label = f'{label} · {s.display_id}'
+        label = s.group_name or 'Walk-in customer'
         bills.append(_make_bill('walkin', label, orders, s.guests, seats,
                                 'seated' if seated else 'cleaning', session=s))
 

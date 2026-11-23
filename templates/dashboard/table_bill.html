@@ -150,9 +150,6 @@
   <div class="bill-body">
     <div class="chips">
       <span class="chip-table">{% if table %}🪑 Table {{ table.number }}{% else %}🥡 Takeaway{% endif %}</span>
-      {% if group_display_id %}
-        <span class="chip-table">👥 {{ group_display_name }} · {{ group_display_id }}</span>
-      {% endif %}
       <span class="chip-date">🕒 {{ now|date:"d M Y, h:i A" }}</span>
     </div>
     <div class="order-ids">

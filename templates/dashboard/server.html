@@ -619,15 +619,6 @@
       <p class="to-label">1. Select Table</p>
       <div class="to-group" id="toGroupBar" hidden></div>
       <div class="to-tables" id="toTables">
-        {% for session in active_table_sessions %}
-          <button type="button"
-                  class="to-chip in-use"
-                  data-session-id="{{ session.id }}"
-                  data-label="TABLE {{ session.table.number }} · {{ session.display_name }} · {{ session.display_id }}">
-            🪑 Table {{ session.table.number }}
-            <small>👥 {{ session.display_name }} · {{ session.display_id }}{% if session.guest_count %} · {{ session.guest_count }} guests{% endif %}</small>
-          </button>
-        {% endfor %}
         {% for t in tables_info %}
           {% if t.held_by %}
             {# customer is still at this table: the server can add a new order (juice, dessert...) to it #}
@@ -1675,15 +1666,6 @@
     document.getElementById('toTables').addEventListener('click', e => {
       const chip = e.target.closest('.to-chip');
       if (!chip || chip.disabled) return;   // occupied tables cannot be picked
-      if (chip.dataset.sessionId) {
-        selectedTable = 'session:' + chip.dataset.sessionId;
-        selectedLabel = chip.dataset.label;
-        guestsInput.value = '';
-        document.querySelectorAll('#toTables .to-chip').forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        recalc();
-        return;
-      }
       const changedTable = String(selectedTable) !== String(chip.dataset.table);
       document.querySelectorAll('#toTables .to-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');

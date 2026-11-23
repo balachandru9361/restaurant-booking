@@ -1976,8 +1976,6 @@ def _group_sessions(session_ids):
             label = f'QR group at {label}'
         out[s.id] = {
             'label': label,
-            'display_id': s.display_id,
-            'display_name': s.display_name,
             'guests': s.guest_count or s.guests,
             'started': s.started_at,
         }
@@ -1993,8 +1991,6 @@ def _mark_groups(orders):
         g = info.get(o.table_session_id)
         o.group_session_id = o.table_session_id if g else None
         o.group_label = g['label'] if g else ''
-        o.group_display_id = g['display_id'] if g else ''
-        o.group_display_name = g['display_name'] if g else ''
         o.group_guests = g['guests'] if g else None
         o.group_since = g['started'] if g else None
     return orders
@@ -2192,15 +2188,6 @@ def server_dashboard(request):
         'todays_bookings': todays_bookings,
         'tables': _free_tables(),
         'tables_info': _tables_info(),
-        'active_table_sessions': (
-            TableSession.objects
-            .filter(is_active=True, closed_at__isnull=True, departed_at__isnull=True)
-            .exclude(bills__is_billed=True)
-            .exclude(bills__is_closed=True)
-            .select_related('table')
-            .distinct()
-            .order_by('table__number', 'started_at')
-        ),
         'food_items': _orderable_food_items(),
     }
     return render(request, 'dashboard/server.html', context)
@@ -2238,8 +2225,6 @@ def server_table_bill(request, pk):
         'orders': orders,
         'table': order.table,
         'group_label': grouped.group_label,      # NEW: 'Tables 1, 2, 4' ('' for a normal table)
-        'group_display_id': grouped.group_display_id,
-        'group_display_name': grouped.group_display_name,
         'group_guests': grouped.group_guests,    # NEW
         'lines': list(lines.values()),
         'items_total': items_total,
@@ -2384,7 +2369,12 @@ def server_free_table(request, pk):
             with transaction.atomic():
                 Order.objects.filter(pk__in=[o.id for o in on_table]).update(table_released=True)
                 if qr_group is not None:
-                    qr_group.mark_departed()
+                    TableSession.objects.filter(pk=qr_group.pk).update(
+                        is_active=False, closed_at=timezone.now()
+                    )
+                    qr_group.bills.update(
+                        is_billed=True, is_closed=True, closed_at=timezone.now()
+                    )
                 else:
                     # End the dine-in session of this table, so "Order again" from
                     # My Orders no longer works after the customer has left.
@@ -2449,31 +2439,12 @@ def server_take_order(request):
     if not rows:
         return JsonResponse({'ok': False, 'error': 'Add at least one item'}, status=400)
 
-    session_id = data.get('session_id')
-    selected_session = None
-    if session_id not in (None, ''):
-        try:
-            session_id = int(session_id)
-        except (TypeError, ValueError):
-            return JsonResponse({'ok': False, 'error': 'Invalid seating session.'}, status=400)
-        selected_session = TableSession.objects.select_related('table').filter(
-            pk=session_id,
-            is_active=True,
-            closed_at__isnull=True,
-            departed_at__isnull=True,
-        ).first()
-        if not selected_session:
-            return JsonResponse({'ok': False, 'error': 'This seating session is no longer active.'}, status=400)
-        table = selected_session.table
-
     table = None
     table_id = data.get('table_id')
     if table_id is not None:
         table = Table.objects.filter(pk=table_id).first()
         if not table:
             return JsonResponse({'ok': False, 'error': 'Table not found'}, status=400)
-        if selected_session is not None and selected_session.table_id != table.id:
-            return JsonResponse({'ok': False, 'error': 'This seating session belongs to a different table.'}, status=400)
         # CHANGED: a table already held by a customer who is still eating can take more orders.
         # Only a booking hold blocks the table.
         # CHANGED: the orders of a walk-in group do not count as "a customer eating at this table".
@@ -2553,50 +2524,9 @@ def server_take_order(request):
     order_item_fields = {f.name for f in OrderItem._meta.get_fields()}
 
     with transaction.atomic():
-        if table is not None and selected_session is None:
-            locked_table = Table.objects.select_for_update().get(pk=table.pk)
-            selected_session = (
-                TableSession.objects.select_for_update()
-                .filter(
-                    table=locked_table,
-                    is_active=True,
-                    closed_at__isnull=True,
-                    departed_at__isnull=True,
-                    source=TableSession.SOURCE_WALKIN,
-                )
-                .filter(allocations__status=SeatAllocation.OCCUPIED)
-                .distinct()
-                .order_by('-started_at')
-                .first()
-            )
-            if selected_session is None:
-                if guests is None:
-                    guests = 1
-                selected_session = TableSession.objects.create(
-                    table=locked_table,
-                    group_name=str(data.get('group_name') or '').strip()[:100],
-                    guests=guests,
-                    guest_count=guests,
-                    source=TableSession.SOURCE_WALKIN,
-                    allocated_by=request.user,
-                )
-                SeatAllocation.objects.create(
-                    session=selected_session,
-                    table=locked_table,
-                    seats=guests,
-                    status=SeatAllocation.OCCUPIED,
-                )
-            else:
-                guests = selected_session.guest_count or selected_session.guests or guests
-
-        if selected_session is not None:
-            from orders.models import Bill
-            Bill.objects.get_or_create(table_session=selected_session)
-
         order = Order.objects.create(
             user=request.user,            # server's own account (no migration needed)
             table=table,                  # None => Takeaway
-            table_session=selected_session,
             order_type='dine_in' if table else 'takeaway',
             guests=guests,                # NEW (guests): people at the table (None for takeaway / unknown)
             total_amount=total,

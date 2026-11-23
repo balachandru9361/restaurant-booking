@@ -208,15 +208,6 @@ class TableSession(models.Model):
         return f"{label} " + ", ".join(str(n) for n in numbers)
 
     @property
-    def display_id(self):
-        """Stable, human-readable identifier for staff screens."""
-        return f"T{self.table.number}-G{self.pk:03d}" if self.pk else ""
-
-    @property
-    def display_name(self):
-        return self.group_name or self.display_id
-
-    @property
     def seats_summary(self):
         """'4 + 3 = 7 seats' style text for dashboards."""
         seats = [a.seats for a in self.live_allocations]
