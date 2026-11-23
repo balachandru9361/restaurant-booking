@@ -28,33 +28,107 @@
   .seat-card.cleaning .seat-btn { background: #fef3c7; color: #92400e; }
   .seat-card.cleaning .seat-btn:hover { background: #f59e0b; color: #fff; }
   .seat-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-  .tbl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
-  .tbl-card {
-    background: #fff; border-radius: 12px; padding: 12px 14px; border-left: 4px solid #16a34a;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  }
-  .tbl-card .tbl-name { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 15px; color: #0d1b2a; }
-  .tbl-card .tbl-line { font-size: 12.5px; color: #374151; margin-top: 4px; font-weight: 600; }
-  .tbl-card .tbl-note { font-size: 11.5px; color: #92400e; margin-top: 4px; font-weight: 700; }
-  .tbl-card.partial { border-left-color: #f59e0b; background: #fffdf5; }
-  .tbl-card.full { border-left-color: #dc2626; background: #fff5f5; }
-  .tbl-card.held { border-left-color: #6366f1; background: #f5f6ff; }
-  .tbl-card .tbl-free { font-weight: 800; color: #166534; }
-  .tbl-card.partial .tbl-free { color: #92400e; }
-  .tbl-card.full .tbl-free { color: #b91c1c; }
   .seat-btns { display: flex; gap: 8px; flex-wrap: wrap; }
   .seat-btn.order { background: #fff4d6; color: #92650a; }
   .seat-btn.order:hover { background: #d4af37; color: #0d1b2a; }
   /* NEW: Cancel seating (customer changed their mind before ordering) */
   .seat-btn.cancel { background: #fee2e2; color: #b91c1c; }
   .seat-btn.cancel:hover { background: #b91c1c; color: #fff; }
-  @media (max-width: 640px) { .seat-btns { width: 100%; } .seat-btn { flex: 1; padding: 12px; font-size: 14px; } }
+
+  /* ================= Tables: Seats and Customers (redesigned) ================= */
+  .tbl-legend {
+    display: flex; flex-wrap: wrap; gap: 8px 14px; margin: -4px 0 14px;
+    font-size: 12px; font-weight: 700; color: #4b5563;
+  }
+  .tbl-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .tbl-legend i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+  .tbl-legend .lg-free { background: #22c55e; }
+  .tbl-legend .lg-part { background: #f59e0b; }
+  .tbl-legend .lg-full { background: #ef4444; }
+  .tbl-legend .lg-clean { background: #fbbf24; box-shadow: 0 0 0 2px #fde68a; }
+  .tbl-legend .lg-res { background: #7c3aed; }
+  .tbl-legend .lg-keep { background: #fff; border: 2px dashed #a5b4fc; width: 9px; height: 9px; }
+
+  .tbl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .tbl-card {
+    position: relative; background: #fff; border-radius: 14px; padding: 14px 14px 12px;
+    border: 1.5px solid #bbf7d0; border-top: 5px solid #22c55e;
+    box-shadow: 0 3px 12px rgba(13,27,42,0.07);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .tbl-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(13,27,42,0.12); }
+  .tbl-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .tbl-card .tbl-name { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 17px; color: #0d1b2a; line-height: 1.1; }
+  .tbl-card .tbl-cap { font-size: 11.5px; font-weight: 700; color: #6b7280; margin-top: 3px; }
+  .tbl-badge {
+    font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 999px;
+    white-space: nowrap; letter-spacing: 0.02em;
+    background: #dcfce7; color: #166534;
+  }
+  /* seat dots: one dot per seat */
+  .tbl-dots { display: flex; flex-wrap: wrap; gap: 5px; margin: 11px 0 9px; }
+  .tbl-dots i {
+    width: 14px; height: 14px; border-radius: 50%; display: inline-block;
+    background: #22c55e; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.12);
+  }
+  .tbl-dots i.used { background: #ef4444; }
+  .tbl-dots i.clean { background: #fbbf24; box-shadow: 0 0 0 2px #fde68a; }
+  /* the big readable line: "1 customer · 5 free" */
+  .tbl-status {
+    display: inline-block; font-size: 13.5px; font-weight: 800; padding: 4px 11px;
+    border-radius: 999px; background: #dcfce7; color: #166534;
+  }
+  .tbl-status .sep { opacity: 0.5; margin: 0 4px; }
+  .tbl-card .tbl-note { font-size: 11.5px; color: #92400e; margin-top: 8px; font-weight: 800; }
+
+  .tbl-card.partial { border-color: #fed7aa; border-top-color: #f59e0b; background: linear-gradient(180deg, #fffaf0, #fff 60%); }
+  .tbl-card.partial .tbl-badge, .tbl-card.partial .tbl-status { background: #ffedd5; color: #c2410c; }
+  .tbl-card.full { border-color: #fecaca; border-top-color: #ef4444; background: linear-gradient(180deg, #fff5f5, #fff 60%); }
+  .tbl-card.full .tbl-badge, .tbl-card.full .tbl-status { background: #fee2e2; color: #b91c1c; }
+
+  /* Booking tables: "Reserved by <name>" (booked) */
+  .tbl-card.reserved {
+    border-color: #ddd6fe; border-top-color: #7c3aed;
+    background: linear-gradient(180deg, #f5f3ff, #fff 70%);
+  }
+  .tbl-card.reserved .tbl-badge { background: #ede9fe; color: #6d28d9; }
+  .res-label { font-size: 10.5px; font-weight: 800; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 12px; }
+  .res-name { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 800; color: #0d1b2a; margin-top: 2px; word-break: break-word; }
+  .res-time {
+    display: inline-flex; align-items: center; gap: 5px; margin-top: 8px;
+    background: #6d28d9; color: #fff; font-size: 12px; font-weight: 800;
+    padding: 4px 11px; border-radius: 999px;
+  }
+  .res-time.soon { background: #dc2626; animation: resSoon 1.6s ease-in-out infinite; }
+  @keyframes resSoon { 0%,100% { opacity: 1; } 50% { opacity: 0.65; } }
+
+  /* Booking tables: "kept for reservations" (nobody booked yet) */
+  .tbl-card.keep {
+    border: 2px dashed #c7d2fe; border-top: 2px dashed #c7d2fe; background: #f8f9ff; box-shadow: none;
+  }
+  .tbl-card.keep .tbl-name { color: #4b5563; }
+  .tbl-card.keep .tbl-badge { background: #e0e7ff; color: #4338ca; }
+  .keep-line { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; font-weight: 800; color: #4338ca; }
+  .keep-line small { display: block; font-size: 11px; font-weight: 600; color: #6b7280; margin-top: 1px; }
+
+  @media (max-width: 640px) {
+    .seat-btns { width: 100%; } .seat-btn { flex: 1; padding: 12px; font-size: 14px; }
+    .tbl-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  }
 </style>
 
 <div class="board-col seat-panel" id="tablePanel">
   <div class="board-col-header">
     <h3>🍽️ Tables: Seats and Customers</h3>
     <span class="board-count" id="tableFreeCount">0 free</span>
+  </div>
+  <div class="tbl-legend">
+    <span><i class="lg-free"></i>Free</span>
+    <span><i class="lg-part"></i>Partly used</span>
+    <span><i class="lg-full"></i>Full</span>
+    <span><i class="lg-clean"></i>Needs cleaning</span>
+    <span><i class="lg-res"></i>Reserved (booked)</span>
+    <span><i class="lg-keep"></i>Kept for reservations</span>
   </div>
   <div class="tbl-grid" id="seatTables"><div class="empty-col">Loading tables...</div></div>
 </div>
@@ -201,6 +275,54 @@
     const tablesBox = document.getElementById('seatTables');
     const freeCount = document.getElementById('tableFreeCount');
 
+    // ---- Booking table helpers ----
+    // The server sends one text line (t.note) for a booking table, for example
+    //   "Booking Table: Reserved by varun"  or  "Booking Table: kept for reservations".
+    // We read the guest name and the time out of that text, so no backend change is needed.
+    function parseNote(note) {
+      note = String(note || '');
+      const nameMatch = note.match(/reserved by\s+(.+?)(?:\s+(?:at|for|@)\s+\d.*)?$/i);
+      const timeMatch = note.match(/(\d{1,2}):(\d{2})\s*([AP]M)/i);
+      const reserved = !!nameMatch || /reserved|booked/i.test(note) && !/kept for/i.test(note);
+      let name = nameMatch ? nameMatch[1].replace(/[.\s]+$/, '').trim() : '';
+      let when = '';
+      let minsLeft = null;
+      if (timeMatch) {
+        let h = parseInt(timeMatch[1], 10) % 12;
+        if (/pm/i.test(timeMatch[3])) h += 12;
+        const m = parseInt(timeMatch[2], 10);
+        when = timeMatch[1] + ':' + timeMatch[2] + ' ' + timeMatch[3].toUpperCase();
+        const now = new Date();
+        minsLeft = (h * 60 + m) - (now.getHours() * 60 + now.getMinutes());
+      }
+      return { reserved: reserved, name: name, when: when, minsLeft: minsLeft };
+    }
+
+    function timeText(minsLeft) {
+      if (minsLeft === null) return '';
+      if (minsLeft > 0 && minsLeft <= 180) {
+        const h = Math.floor(minsLeft / 60), m = minsLeft % 60;
+        return ' · in ' + (h ? h + 'h ' : '') + m + ' min';
+      }
+      if (minsLeft <= 0 && minsLeft > -180) return ' · now';
+      return '';
+    }
+
+    function seatDots(t) {
+      const cap = parseInt(t.capacity, 10) || 0;
+      if (!cap || cap > 16) return null;       // very big tables: skip the dots
+      const used = Math.min(cap, parseInt(t.customers, 10) || 0);
+      const clean = Math.min(cap - used, parseInt(t.cleaning, 10) || 0);
+      const wrap = el('div', 'tbl-dots');
+      for (let i = 0; i < cap; i++) {
+        let cls = '';
+        if (i < used) cls = 'used';
+        else if (i < used + clean) cls = 'clean';
+        wrap.appendChild(el('i', cls));
+      }
+      return wrap;
+    }
+
     function renderTables(rows, freeTotal) {
       freeCount.textContent = freeTotal + ' free seat' + (freeTotal === 1 ? '' : 's');
       tablesBox.innerHTML = '';
@@ -209,19 +331,59 @@
         return;
       }
       rows.forEach(function (t) {
-        const card = el('div', 'tbl-card ' + t.state);
-        card.appendChild(el('div', 'tbl-name', '🪑 Table ' + t.number));
-        const line = el('div', 'tbl-line');
-        if (t.state === 'held') {
-          line.textContent = t.capacity + ' seats';
-          card.appendChild(line);
-          card.appendChild(el('div', 'tbl-note', t.note));
+        const isHeld = t.state === 'held';
+        const info = isHeld ? parseNote(t.note) : null;
+        const cardState = isHeld ? (info.reserved ? 'reserved' : 'keep') : (t.state || 'free');
+        const card = el('div', 'tbl-card ' + cardState);
+
+        // top row: table name + seats, state badge on the right
+        const top = el('div', 'tbl-top');
+        const left = el('div');
+        left.appendChild(el('div', 'tbl-name', 'Table ' + t.number));
+        left.appendChild(el('div', 'tbl-cap', t.capacity + ' seats'));
+        top.appendChild(left);
+
+        if (isHeld) {
+          top.appendChild(el('span', 'tbl-badge', info.reserved ? '🔒 RESERVED' : '📅 RESERVATION TABLE'));
+          card.appendChild(top);
+          if (info.reserved) {
+            card.appendChild(el('div', 'res-label', 'Reserved by'));
+            card.appendChild(el('div', 'res-name', info.name || 'Guest'));
+            if (info.when) {
+              const soon = info.minsLeft !== null && info.minsLeft <= 30 && info.minsLeft > -180;
+              card.appendChild(el('div', 'res-time' + (soon ? ' soon' : ''),
+                '⏰ ' + info.when + timeText(info.minsLeft)));
+            }
+          } else {
+            const keep = el('div', 'keep-line');
+            keep.appendChild(el('span', '', '📅'));
+            const txt = el('div', '', 'Kept for reservations');
+            txt.appendChild(el('small', '', 'Not for walk-in guests'));
+            keep.appendChild(txt);
+            card.appendChild(keep);
+          }
         } else {
-          line.appendChild(document.createTextNode(
-            t.capacity + ' seats, ' + t.customers + ' customer' + (t.customers === 1 ? '' : 's') + ', '));
-          line.appendChild(el('span', 'tbl-free', t.free === 0 ? 'full' : t.free + ' free'));
-          card.appendChild(line);
-          if (t.cleaning) card.appendChild(el('div', 'tbl-note', '🧹 ' + t.cleaning + ' seat' + (t.cleaning === 1 ? '' : 's') + ' waiting for cleaning'));
+          const badge =
+            t.state === 'full' ? '🔴 FULL' :
+            t.state === 'partial' ? '🟠 PARTLY USED' : '🟢 FREE';
+          top.appendChild(el('span', 'tbl-badge', badge));
+          card.appendChild(top);
+
+          const dots = seatDots(t);
+          if (dots) card.appendChild(dots);
+
+          // big line: "1 customer · 5 free"
+          const status = el('div', 'tbl-status');
+          const c = parseInt(t.customers, 10) || 0;
+          status.appendChild(document.createTextNode(c + ' customer' + (c === 1 ? '' : 's')));
+          status.appendChild(el('span', 'sep', '·'));
+          status.appendChild(document.createTextNode(t.free === 0 ? 'full' : t.free + ' free'));
+          card.appendChild(status);
+
+          if (t.cleaning) {
+            card.appendChild(el('div', 'tbl-note',
+              '🧹 ' + t.cleaning + ' seat' + (t.cleaning === 1 ? '' : 's') + ' waiting for cleaning'));
+          }
         }
         tablesBox.appendChild(card);
       });
@@ -238,6 +400,6 @@
 
     window.refreshSeatingPanel = loadAll;
     window.addEventListener('load', loadAll);
-    setInterval(loadAll, 15000);
+    setInterval(function () { if (!document.hidden) loadAll(); }, 60000);   // safety net only, server_poll triggers the real refresh
   })();
 </script>
