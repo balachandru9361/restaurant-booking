@@ -653,6 +653,7 @@ def view_cart(request):
         'known_guests': known_guests,
         'available_seats': available_seats,
         'guest_options': guest_options,
+        'customer_type_choices': TableSession.CUSTOMER_TYPE_CHOICES,
         'no_seats_available': bool(selected_table and available_seats == 0),
     }
     return render(request, 'orders/cart.html', context)
@@ -835,6 +836,11 @@ def confirm_order(request):
     )
     guests = None
     validation_error = ''
+    customer_type = request.POST.get(
+        'customer_type', TableSession.CUSTOMER_TYPE_OTHER
+    )
+    if qr_session and customer_type not in dict(TableSession.CUSTOMER_TYPE_CHOICES):
+        validation_error = 'Choose a valid customer type.'
     if order_type == 'dine_in' and not qr_session:
         needs_guest_count = _asks_guests(selected_table, table_session)
         if not needs_guest_count and table_session is not None:
@@ -898,7 +904,10 @@ def confirm_order(request):
                 if not validation_error:
                     table_session.guest_count = guests
                     table_session.guests = guests
-                    table_session.save(update_fields=['guest_count', 'guests'])
+                    table_session.customer_type = customer_type
+                    table_session.save(update_fields=[
+                        'guest_count', 'guests', 'customer_type',
+                    ])
                     selected_table = locked_table
             if not validation_error:
                 Bill.objects.get_or_create(table_session=table_session)
@@ -930,6 +939,8 @@ def confirm_order(request):
                     price=price,
                     options_text=options_text,
                 )
+            if qr_session and table_session is not None:
+                table_session.mark_ordering()
 
     if validation_error:
         messages.error(request, validation_error)

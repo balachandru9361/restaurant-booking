@@ -52,11 +52,13 @@ class Table(models.Model):
     @property
     def seats_taken(self):
         """Seats that cannot be given to a new group right now."""
-        return self._live_allocations().aggregate(total=Sum('seats'))['total'] or 0
+        return max(self.capacity - self.seats_free, 0)
 
     @property
     def seats_free(self):
-        return max(self.capacity - self.seats_taken, 0)
+        from .availability import table_available_seats
+
+        return table_available_seats(self)
 
     @property
     def seats_cleaning(self):
@@ -97,6 +99,32 @@ class TableSession(models.Model):
         (SOURCE_WALKIN, 'Walk-in (server)'),
     ]
 
+    CUSTOMER_TYPE_FAMILY = 'family'
+    CUSTOMER_TYPE_FRIENDS = 'friends'
+    CUSTOMER_TYPE_COUPLE = 'couple'
+    CUSTOMER_TYPE_INDIVIDUAL = 'individual'
+    CUSTOMER_TYPE_OTHER = 'other'
+    CUSTOMER_TYPE_CHOICES = [
+        (CUSTOMER_TYPE_FAMILY, 'Family'),
+        (CUSTOMER_TYPE_FRIENDS, 'Friends'),
+        (CUSTOMER_TYPE_COUPLE, 'Couple'),
+        (CUSTOMER_TYPE_INDIVIDUAL, 'Individual'),
+        (CUSTOMER_TYPE_OTHER, 'Other'),
+    ]
+
+    STATUS_SEATED = 'seated'
+    STATUS_ORDERING = 'ordering'
+    STATUS_DINING = 'dining'
+    STATUS_COMPLETED = 'completed'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (STATUS_SEATED, 'Seated'),
+        (STATUS_ORDERING, 'Ordering'),
+        (STATUS_DINING, 'Dining'),
+        (STATUS_COMPLETED, 'Completed'),
+        (STATUS_CANCELLED, 'Cancelled'),
+    ]
+
     table = models.ForeignKey(Table, on_delete=models.PROTECT, related_name='sessions')
     qr_token = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     started_at = models.DateTimeField(auto_now_add=True)
@@ -105,6 +133,17 @@ class TableSession(models.Model):
 
     # Customer group details.
     group_name = models.CharField(max_length=100, blank=True)
+    customer_type = models.CharField(
+        max_length=12,
+        choices=CUSTOMER_TYPE_CHOICES,
+        default=CUSTOMER_TYPE_OTHER,
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default=STATUS_SEATED,
+        db_index=True,
+    )
     guests = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
     guest_count = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1)])
     source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=SOURCE_QR)
@@ -116,6 +155,21 @@ class TableSession(models.Model):
 
     class Meta:
         ordering = ['-started_at']
+
+    @property
+    def group_id(self):
+        """Stable, unique identifier for this customer group."""
+        return f'G-{self.pk}' if self.pk else ''
+
+    def mark_ordering(self):
+        if self.status == self.STATUS_SEATED:
+            self.status = self.STATUS_ORDERING
+            self.save(update_fields=['status'])
+
+    def mark_dining(self):
+        if self.status in (self.STATUS_SEATED, self.STATUS_ORDERING):
+            self.status = self.STATUS_DINING
+            self.save(update_fields=['status'])
 
     @classmethod
     def get_or_start(cls, table):
@@ -137,7 +191,8 @@ class TableSession(models.Model):
         group is marked departed and the cleaning is confirmed."""
         self.is_active = False
         self.closed_at = timezone.now()
-        self.save(update_fields=['is_active', 'closed_at'])
+        self.status = self.STATUS_COMPLETED
+        self.save(update_fields=['is_active', 'closed_at', 'status'])
         self.bills.update(is_billed=True, is_closed=True, closed_at=self.closed_at)
 
     # ------------------------------------------------------------------
@@ -159,7 +214,11 @@ class TableSession(models.Model):
         if self.is_active and not self.allocations.exclude(
             status=SeatAllocation.CANCELLED
         ).exists():
-            self.close()
+            self.is_active = False
+            self.closed_at = timezone.now()
+            self.status = self.STATUS_CANCELLED
+            self.save(update_fields=['is_active', 'closed_at', 'status'])
+            self.bills.update(is_billed=True, is_closed=True, closed_at=self.closed_at)
 
     @transaction.atomic
     def mark_departed(self):
@@ -175,6 +234,8 @@ class TableSession(models.Model):
             self.is_active = False
             self.closed_at = now
             fields += ['is_active', 'closed_at']
+        self.status = self.STATUS_COMPLETED
+        fields.append('status')
         self.save(update_fields=fields)
         self.bills.update(is_billed=True, is_closed=True, closed_at=now)
 

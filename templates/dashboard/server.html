@@ -403,6 +403,8 @@
     width: 140px; max-width: 100%; padding: 10px 12px; border: 1.5px solid #d1d5db; border-radius: 10px;
     font-size: 16px; font-weight: 700; font-family: 'Inter', sans-serif; box-sizing: border-box;
   }
+  .to-group-name { display: block; width: 100%; margin-bottom: 10px; }
+  .to-group-type { width: 100%; max-width: 260px; }
   .to-guests-input:focus { outline: none; border-color: #0f766e; box-shadow: 0 0 0 4px rgba(15,118,110,0.12); }
   .to-guests-hint { font-size: 12px; font-weight: 600; color: #6b7280; margin-top: 6px; }
   .to-guests-hint.bad { color: #b91c1c; }
@@ -519,6 +521,8 @@
     flex: 1; min-width: 0; padding: 11px 12px; border: 1.5px solid #d1d5db; border-radius: 10px;
     font-size: 16px; font-weight: 700; font-family: 'Inter', sans-serif; box-sizing: border-box;
   }
+  .wk-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .wk-details .wk-input { width: 100%; }
   .wk-input:focus { outline: none; border-color: #0f766e; box-shadow: 0 0 0 4px rgba(15,118,110,0.12); }
   .wk-check {
     border: 0; cursor: pointer; padding: 11px 18px; border-radius: 10px; white-space: nowrap;
@@ -620,12 +624,7 @@
       <div class="to-group" id="toGroupBar" hidden></div>
       <div class="to-tables" id="toTables">
         {% for t in tables_info %}
-          {% if t.held_by %}
-            {# customer is still at this table: the server can add a new order (juice, dessert...) to it #}
-            <button type="button" class="to-chip in-use" data-table="{{ t.id }}" data-capacity="{{ t.capacity }}" data-label="TABLE {{ t.number }} (add more)">
-              🪑 Table {{ t.number }}<small>🟠 Eating · Order #{{ t.held_by }} · add more</small>
-            </button>
-          {% elif t.busy %}
+          {% if t.busy %}
             <button type="button" class="to-chip occupied" disabled>
               🪑 Table {{ t.number }}<small>📅 Booked now</small>
             </button>
@@ -647,6 +646,16 @@
         <label class="to-label" for="toGuests">How many guests at this table?</label>
         <input type="number" class="to-guests-input" id="toGuests" min="1" step="1" inputmode="numeric" placeholder="e.g. 4">
         <div class="to-guests-hint" id="toGuestsHint"></div>
+        <label class="to-label" for="toGroupName">Group name (optional)</label>
+        <input type="text" class="to-guests-input to-group-name" id="toGroupName" maxlength="100">
+        <label class="to-label" for="toCustomerType">Customer type</label>
+        <select class="to-guests-input to-group-type" id="toCustomerType">
+          <option value="other">Other</option>
+          <option value="family">Family</option>
+          <option value="friends">Friends</option>
+          <option value="couple">Couple</option>
+          <option value="individual">Individual</option>
+        </select>
       </div>
 
       <p class="to-label">2. Add Items</p>
@@ -725,6 +734,16 @@
       <div class="wk-row">
         <input type="number" class="wk-input" id="wkGuests" min="1" max="100" inputmode="numeric" placeholder="e.g. 7">
         <button type="button" class="wk-check" id="wkCheck">Check seats</button>
+      </div>
+      <div class="wk-details">
+        <input type="text" class="wk-input" id="wkGroupName" maxlength="100" placeholder="Group name (optional)">
+        <select class="wk-input" id="wkCustomerType" aria-label="Customer type">
+          <option value="other">Other</option>
+          <option value="family">Family</option>
+          <option value="friends">Friends</option>
+          <option value="couple">Couple</option>
+          <option value="individual">Individual</option>
+        </select>
       </div>
       <div class="wk-result" id="wkResult"></div>
     </div>
@@ -1546,12 +1565,11 @@
     const guestsBox = document.getElementById('toGuestsBox');
     const guestsInput = document.getElementById('toGuests');
     const guestsHint = document.getElementById('toGuestsHint');
+    const groupNameInput = document.getElementById('toGroupName');
+    const customerTypeInput = document.getElementById('toCustomerType');
 
     // ---- Guests at the table ----
-    // Needed only for a TABLE order (not takeaway, not a seated walk-in group).
-    // A fresh table needs a guest count (at most the seats that are free on it).
-    // A table whose customer is still eating ("add more") may leave it blank:
-    // the server keeps the same number.
+    // Every manual table order starts a new group and needs an explicit guest count.
     function guestsState() {
       const isTable = selectedTable && selectedTable !== 'takeaway'
         && String(selectedTable).indexOf('session:') !== 0;
@@ -1559,15 +1577,12 @@
 
       const chip = document.querySelector('#toTables .to-chip.active');
       const cap = chip ? (parseInt(chip.dataset.capacity, 10) || 0) : 0;
-      const inUse = !!(chip && chip.classList.contains('in-use'));
       const raw = guestsInput.value.trim();
 
       if (raw === '') {
         return {
-          needed: true, ok: inUse, value: null, bad: false, cap: cap,
-          msg: inUse
-            ? 'Leave blank if it is the same people as before.'
-            : 'Enter the number of guests to place the order.' + (cap ? ' (Up to ' + cap + ' guests)' : '')
+          needed: true, ok: false, value: null, bad: false, cap: cap,
+          msg: 'Enter the number of guests for this new group.' + (cap ? ' (Up to ' + cap + ' guests)' : '')
         };
       }
       const n = Number(raw);
@@ -1613,6 +1628,8 @@
         tablesBox.style.display = '';
       }
       guestsInput.value = '';
+      groupNameInput.value = '';
+      customerTypeInput.value = 'other';
       recalc();
     }
     window.openTakeOrderForGroup = function (g) { setGroup(g); openModal(); };
@@ -1629,6 +1646,8 @@
       });
       document.getElementById('toSearch').value = '';
       guestsInput.value = '';
+      groupNameInput.value = '';
+      customerTypeInput.value = 'other';
       filterMenu('');
       errBox.style.display = 'none';
       recalc();
@@ -1671,7 +1690,11 @@
       chip.classList.add('active');
       selectedTable = chip.dataset.table;
       selectedLabel = chip.dataset.label;
-      if (changedTable) guestsInput.value = '';   // a different table has a different group
+      if (changedTable) {
+        guestsInput.value = '';
+        groupNameInput.value = '';
+        customerTypeInput.value = 'other';
+      }
       recalc();
       if (chip.dataset.table !== 'takeaway' && changedTable) guestsInput.focus();
     });
@@ -1704,8 +1727,15 @@
       if (isGroup) {
         payload = { session_id: Number(String(selectedTable).slice(8)), items: items };
       } else {
-        payload = { table_id: selectedTable === 'takeaway' ? null : Number(selectedTable), items: items };
-        if (gs.needed && gs.value) payload.guests = gs.value;   // only a table order carries guests
+        payload = {
+          table_id: selectedTable === 'takeaway' ? null : Number(selectedTable),
+          items: items
+        };
+        if (gs.needed && gs.value) {
+          payload.guests = gs.value;
+          payload.group_name = groupNameInput.value.trim();
+          payload.customer_type = customerTypeInput.value;
+        }
       }
 
       fetch(isGroup ? "{% url 'dashboard:server_take_session_order' %}" : "{% url 'dashboard:server_take_order' %}", {
@@ -1765,6 +1795,8 @@
     const overlay = document.getElementById('wkOverlay');
     document.body.appendChild(overlay);   // keep it outside the re-rendered liveRegion / page layout
     const input = document.getElementById('wkGuests');
+    const groupName = document.getElementById('wkGroupName');
+    const customerType = document.getElementById('wkCustomerType');
     const checkBtn = document.getElementById('wkCheck');
     const result = document.getElementById('wkResult');
     const checkUrl = "{% url 'dashboard:server_walkin_check' %}";
@@ -1772,6 +1804,8 @@
 
     function openModal() {
       result.innerHTML = '';
+      groupName.value = '';
+      customerType.value = 'other';
       overlay.classList.add('open');
       input.focus();
       input.select();
@@ -1839,6 +1873,8 @@
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN },
         body: JSON.stringify({
           guests: d.guests,
+          group_name: groupName.value,
+          customer_type: customerType.value,
           plan: d.tables.map(function (t) { return { table_id: t.id, seats: t.seats }; })
         })
       })
@@ -1852,7 +1888,7 @@
 
     function seated(info) {
       result.innerHTML = '';
-      result.appendChild(el('div', 'wk-msg ok', '✅ Seated: ' + info.tables + ' (' + info.seats + ')'));
+      result.appendChild(el('div', 'wk-msg ok', '✅ ' + info.group_id + ' seated: ' + info.tables + ' (' + info.seats + ')'));
       const actions = el('div', 'wk-actions');
       const take = el('button', 'wk-take', '➕ Take Order');
       take.type = 'button';

@@ -34,6 +34,7 @@
   .tb-badge.cleaning { background: #fef3c7; color: #92400e; }
   .tb-meta { font-size: 12.5px; color: #4b5563; margin-bottom: 8px; line-height: 1.5; }
   .tb-items { font-size: 12.5px; color: #374151; margin-bottom: 10px; overflow-wrap: anywhere; }
+  .tb-orders { font-size: 12px; color: #4b5563; margin: 0 0 10px; line-height: 1.6; }
   .tb-money { display: flex; justify-content: space-between; align-items: center; background: #f4f6f9; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; font-weight: 700; color: #0d1b2a; }
   .tb-money .amt { font-family: 'Sora', sans-serif; font-size: 17px; }
   .tb-money.due { background: #fef2f2; color: #b91c1c; }
@@ -74,6 +75,7 @@
 <div class="tb-stats">
   <div class="tb-stat seat"><div class="n">{{ used_seats }}/{{ capacity }}</div><div class="l">Seats occupied</div></div>
   <div class="tb-stat"><div class="n">{{ free_seats }}</div><div class="l">Seats free</div></div>
+  <div class="tb-stat"><div class="n">{{ group_count }}</div><div class="l">Active groups</div></div>
   <div class="tb-stat"><div class="n">{{ bill_count }}</div><div class="l">Bills on this table</div></div>
   <div class="tb-stat due"><div class="n">₹{{ due_total|inr }}</div><div class="l">Total to collect</div></div>
 </div>
@@ -84,6 +86,7 @@
       <div class="tb-top">
         <div>
           <div class="tb-label">{% if b.kind == 'table' %}👥{% else %}👤{% endif %} {{ b.label }}</div>
+          {% if b.group_id %}<div class="tb-bill">{{ b.group_id }} · {{ b.customer_type }}</div>{% endif %}
           <div class="tb-bill">
             {% if b.has_orders %}Bill #{{ b.bill_no }}{% if b.order_ids|length > 1 %} · {{ b.order_ids|length }} orders{% endif %}{% else %}No order yet{% endif %}
           </div>
@@ -103,9 +106,17 @@
         {% if b.guests %}{{ b.guests }} guest{{ b.guests|pluralize }}{% else %}guests not entered{% endif %}
         · {% if b.seats %}{{ b.seats }} seat{{ b.seats|pluralize }} used{% else %}seats from the table{% endif %}
         {% if b.has_orders %}· {% if b.served %}served{% else %}not served yet{% endif %}{% endif %}
+        {% if b.group_id %}· {{ b.group_status }} · seated {{ b.seated_at|time:"g:i A" }}{% endif %}
       </div>
 
       {% if b.items %}<div class="tb-items">{{ b.items }}</div>{% endif %}
+      {% if b.order_details %}
+        <div class="tb-orders">
+          {% for order in b.order_details %}
+            Order #{{ order.id }} · {{ order.status }} · {{ order.payment_status }} · ₹{{ order.total|inr }}{% if not forloop.last %}<br>{% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
 
       {% if b.has_orders %}
         <div class="tb-money{% if b.due > 0 %} due{% endif %}">

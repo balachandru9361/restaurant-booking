@@ -24,7 +24,7 @@ import json
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -32,7 +32,9 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from booking.availability import (
-    suggest_walkin_arrangement, table_status_map, upcoming_status_map,
+    active_group_counts_by_table, suggest_walkin_arrangement,
+    is_table_reserved_now, table_available_seats, table_status_map,
+    upcoming_status_map,
     walkin_blocked_table_ids, walkin_free_seats,
 )
 from booking.models import SeatAllocation, Table, TableSession
@@ -136,8 +138,12 @@ def server_walkin_confirm(request):
         guests = int(data.get('guests', 0))
         plan = [(int(p['table_id']), int(p['seats'])) for p in (data.get('plan') or [])]
         group_name = str(data.get('group_name') or '').strip()[:100]
+        customer_type = str(data.get('customer_type') or TableSession.CUSTOMER_TYPE_OTHER)
     except (json.JSONDecodeError, TypeError, ValueError, KeyError, AttributeError):
         return JsonResponse({'ok': False, 'error': 'Invalid request.'}, status=400)
+
+    if customer_type not in dict(TableSession.CUSTOMER_TYPE_CHOICES):
+        return JsonResponse({'ok': False, 'error': 'Choose a valid customer type.'}, status=400)
 
     ids = [tid for tid, _ in plan]
     if (guests < 1 or guests > MAX_GUESTS or not plan
@@ -176,6 +182,7 @@ def server_walkin_confirm(request):
             table=tables[ordered[0][0]],          # main table = lowest number
             guests=guests,
             group_name=group_name,
+            customer_type=customer_type,
             source=TableSession.SOURCE_WALKIN,
             allocated_by=request.user,
         )
@@ -187,7 +194,10 @@ def server_walkin_confirm(request):
     return JsonResponse({
         'ok': True,
         'session_id': session.id,
+        'group_id': session.group_id,
         'guests': guests,
+        'customer_type': session.get_customer_type_display(),
+        'status': session.get_status_display(),
         'tables': session.table_numbers,
         'seats': session.seats_summary,
     })
@@ -217,8 +227,11 @@ def server_seating_panel(request):
         since = s.started_at if seated else (s.departed_at or s.started_at)
         groups.append({
             'id': s.id,
+            'group_id': s.group_id,
             'group_name': s.group_name,
+            'customer_type': s.get_customer_type_display(),
             'guests': s.guests,
+            'status': s.get_status_display(),
             'tables': _tables_text([a.table.number for a in allocs]),
             'seats': _seats_text([a.seats for a in allocs]),
             'state': 'seated' if seated else 'cleaning',
@@ -256,12 +269,13 @@ def server_seating_cancel(request, pk):
         numbers = sorted({a.table.number for a in
                           session.allocations.select_related('table')})
 
-        # Free the seats. Free seats are counted from the SeatAllocation rows.
+        # Preserve the group record and its identifier for the seating history.
         session.allocations.all().delete()
-
-        # Remove the empty group too, unless an order (even a cancelled one) points to it
-        if not Order.objects.filter(table_session=session).exists():
-            session.delete()
+        session.is_active = False
+        session.closed_at = timezone.now()
+        session.status = TableSession.STATUS_CANCELLED
+        session.save(update_fields=['is_active', 'closed_at', 'status'])
+        session.bills.update(is_billed=True, is_closed=True, closed_at=session.closed_at)
 
     return JsonResponse({
         'ok': True,
@@ -370,6 +384,7 @@ def _create_session_order(request, session, lines, total, guest_name=''):
     )
     for food, qty in lines:
         OrderItem.objects.create(order=order, food_item=food, quantity=qty, price=food.price)
+    session.mark_ordering()
     _deduct_stock_for_order(order)
     return order
 
@@ -426,8 +441,14 @@ def server_individual_bill_create(request):
         data = json.loads(request.body)
         table_id = int(data.get('table_id'))
         name = str(data.get('customer_name') or '').strip()[:100]
+        customer_type = str(
+            data.get('customer_type') or TableSession.CUSTOMER_TYPE_INDIVIDUAL
+        )
     except (json.JSONDecodeError, TypeError, ValueError, AttributeError):
         return JsonResponse({'ok': False, 'error': 'Invalid request'}, status=400)
+
+    if customer_type not in dict(TableSession.CUSTOMER_TYPE_CHOICES):
+        return JsonResponse({'ok': False, 'error': 'Choose a valid customer type.'}, status=400)
 
     lines, total, error = _parse_order_lines(data.get('items') or [])
     if error:
@@ -456,6 +477,7 @@ def server_individual_bill_create(request):
             table=table,
             guests=1,
             group_name=name,
+            customer_type=customer_type,
             source=TableSession.SOURCE_WALKIN,
             allocated_by=request.user,
         )
@@ -501,7 +523,20 @@ def _make_bill(kind, label, orders, guests, seats, state, session=None):
         'state': state,                       # 'seated' or 'cleaning'
         'guests': guests,
         'seats': seats,
+        'group_id': session.group_id if session is not None else '',
+        'customer_type': session.get_customer_type_display() if session is not None else '',
+        'group_status': session.get_status_display() if session is not None else '',
+        'seated_at': session.started_at if session is not None else None,
         'order_ids': [o.id for o in orders],
+        'order_details': [
+            {
+                'id': o.id,
+                'status': o.get_status_display(),
+                'payment_status': o.get_payment_status_display(),
+                'total': o.total_amount,
+            }
+            for o in orders
+        ],
         'bill_no': first.id if first else None,
         'persisted_bill_id': persisted_bill.id if persisted_bill else None,
         'is_billed': persisted_bill.is_billed if persisted_bill else False,
@@ -535,7 +570,10 @@ def server_table_billing(request, table_id):
     from .views import _not_walkin
 
     table = get_object_or_404(Table, pk=table_id)
-    free = {t.id: f for t, f in walkin_free_seats()}.get(table.id, table.capacity)
+    if table.is_booking_table:
+        free = 0 if is_table_reserved_now(table.id) else table_available_seats(table)
+    else:
+        free = {t.id: f for t, f in walkin_free_seats()}.get(table.id, table.capacity)
     live_seat_status = [SeatAllocation.OCCUPIED, SeatAllocation.CLEANING]
 
     bills = []
@@ -551,17 +589,25 @@ def server_table_billing(request, table_id):
         .order_by('created_at', 'id'))
     qr_sessions = (TableSession.objects
                    .filter(source=TableSession.SOURCE_QR,
-                           orders__table_id=table.id,
-                           orders__table_released=False)
+                           table=table,
+                           is_active=True,
+                           closed_at__isnull=True,
+                           departed_at__isnull=True)
+                   .filter(
+                       Q(guest_count__isnull=False)
+                       | Q(orders__table_id=table.id, orders__table_released=False)
+                   )
+                   .exclude(bills__is_billed=True)
+                   .exclude(bills__is_closed=True)
                    .prefetch_related('bills')
                    .distinct()
                    .order_by('started_at'))
     for session in qr_sessions:
         orders = [o for o in table_orders if o.table_session_id == session.id]
-        if not orders:
-            continue
         guests = session.guest_count or max((o.guests or 0 for o in orders), default=0) or None
-        bills.append(_make_bill('table', 'QR Group', orders, guests, guests, 'seated', session=session))
+        bills.append(_make_bill(
+            'table', 'QR Group', orders, guests, guests, 'seated', session=session
+        ))
     legacy_orders = [o for o in table_orders if o.table_session_id is None]
     if legacy_orders:
         guests = max((o.guests or 0 for o in legacy_orders), default=0) or None
@@ -594,6 +640,7 @@ def server_table_billing(request, table_id):
         'used_seats': used,
         'free_seats': free,
         'bills': bills,
+        'group_count': sum(1 for bill in bills if bill['group_id']),
         'due_total': sum((b['due'] for b in bills), Decimal('0')),
         'bill_count': sum(1 for b in bills if b['has_orders']),
     })
@@ -612,6 +659,7 @@ def server_tables_overview(request):
     separate 'held' rows ("Booking Table") so the server still sees them, but their seats
     are NOT counted in free_total because walk-ins cannot use them."""
     rows = walkin_free_seats()
+    group_counts = active_group_counts_by_table()
     blocked = walkin_blocked_table_ids()
     holds = table_status_map()
 
@@ -635,6 +683,7 @@ def server_tables_overview(request):
             tables.append({
                 'id': table.id, 'number': table.number, 'capacity': table.capacity,
                 'customers': None, 'free': 0, 'cleaning': 0, 'state': 'held', 'note': note,
+                'groups': group_counts.get(table.id, 0),
             })
             continue
 
@@ -651,7 +700,7 @@ def server_tables_overview(request):
         tables.append({
             'id': table.id, 'number': table.number, 'capacity': table.capacity,
             'customers': customers, 'free': free, 'cleaning': waiting,
-            'state': state, 'note': '',
+            'state': state, 'note': '', 'groups': group_counts.get(table.id, 0),
         })
 
     # NEW: Booking Tables, shown as 'held' rows (not available to walk-ins, not in free_total)
@@ -669,6 +718,7 @@ def server_tables_overview(request):
         tables.append({
             'id': table.id, 'number': table.number, 'capacity': table.capacity,
             'customers': None, 'free': 0, 'cleaning': 0, 'state': 'held', 'note': note,
+            'groups': group_counts.get(table.id, 0),
         })
 
     tables.sort(key=lambda t: t['number'])

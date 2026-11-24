@@ -351,6 +351,12 @@
           <p class="guests-hint bad" id="noSeatsMessage">No seats available.</p>
           {% endif %}
           <p class="guests-hint" id="guestsHint"></p>
+          <label for="customerTypeInput">Customer type</label>
+          <select class="guests-input" id="customerTypeInput" name="customer_type" form="checkoutForm">
+            {% for value, label in customer_type_choices %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
         </div>
         {% endif %}
 

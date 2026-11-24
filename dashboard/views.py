@@ -21,7 +21,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Sum, F, Count, Q, Case, When, Value, IntegerField, Max
+from django.db.models import Sum, F, Count, Q, Case, When, Value, IntegerField
 from django.db.models import ProtectedError
 from django.db.models.functions import TruncDate, TruncMonth
 from django.core.mail import send_mail
@@ -39,8 +39,10 @@ from booking.models import SeatAllocation, Table, TableBooking, TableSession
 from booking.forms import SEATS_PER_TABLE, tables_needed
 # CHANGED: later_reservations (clash with a later approved booking) and ALLOW_SINGLE_BIG_TABLE added
 from booking.availability import (
-    ALLOW_SINGLE_BIG_TABLE, is_table_busy_now, later_reservations,
+    ALLOW_SINGLE_BIG_TABLE, active_group_counts_by_table,
+    is_table_busy_now, is_table_reserved_now, later_reservations,
     release_table, table_status_map, upcoming_status_map, walkin_free_seats,
+    table_available_seats, walkin_blocked_table_ids,
 )
 from orders.models import Order, OrderItem, Coupon
 
@@ -267,6 +269,7 @@ def manage_tables(request):
     # (_tables_info), so both pages always show the same numbers, for example
     # "6 seats, 3 customers, 3 free". A table that is missing from the map has all seats free.
     free_map = {t.id: free for t, free in walkin_free_seats()}
+    group_counts = active_group_counts_by_table()
 
     rows = []
     free_seats_total = 0
@@ -274,7 +277,12 @@ def manage_tables(request):
     for table in tables:
         hold = holds.get(table.id)
         up = upcoming.get(table.id)
-        free_seats = max(0, min(table.capacity, free_map.get(table.id, table.capacity)))
+        if table.is_booking_table:
+            free_seats = (
+                0 if is_table_reserved_now(table.id) else table_available_seats(table)
+            )
+        else:
+            free_seats = max(0, min(table.capacity, free_map.get(table.id, table.capacity)))
         used_seats = table.capacity - free_seats
         free_seats_total += free_seats
         if not hold and used_seats == 0:
@@ -286,6 +294,7 @@ def manage_tables(request):
             'upcoming_in_mins': int((up.start - now).total_seconds() // 60) + 1 if up else 0,
             'used_seats': used_seats,
             'free_seats': free_seats,
+            'active_group_count': group_counts.get(table.id, 0),
         })
 
     return render(request, 'dashboard/manage_tables.html', {
@@ -1791,6 +1800,8 @@ def update_order_status(request, pk, new_status):
                     order.prepared_by = request.user
                     fields.append('prepared_by')
             order.save(update_fields=fields)
+            if order.table_session_id and new_status in ('preparing', 'ready', 'delivered'):
+                order.table_session.mark_dining()
 
     if error:
         messages.error(request, error)
@@ -1890,44 +1901,24 @@ def _orderable_food_items():
 
 
 def _tables_info():
-    """Table chips for the Take Order popup: free / booked now / occupied by an order / seats full.
-    CHANGED: each chip also carries
-      capacity    seats of the table (the guests box uses it as the limit)
-      free_seats  seats that are free right now (a seated walk-in group uses seats, see SeatAllocation)
-      full        True when no seat is free and no normal order is running on the table
-                  (for example Tables 2 and 4 of a seated group of 17 on Tables 1, 2, 4)
-    CHANGED: the orders of a walk-in group are not counted as 'held_by', so the main table of a
-    group (Table 1) is shown as full, not as 'Eating, add more' (which would mix a normal order
-    into the group's table).
-    CHANGED: a Booking Table is never shown as 'Booked now'. The booked customer sits there and
-    the server must be able to take their order, so it is always selectable and has all its
-    seats free. A running order on it still shows 'Eating, add more' like a normal table.
-    Normal tables keep the old 'Booked now' / 'full' checks."""
-    held = {
-        o.table_id: o.id
-        for o in _not_walkin(Order.objects.visible_to_staff()
-                             .filter(table__isnull=False, table_released=False))
-                             .exclude(status='cancelled')
-    }
+    """Table chips for manual orders: each chip exposes only seats still available."""
     free_map = {t.id: free for t, free in walkin_free_seats()}
+    blocked = walkin_blocked_table_ids()
     chips = []
     for t in Table.objects.all().order_by('number'):
-        held_by = held.get(t.id)
         if t.is_booking_table:
-            # CHANGED: Booking Tables are not part of walk-in seating, so no busy / full check
             busy = False
-            free = t.capacity
-            full = False
+            free = table_available_seats(t)
         else:
-            busy = is_table_busy_now(t.id)
+            busy = t.id in blocked
             free = free_map.get(t.id, t.capacity)
-            full = (not busy) and (not held_by) and free <= 0
+        full = free <= 0
         chips.append({
             'id': t.id,
             'number': t.number,
             'capacity': t.capacity,
             'busy': busy,
-            'held_by': held_by,
+            'held_by': None,
             'free_seats': free,
             'full': full,
         })
@@ -2370,7 +2361,9 @@ def server_free_table(request, pk):
                 Order.objects.filter(pk__in=[o.id for o in on_table]).update(table_released=True)
                 if qr_group is not None:
                     TableSession.objects.filter(pk=qr_group.pk).update(
-                        is_active=False, closed_at=timezone.now()
+                        is_active=False,
+                        closed_at=timezone.now(),
+                        status=TableSession.STATUS_COMPLETED,
                     )
                     qr_group.bills.update(
                         is_billed=True, is_closed=True, closed_at=timezone.now()
@@ -2419,17 +2412,14 @@ def server_mark_cash_received(request, pk):
 def server_take_order(request):
     """Server takes an order at the table. It lands straight on the Kitchen board (status 'confirmed'),
     paid in cash at the counter (cash_pending until the cash is marked received).
-    A table whose customer is still eating can take another order (extra juice, dessert...).
+    Every dine-in submission creates its own group. Reorders for an existing group use
+    server_take_session_order so groups sharing a table are never merged.
     Payment first: this is the ONLY place a cash order is created (customers pay online only).
     NEW: the order is saved with source='server' and taken_by=<this server>, so every dashboard
     can show WHICH server took it.
     NEW (guests): POST JSON may carry `guests` (people at the table). It is saved in Order.guests,
-    so the dashboard can show "6 seats, 2 customers, 4 free" and walk-ins can use the free seats.
-      - Only for a TABLE order (takeaway ignores it).
-      - 1 .. the seats of that table.
-      - If `guests` is not sent, a table that already has a running order with a guest count
-        keeps that number (the same people ordering again). Otherwise it stays blank
-        (the old behaviour: the whole table is held)."""
+    and in a new TableSession/SeatAllocation group. It must be between 1 and the seats currently
+    available on the selected table. Takeaway orders do not create seating groups."""
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, TypeError):
@@ -2439,64 +2429,28 @@ def server_take_order(request):
     if not rows:
         return JsonResponse({'ok': False, 'error': 'Add at least one item'}, status=400)
 
-    table = None
     table_id = data.get('table_id')
-    if table_id is not None:
-        table = Table.objects.filter(pk=table_id).first()
-        if not table:
-            return JsonResponse({'ok': False, 'error': 'Table not found'}, status=400)
-        # CHANGED: a table already held by a customer who is still eating can take more orders.
-        # Only a booking hold blocks the table.
-        # CHANGED: the orders of a walk-in group do not count as "a customer eating at this table".
-        own_running = _not_walkin(Order.objects.visible_to_staff()
-                                  .filter(table_id=table.id, table_released=False)
-                                  ).exclude(status='cancelled').exists()
-        # CHANGED: a Booking Table is never refused as "booked right now" (the booked customer is there)
-        if not own_running and not table.is_booking_table and is_table_busy_now(table.id):
-            return JsonResponse({'ok': False, 'error': f'Table {table.number} is booked right now.'}, status=409)
+    if table_id not in (None, '', 'takeaway'):
+        try:
+            table_id = int(table_id)
+        except (TypeError, ValueError):
+            return JsonResponse({'ok': False, 'error': 'Choose a valid table.'}, status=400)
+    else:
+        table_id = None
 
-        # NEW: seats used by a seated walk-in group (SeatAllocation) are not free for a new table order
-        # (a Booking Table is not in walkin_free_seats(), so it gets its full capacity here)
-        seats_free = {t.id: f for t, f in walkin_free_seats()}.get(table.id, table.capacity)
-        if not own_running and seats_free <= 0:
-            return JsonResponse({
-                'ok': False,
-                'error': f'Table {table.number} has no free seats (a walk-in group is seated there).',
-            }, status=409)
+    customer_type = str(data.get('customer_type') or TableSession.CUSTOMER_TYPE_OTHER)
+    if table_id is not None and customer_type not in dict(TableSession.CUSTOMER_TYPE_CHOICES):
+        return JsonResponse({'ok': False, 'error': 'Choose a valid customer type.'}, status=400)
 
-    # NEW (guests): how many people are at this table
     guests = None
-    if table is not None:
-        # a table that already has its own running order = the same people ordering again,
-        # so the whole table size is the limit. A fresh table can only use its free seats.
-        guest_limit = table.capacity if own_running else min(table.capacity, seats_free)
+    if table_id is not None:
         raw_guests = data.get('guests')
-        if raw_guests not in (None, ''):
-            try:
-                guests = int(raw_guests)
-            except (TypeError, ValueError):
-                return JsonResponse({'ok': False, 'error': 'Enter a valid number of guests.'}, status=400)
-            if guests < 1 or guests > guest_limit:
-                if guest_limit < table.capacity:
-                    err = f'Only {guest_limit} seats are free on Table {table.number}.'
-                else:
-                    err = f'Guests must be between 1 and {table.capacity} for Table {table.number}.'
-                return JsonResponse({'ok': False, 'error': err}, status=400)
-        elif not own_running and guest_limit < table.capacity:
-            # part of this table is used by a walk-in group: the guest count is needed,
-            # otherwise this order would hold the whole table
-            return JsonResponse({
-                'ok': False,
-                'error': f'Enter the number of guests ({guest_limit} seats are free on Table {table.number}).',
-            }, status=400)
-        else:
-            # same people ordering again (juice, dessert): keep the guest count of the table
-            known = (Order.objects.visible_to_staff()
-                     .filter(table_id=table.id, table_released=False)
-                     .exclude(status='cancelled')
-                     .aggregate(m=Max('guests'))['m'])
-            if known:
-                guests = known
+        try:
+            guests = int(raw_guests)
+        except (TypeError, ValueError):
+            return JsonResponse({'ok': False, 'error': 'Enter a valid number of guests.'}, status=400)
+        if guests < 1:
+            return JsonResponse({'ok': False, 'error': 'At least one guest is required.'}, status=400)
 
     # Collect lines first so a bad line never leaves a half-made order behind
     lines = []
@@ -2524,11 +2478,46 @@ def server_take_order(request):
     order_item_fields = {f.name for f in OrderItem._meta.get_fields()}
 
     with transaction.atomic():
+        table = None
+        table_session = None
+        if table_id is not None:
+            table = Table.objects.select_for_update().filter(pk=table_id).first()
+            if not table:
+                return JsonResponse({'ok': False, 'error': 'Table not found.'}, status=400)
+
+            if table.is_booking_table:
+                seats_free = table_available_seats(table)
+            else:
+                seats_free = {
+                    t.id: free for t, free in walkin_free_seats()
+                }.get(table.id, 0)
+            if guests > seats_free:
+                return JsonResponse({
+                    'ok': False,
+                    'error': f'Table {table.number} has only {seats_free} free seat(s).',
+                }, status=409)
+
+            table_session = TableSession.objects.create(
+                table=table,
+                guests=guests,
+                group_name=str(data.get('group_name') or '').strip()[:100],
+                customer_type=customer_type,
+                source=TableSession.SOURCE_WALKIN,
+                allocated_by=request.user,
+            )
+            SeatAllocation.objects.create(
+                session=table_session,
+                table=table,
+                seats=guests,
+                status=SeatAllocation.OCCUPIED,
+            )
+
         order = Order.objects.create(
             user=request.user,            # server's own account (no migration needed)
             table=table,                  # None => Takeaway
+            table_session=table_session,
             order_type='dine_in' if table else 'takeaway',
-            guests=guests,                # NEW (guests): people at the table (None for takeaway / unknown)
+            guests=guests,
             total_amount=total,
             status='confirmed',           # Kitchen board reads 'confirmed'
             payment_method='cash',
@@ -2542,6 +2531,9 @@ def server_take_order(request):
             if 'price' in order_item_fields:
                 item_kwargs['price'] = food.price
             OrderItem.objects.create(**item_kwargs)
+
+        if table_session is not None:
+            table_session.mark_ordering()
 
         # Server orders skip Approve, so use up the grocery stock here
         _deduct_stock_for_order(order)

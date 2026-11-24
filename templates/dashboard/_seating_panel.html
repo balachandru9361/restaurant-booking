@@ -115,7 +115,9 @@
         main.appendChild(title);
 
         const meta = el('div', 'seat-meta');
-        let text = g.guests + ' guest' + (g.guests === 1 ? '' : 's') + ' · ' + g.seats;
+        let text = g.group_id + ' · ' + g.customer_type + ' · ' +
+          g.guests + ' guest' + (g.guests === 1 ? '' : 's') + ' · ' + g.seats +
+          ' · ' + g.status;
         if (g.group_name) text = g.group_name + ' · ' + text;
         text += cleaning ? ' · waiting ' + elapsed(g.since) : ' · seated ' + elapsed(g.since);
         if (g.order_count) text += ' · ' + g.order_count + ' order' + (g.order_count === 1 ? '' : 's');
@@ -213,12 +215,13 @@
         card.appendChild(el('div', 'tbl-name', '🪑 Table ' + t.number));
         const line = el('div', 'tbl-line');
         if (t.state === 'held') {
-          line.textContent = t.capacity + ' seats';
+          line.textContent = t.capacity + ' seats · ' + t.groups + ' active group' + (t.groups === 1 ? '' : 's');
           card.appendChild(line);
           card.appendChild(el('div', 'tbl-note', t.note));
         } else {
           line.appendChild(document.createTextNode(
-            t.capacity + ' seats, ' + t.customers + ' customer' + (t.customers === 1 ? '' : 's') + ', '));
+            t.capacity + ' seats, ' + t.groups + ' group' + (t.groups === 1 ? '' : 's') +
+            ', ' + t.customers + ' customer' + (t.customers === 1 ? '' : 's') + ', '));
           line.appendChild(el('span', 'tbl-free', t.free === 0 ? 'full' : t.free + ' free'));
           card.appendChild(line);
           if (t.cleaning) card.appendChild(el('div', 'tbl-note', '🧹 ' + t.cleaning + ' seat' + (t.cleaning === 1 ? '' : 's') + ' waiting for cleaning'));

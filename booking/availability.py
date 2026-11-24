@@ -430,6 +430,52 @@ def walkin_free_seats(buffer=WALKIN_BUFFER):
     return result
 
 
+def active_group_counts_by_table():
+    """Map table ids to customer groups currently using seats on that table."""
+    from django.db.models import Q
+
+    from .models import SeatAllocation, TableSession
+
+    groups = {}
+    now = timezone.now()
+    for table_id, session_id in (
+        SeatAllocation.objects
+        .filter(
+            Q(status__in=[SeatAllocation.OCCUPIED, SeatAllocation.CLEANING])
+            | Q(status=SeatAllocation.HELD, held_until__gt=now)
+        )
+        .values_list('table_id', 'session_id')
+        .distinct()
+    ):
+        groups.setdefault(table_id, set()).add(session_id)
+
+    qr_sessions = (
+        TableSession.objects
+        .filter(
+            source=TableSession.SOURCE_QR,
+            is_active=True,
+            closed_at__isnull=True,
+            departed_at__isnull=True,
+        )
+        .filter(
+            Q(guest_count__isnull=False)
+            | Q(orders__table_id__isnull=False, orders__table_released=False)
+        )
+        .exclude(status__in=[
+            TableSession.STATUS_COMPLETED,
+            TableSession.STATUS_CANCELLED,
+        ])
+        .exclude(bills__is_billed=True)
+        .exclude(bills__is_closed=True)
+        .distinct()
+        .values_list('table_id', 'id')
+    )
+    for table_id, session_id in qr_sessions:
+        groups.setdefault(table_id, set()).add(session_id)
+
+    return {table_id: len(session_ids) for table_id, session_ids in groups.items()}
+
+
 def suggest_walkin_arrangement(guests, buffer=WALKIN_BUFFER):
     """Suggest where a walk-in group of `guests` can sit.
 

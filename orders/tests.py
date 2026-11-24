@@ -40,12 +40,13 @@ class QRGuestSessionTests(TransactionTestCase):
             {'quantity': quantity},
         )
 
-    def place_order(self, client, guests, name):
+    def place_order(self, client, guests, name, customer_type='other'):
         return client.post(
             reverse('orders:confirm_order'),
             {
                 'order_type': 'dine_in',
                 'guests': guests,
+                'customer_type': customer_type,
                 'guest_name': name,
                 'guest_phone': '1234567890',
             },
@@ -64,11 +65,14 @@ class QRGuestSessionTests(TransactionTestCase):
         self.assertEqual(cart_a['items'][0]['quantity'], 1)
         self.assertEqual(cart_b['items'][0]['quantity'], 2)
 
-        response_a = self.place_order(client_a, 3, 'Group A')
+        response_a = self.place_order(client_a, 3, 'Group A', 'family')
         self.assertIn('/payment/initiate/', response_a.url)
 
         session_a.refresh_from_db()
         self.assertEqual(session_a.guest_count, 3)
+        self.assertEqual(session_a.customer_type, 'family')
+        self.assertEqual(session_a.status, TableSession.STATUS_ORDERING)
+        self.assertEqual(self.table.seats_free, 3)
         order_a = Order.objects.get(table_session=session_a)
         self.assertEqual(order_a.guests, 3)
 
@@ -81,10 +85,12 @@ class QRGuestSessionTests(TransactionTestCase):
         self.assertContains(cart_page, '<option value="3"')
         self.assertNotContains(cart_page, '<option value="4"')
 
-        response_b = self.place_order(client_b, 3, 'Group B')
+        response_b = self.place_order(client_b, 3, 'Group B', 'friends')
         self.assertIn('/payment/initiate/', response_b.url)
         session_b.refresh_from_db()
         self.assertEqual(session_b.guest_count, 3)
+        self.assertEqual(session_b.customer_type, 'friends')
+        self.assertEqual(self.table.seats_free, 0)
 
         client_c = Client()
         session_c = self.scan(client_c)
