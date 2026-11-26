@@ -170,9 +170,14 @@
     {% endfor %}
 
     <div class="totals">
-      {% if adjustment %}
+      {% if tip_lines or discount_total > 0 %}
       <div class="t-row sub"><span>Items total</span><span>₹{{ items_total|floatformat:2 }}</span></div>
-      <div class="t-row"><span>Discount / adjustment</span><span>₹{{ adjustment|floatformat:2 }}</span></div>
+      {% for tip in tip_lines %}
+      <div class="t-row"><span>{{ tip.label }}</span><span>+₹{{ tip.amount|floatformat:2 }}</span></div>
+      {% endfor %}
+      {% if discount_total > 0 %}
+      <div class="t-row"><span>Discount</span><span>-₹{{ discount_total|floatformat:2 }}</span></div>
+      {% endif %}
       {% endif %}
       <div class="grand"><span>GRAND TOTAL</span><span>₹{{ grand_total|floatformat:2 }}</span></div>
       {% if paid_total and due_total > 0 %}
@@ -212,9 +217,7 @@
 
 <script>
   function printThisBill() {
-    var itemsTotal = parseFloat('{{ items_total|floatformat:"2u" }}') || 0;
     var grandTotal = parseFloat('{{ grand_total|floatformat:"2u" }}') || 0;
-    var discount = itemsTotal - grandTotal;   // only a real discount (coupon) is shown
 
     printThermal({
       type: 'bill',
@@ -225,7 +228,11 @@
         {% endfor %}
       ],
       total: grandTotal.toFixed(2),
-      discount: discount > 0.004 ? discount.toFixed(2) : '',
+      tips: [
+        {% for tip in tip_lines %}{ label: '{{ tip.label|escapejs }}', amount: '{{ tip.amount|floatformat:"2u" }}' }{% if not forloop.last %},{% endif %}
+        {% endfor %}
+      ],
+      discount: '{{ discount_total|floatformat:"2u" }}',
       payment: {% if due_total > 0 %}'DUE Rs.{{ due_total|floatformat:"2u" }}'{% else %}'PAID'{% endif %}
     });
   }

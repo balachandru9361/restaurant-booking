@@ -1,16 +1,19 @@
 import json
 import re
+from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core import mail
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import Profile
 from booking.models import SeatAllocation, Table, TableSession
 from menu.models import Category, FoodItem
-from orders.models import Order
+from orders.models import Coupon, Order, OrderItem
 from .models import Notification
 
 
@@ -351,6 +354,82 @@ class SharedTableGroupSeatingTests(TestCase):
         self.assertEqual(group.status, TableSession.STATUS_CANCELLED)
         self.assertFalse(order.refunded)
         self.assertEqual(self.table.seats_free, self.table.capacity)
+
+
+class ServerBillAdjustmentTests(TestCase):
+    def setUp(self):
+        self.server = User.objects.create_user(
+            'bill-server', password='x', is_staff=True
+        )
+        Profile.objects.create(user=self.server, role='server')
+        self.client.force_login(self.server)
+        category = Category.objects.create(name='Bill test', slug='bill-test')
+        self.food = FoodItem.objects.create(
+            category=category, name='Dinner', price='4500.00'
+        )
+
+    def make_bill(self, total, discount='0.00', coupon=None):
+        order = Order.objects.create(
+            order_type='takeaway',
+            source='server',
+            status='confirmed',
+            payment_method='cash',
+            payment_status='cash_pending',
+            discount_amount=discount,
+            coupon=coupon,
+            total_amount=total,
+        )
+        OrderItem.objects.create(
+            order=order,
+            food_item=self.food,
+            quantity=1,
+            price='4500.00',
+        )
+        return self.client.get(
+            reverse('dashboard:server_table_bill', args=[order.pk])
+        )
+
+    def test_bill_separates_tip_and_coupon_discount(self):
+        coupon = Coupon.objects.create(
+            code='SAVE2',
+            discount_percent=2,
+            valid_until=timezone.now() + timedelta(days=1),
+        )
+        response = self.make_bill('4635.00', discount='90.00', coupon=coupon)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Tip (5%)')
+        self.assertContains(response, '+₹225.00')
+        self.assertContains(response, 'Discount')
+        self.assertContains(response, '-₹90.00')
+        self.assertEqual(response.context['grand_total'], Decimal('4635.00'))
+        self.assertEqual(
+            response.context['items_total']
+            + sum(tip['amount'] for tip in response.context['tip_lines'])
+            - response.context['discount_total'],
+            response.context['grand_total'],
+        )
+
+    def test_bill_labels_ten_percent_tip(self):
+        response = self.make_bill('4950.00')
+
+        self.assertContains(response, 'Tip (10%)')
+        self.assertContains(response, '+₹450.00')
+        self.assertNotContains(
+            response, '<div class="t-row"><span>Discount</span>'
+        )
+
+    def test_bill_hides_zero_tip_and_discount_lines(self):
+        response = self.make_bill('4500.00')
+
+        self.assertEqual(response.context['tip_lines'], [])
+        self.assertEqual(response.context['discount_total'], Decimal('0.00'))
+        self.assertNotContains(
+            response, '<div class="t-row sub"><span>Items total</span>'
+        )
+        self.assertNotContains(
+            response, '<div class="t-row"><span>Discount</span>'
+        )
 
 
 class KitchenToServerToAdminFlowTests(TestCase):

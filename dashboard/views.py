@@ -5,7 +5,7 @@ from functools import wraps
 from django.http import HttpResponse
 import json
 import logging
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 try:
     import razorpay
@@ -2202,16 +2202,45 @@ def server_table_bill(request, pk):
 
     # Same dish ordered twice (e.g. Apple in order 13 and 14) becomes one line
     lines = {}
+    order_item_totals = {}
     for o in orders:
+        order_item_total = Decimal('0.00')
         for oi in o.items.all():
             unit = getattr(oi, 'price', None) or oi.food_item.price
             key = (oi.food_item_id, unit)
             if key not in lines:
                 lines[key] = {'name': oi.food_item.name, 'qty': 0, 'unit': unit, 'amount': Decimal('0')}
             lines[key]['qty'] += oi.quantity
-            lines[key]['amount'] += unit * oi.quantity
+            amount = unit * oi.quantity
+            lines[key]['amount'] += amount
+            order_item_total += amount
+        order_item_totals[o.pk] = order_item_total
 
     items_total = sum((l['amount'] for l in lines.values()), Decimal('0'))
+    discount_total = sum(
+        (o.discount_amount for o in orders if o.discount_amount > 0),
+        Decimal('0.00'),
+    )
+    tip_totals = {5: Decimal('0.00'), 10: Decimal('0.00')}
+    for o in orders:
+        tip_amount = (
+            o.total_amount
+            - order_item_totals[o.pk]
+            + (o.discount_amount or Decimal('0.00'))
+        )
+        for percent in tip_totals:
+            expected_tip = (
+                order_item_totals[o.pk] * Decimal(percent) / Decimal('100')
+            ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            if tip_amount == expected_tip and tip_amount > 0:
+                tip_totals[percent] += tip_amount
+                break
+
+    tip_lines = [
+        {'label': f'Tip ({percent}%)', 'amount': amount}
+        for percent, amount in tip_totals.items()
+        if amount > 0
+    ]
     grand_total = sum((o.total_amount for o in orders), Decimal('0'))
     paid_total = sum((o.total_amount for o in orders if o.payment_status == 'paid'), Decimal('0'))
     due_total = grand_total - paid_total
@@ -2227,7 +2256,8 @@ def server_table_bill(request, pk):
         'group_guests': grouped.group_guests,    # NEW
         'lines': list(lines.values()),
         'items_total': items_total,
-        'adjustment': grand_total - items_total,   # coupon / discount difference, if any
+        'tip_lines': tip_lines,
+        'discount_total': discount_total,
         'grand_total': grand_total,
         'paid_total': paid_total,
         'due_total': due_total,

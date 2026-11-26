@@ -107,6 +107,7 @@
       items:    [{ name: 'Mutton Pepper Fry', qty: 3, price: 1500 }],
       total:    '4500.00',      // bill: final amount
       discount: '100.00',       // bill: optional
+      tips:     [{ label: 'Tip (5%)', amount: '225.00' }], // bill: optional
       payment:  'Cash Paid',    // bill: optional text
       note:     'Less spicy'    // kitchen: optional
     })
@@ -155,11 +156,24 @@
     } else {
       // ---- Bill totals ----
       var discount = parseFloat(o.discount) || 0;
+      var tips = Array.isArray(o.tips) ? o.tips : [];
+      var tipTotal = 0;
+      tips.forEach(function (tip) {
+        tipTotal += Math.max(0, parseFloat(tip.amount) || 0);
+      });
       var total = (o.total !== undefined && o.total !== '' && !isNaN(parseFloat(o.total)))
-        ? parseFloat(o.total) : (subtotal - discount);
+        ? parseFloat(o.total) : (subtotal + tipTotal - discount);
 
-      if (discount > 0) {
+      if (discount > 0 || tipTotal > 0) {
         out += '<div class="row line"><span>Subtotal</span><span>' + money(subtotal) + '</span></div>';
+      }
+      tips.forEach(function (tip) {
+        var amount = parseFloat(tip.amount) || 0;
+        if (amount > 0) {
+          out += '<div class="row line"><span>' + esc(tip.label) + '</span><span>+' + money(amount) + '</span></div>';
+        }
+      });
+      if (discount > 0) {
         out += '<div class="row line"><span>Discount</span><span>-' + money(discount) + '</span></div>';
       }
       out += '<div class="row total"><span>TOTAL</span><span>' + esc(CURRENCY) + ' ' + money(total) + '</span></div>';
