@@ -221,6 +221,27 @@ class TableSession(models.Model):
             self.bills.update(is_billed=True, is_closed=True, closed_at=self.closed_at)
 
     @transaction.atomic
+    def cancel_seating(self):
+        """Cancel this group and release its seats without deleting history."""
+        if not self.is_active and self.status == self.STATUS_CANCELLED:
+            return False
+
+        now = timezone.now()
+        self.allocations.filter(
+            status__in=[
+                SeatAllocation.HELD,
+                SeatAllocation.OCCUPIED,
+                SeatAllocation.CLEANING,
+            ]
+        ).update(status=SeatAllocation.RELEASED, held_until=None)
+        self.is_active = False
+        self.closed_at = now
+        self.status = self.STATUS_CANCELLED
+        self.save(update_fields=['is_active', 'closed_at', 'status'])
+        self.bills.update(is_billed=True, is_closed=True, closed_at=now)
+        return True
+
+    @transaction.atomic
     def mark_departed(self):
         """Group finished dining. Seats move to 'awaiting cleaning' (still
         blocked). Orders are stopped if the session is still active."""

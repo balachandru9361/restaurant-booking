@@ -251,31 +251,38 @@ def server_seating_panel(request):
 @server_required
 @require_POST
 def server_seating_cancel(request, pk):
-    """The group was seated but has not ordered and does not want the seats.
-    The seats are freed at once (no cleaning step) and nothing is kept in sales.
-    Not allowed once the group has an order. Use Customer Left for that."""
+    """Cancel one group before ordering, or a rejected QR group, and release its seats."""
     with transaction.atomic():
         session = get_object_or_404(TableSession.objects.select_for_update(), pk=pk)
 
-        if not session.allocations.filter(status=SeatAllocation.OCCUPIED).exists():
+        if not session.is_active and session.status == TableSession.STATUS_CANCELLED:
+            return JsonResponse({
+                'ok': True,
+                'message': f'{session.table_numbers} were already released.',
+            })
+
+        has_occupied_seats = session.allocations.filter(
+            status=SeatAllocation.OCCUPIED
+        ).exists()
+        is_active_qr_group = (
+            session.source == TableSession.SOURCE_QR
+            and session.is_active
+            and session.guest_count is not None
+        )
+        if not has_occupied_seats and not is_active_qr_group:
             return JsonResponse({'ok': False, 'error': 'This group is not seated.'}, status=400)
 
-        if _session_orders(session).exists():
+        if Order.objects.filter(table_session=session).exclude(status='cancelled').exists():
             return JsonResponse({
                 'ok': False,
                 'error': 'This group already has an order. Use Customer Left instead.',
             }, status=400)
 
-        numbers = sorted({a.table.number for a in
-                          session.allocations.select_related('table')})
-
-        # Preserve the group record and its identifier for the seating history.
-        session.allocations.all().delete()
-        session.is_active = False
-        session.closed_at = timezone.now()
-        session.status = TableSession.STATUS_CANCELLED
-        session.save(update_fields=['is_active', 'closed_at', 'status'])
-        session.bills.update(is_billed=True, is_closed=True, closed_at=session.closed_at)
+        numbers = sorted(
+            {a.table.number for a in session.allocations.select_related('table')}
+            or {session.table.number}
+        )
+        session.cancel_seating()
 
     return JsonResponse({
         'ok': True,

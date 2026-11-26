@@ -1,8 +1,10 @@
 import json
+import re
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core import mail
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from accounts.models import Profile
@@ -190,6 +192,131 @@ class SharedTableGroupSeatingTests(TestCase):
         self.assertEqual(response.status_code, 200)
         session = TableSession.objects.get(pk=group['session_id'])
         self.assertEqual(session.status, TableSession.STATUS_CANCELLED)
+        self.assertEqual(self.table.seats_free, self.table.capacity)
+
+    def make_qr_group(self, group_name, with_order=False, refunded=False):
+        session = TableSession.objects.create(
+            table=self.table,
+            guests=3,
+            guest_count=3,
+            group_name=group_name,
+            customer_type=TableSession.CUSTOMER_TYPE_FAMILY,
+            source=TableSession.SOURCE_QR,
+            status=TableSession.STATUS_ORDERING if with_order else TableSession.STATUS_SEATED,
+        )
+        order = None
+        if with_order:
+            order = Order.objects.create(
+                table=self.table,
+                table_session=session,
+                guests=3,
+                status='pending',
+                payment_method='online',
+                payment_status='paid',
+                refunded=refunded,
+                total_amount='30.00',
+            )
+        return session, order
+
+    def table_overview(self):
+        response = self.client.get(reverse('dashboard:server_tables_overview'))
+        self.assertEqual(response.status_code, 200, response.content)
+        return next(row for row in response.json()['tables'] if row['id'] == self.table.pk)
+
+    def test_qr_rejection_and_billing_cancellation_release_only_the_selected_groups(self):
+        group_a, order_a = self.make_qr_group(
+            'Group A', with_order=True, refunded=True
+        )
+        group_b, _ = self.make_qr_group('Group B')
+        other_table = Table.objects.create(number=76, capacity=2)
+        other_group = TableSession.objects.create(
+            table=other_table,
+            guests=2,
+            guest_count=2,
+            source=TableSession.SOURCE_QR,
+        )
+
+        rejected = self.client.post(
+            reverse('dashboard:server_reject_order', args=[order_a.pk]),
+            {'reason': 'Unavailable'},
+        )
+        self.assertEqual(rejected.status_code, 200, rejected.content)
+        group_a.refresh_from_db()
+        order_a.refresh_from_db()
+        self.assertEqual(group_a.status, TableSession.STATUS_CANCELLED)
+        self.assertFalse(group_a.is_active)
+        self.assertTrue(order_a.refunded)
+        self.assertEqual(self.table.seats_free, 3)
+        self.assertEqual(self.table_overview()['groups'], 1)
+        self.assertEqual(other_table.seats_free, 0)
+        self.assertTrue(other_group.is_active)
+
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.force_login(self.server)
+        billing = csrf_client.get(
+            reverse('dashboard:server_table_billing', args=[self.table.pk])
+        )
+        self.assertEqual(billing.status_code, 200, billing.content)
+        self.assertContains(billing, group_b.group_id)
+        self.assertContains(billing, 'Cancel seating')
+        csrf_match = re.search(
+            r"const csrf = '([^']*)';", billing.content.decode()
+        )
+        self.assertIsNotNone(csrf_match)
+        csrf_token = csrf_match.group(1)
+        self.assertTrue(csrf_token)
+
+        cancel_url = reverse(
+            'dashboard:server_seating_cancel', args=[group_b.pk]
+        )
+        cancelled = csrf_client.post(
+            cancel_url, HTTP_X_CSRFTOKEN=csrf_token
+        )
+        repeated = csrf_client.post(
+            cancel_url, HTTP_X_CSRFTOKEN=csrf_token
+        )
+        self.assertEqual(cancelled.status_code, 200, cancelled.content)
+        self.assertTrue(cancelled.json()['ok'])
+        self.assertEqual(repeated.status_code, 200, repeated.content)
+        self.assertTrue(repeated.json()['ok'])
+        group_b.refresh_from_db()
+        self.assertEqual(group_b.status, TableSession.STATUS_CANCELLED)
+        self.assertFalse(group_b.is_active)
+        self.assertEqual(self.table.seats_free, 6)
+        self.assertEqual(self.table_overview()['groups'], 0)
+        self.assertEqual(other_table.seats_free, 0)
+        billing_after = self.client.get(
+            reverse('dashboard:server_table_billing', args=[self.table.pk])
+        )
+        self.assertEqual(billing_after.context['used_seats'], 0)
+        self.assertEqual(billing_after.context['free_seats'], 6)
+        self.assertEqual(billing_after.context['group_count'], 0)
+
+        admin = User.objects.create_superuser('seating-admin', password='x')
+        self.client.force_login(admin)
+        admin_tables = self.client.get(reverse('dashboard:manage_tables'))
+        table_row = next(
+            row for row in admin_tables.context['rows']
+            if row['table'].pk == self.table.pk
+        )
+        self.assertEqual(table_row['free_seats'], 6)
+        self.assertEqual(table_row['active_group_count'], 0)
+
+    @patch('dashboard.views._razorpay_refund', return_value=(False, 'Refund pending'))
+    def test_qr_rejection_releases_seats_even_when_refund_is_pending(self, refund):
+        group, order = self.make_qr_group('Refund pending', with_order=True)
+
+        response = self.client.post(
+            reverse('dashboard:server_reject_order', args=[order.pk])
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(response.json()['refund'])
+        self.assertFalse(response.json()['refunded'])
+        refund.assert_called_once()
+        group.refresh_from_db()
+        order.refresh_from_db()
+        self.assertEqual(group.status, TableSession.STATUS_CANCELLED)
+        self.assertFalse(order.refunded)
         self.assertEqual(self.table.seats_free, self.table.capacity)
 
 

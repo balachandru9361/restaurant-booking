@@ -1104,6 +1104,14 @@ def _reject_pending_order(pk, reason, user):
         order.status = 'cancelled'
         order.save(update_fields=['status'])
 
+        if order.table_session_id:
+            qr_session = TableSession.objects.select_for_update().filter(
+                pk=order.table_session_id,
+                source=TableSession.SOURCE_QR,
+            ).first()
+            if qr_session:
+                qr_session.cancel_seating()
+
         # Give the coupon use back so usage-limited coupons are not wasted
         if order.coupon_id:
             Coupon.objects.filter(pk=order.coupon_id, times_used__gt=0).update(times_used=F('times_used') - 1)
