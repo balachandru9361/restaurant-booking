@@ -194,6 +194,39 @@ class SharedTableGroupSeatingTests(TestCase):
         self.assertEqual(session.status, TableSession.STATUS_CANCELLED)
         self.assertEqual(self.table.seats_free, self.table.capacity)
 
+    def test_individual_bill_menu_uses_take_order_thumbnails_and_fallback(self):
+        category = Category.objects.create(name='Thumbnail test', slug='thumbnail-test')
+        FoodItem.objects.create(
+            category=category,
+            name='Dish with photo',
+            price='12.00',
+            image='food_images/dish.jpg',
+        )
+        FoodItem.objects.create(
+            category=category,
+            name='Dish without photo',
+            price='10.00',
+        )
+
+        response = self.client.get(reverse('dashboard:server_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<img class="to-thumb" src="/media/food_images/dish.jpg"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            '<span class="to-ph" data-n="Dish without photo"></span>',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            "this.style.display='none';this.nextElementSibling.style.display='flex'",
+            html=False,
+        )
+
     def make_qr_group(self, group_name, with_order=False, refunded=False):
         session = TableSession.objects.create(
             table=self.table,
