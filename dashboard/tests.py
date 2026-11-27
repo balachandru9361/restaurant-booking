@@ -294,7 +294,7 @@ class SharedTableGroupSeatingTests(TestCase):
             count=2, html=False,
         )
 
-    def make_qr_group(self, group_name, with_order=False, refunded=False):
+    def make_qr_group(self, group_name, with_order=False, refund_status='none'):
         session = TableSession.objects.create(
             table=self.table,
             guests=3,
@@ -313,7 +313,7 @@ class SharedTableGroupSeatingTests(TestCase):
                 status='pending',
                 payment_method='online',
                 payment_status='paid',
-                refunded=refunded,
+                refund_status=refund_status,
                 total_amount='30.00',
             )
         return session, order
@@ -346,7 +346,7 @@ class SharedTableGroupSeatingTests(TestCase):
 
     def test_qr_rejection_and_billing_cancellation_release_only_the_selected_groups(self):
         group_a, order_a = self.make_qr_group(
-            'Group A', with_order=True, refunded=True
+            'Group A', with_order=True, refund_status='refunded'
         )
         group_b, _ = self.make_qr_group('Group B')
         other_table = Table.objects.create(number=76, capacity=2)
@@ -366,7 +366,7 @@ class SharedTableGroupSeatingTests(TestCase):
         order_a.refresh_from_db()
         self.assertEqual(group_a.status, TableSession.STATUS_CANCELLED)
         self.assertFalse(group_a.is_active)
-        self.assertTrue(order_a.refunded)
+        self.assertEqual(order_a.refund_status, 'refunded')
         self.assertEqual(self.table.seats_free, 3)
         self.assertEqual(self.table_overview()['groups'], 1)
         self.assertEqual(other_table.seats_free, 0)
@@ -423,7 +423,7 @@ class SharedTableGroupSeatingTests(TestCase):
         self.assertEqual(table_row['free_seats'], 6)
         self.assertEqual(table_row['active_group_count'], 0)
 
-    @patch('dashboard.views._razorpay_refund', return_value=(False, 'Refund pending'))
+    @patch('orders.services.refund_razorpay_payment', return_value=(False, 'Refund pending'))
     def test_qr_rejection_releases_seats_even_when_refund_is_pending(self, refund):
         group, order = self.make_qr_group('Refund pending', with_order=True)
 
@@ -437,8 +437,27 @@ class SharedTableGroupSeatingTests(TestCase):
         group.refresh_from_db()
         order.refresh_from_db()
         self.assertEqual(group.status, TableSession.STATUS_CANCELLED)
-        self.assertFalse(order.refunded)
+        self.assertEqual(order.refund_status, 'pending')
         self.assertEqual(self.table.seats_free, self.table.capacity)
+
+    def test_mark_refunded_updates_refund_state_without_rewriting_payment_state(self):
+        order = Order.objects.create(
+            status='cancelled',
+            payment_method='online',
+            payment_status='paid',
+            refund_status='pending',
+        )
+        admin = User.objects.create_superuser('refund-admin', password='x')
+        self.client.force_login(admin)
+
+        response = self.client.post(
+            reverse('dashboard:mark_refunded', args=[order.pk])
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, 'paid')
+        self.assertEqual(order.refund_status, 'refunded')
 
     def test_cancel_unpaid_qr_order_releases_only_its_group_and_keeps_history(self):
         group_a, order_a = self.make_unpaid_qr_group('Unpaid A', seats=2)

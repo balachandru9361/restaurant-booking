@@ -337,7 +337,7 @@ class Command(BaseCommand):
     def _payment_counts(self, orders):
         return OrderedDict([
             ('orders_to_archive', orders.count()),
-            ('refunded_orders_to_archive', orders.filter(refunded=True).count()),
+            ('refunded_orders_to_archive', orders.filter(refund_status='refunded').count()),
             (
                 'identifiable_test_mock_ids',
                 orders.filter(razorpay_payment_id__startswith='mock_').count(),
@@ -597,7 +597,8 @@ class Command(BaseCommand):
                     'total_amount': str(order.total_amount),
                     'discount_amount': str(order.discount_amount),
                     'coupon_code': order.coupon.code if order.coupon_id else '',
-                    'refunded': order.refunded,
+                    'refund_status': order.refund_status,
+                    'refunded': order.refund_status == 'refunded',
                     'razorpay_payment_id': order.razorpay_payment_id,
                     'transaction_classification': self._classify_transaction(order),
                     'items_json': json.dumps(items, ensure_ascii=False),

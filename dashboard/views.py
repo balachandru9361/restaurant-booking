@@ -40,7 +40,7 @@ from booking.availability import (
     table_available_seats, walkin_blocked_table_ids,
 )
 from orders.models import Order, OrderItem, Coupon
-from orders.services import refund_razorpay_payment as _razorpay_refund
+from orders.services import process_order_refund, release_cancelled_order_seats
 
 logger = logging.getLogger(__name__)
 
@@ -713,14 +713,15 @@ ORDER_FILTER_Q = {
     'kitchen': Q(status__in=KITCHEN_STATUSES),
     'delivered': Q(status__in=['delivered', 'completed']),
     'cancelled': Q(status='cancelled'),
+    'cancellations': Q(status='cancelled') | ~Q(cancellation_status='not_requested'),
 }
 ORDER_PAY_Q = {
     'unpaid': _UNPAID,
     'cashpaid': ~_UNPAID & _CASH & Q(payment_status='paid'),
     # CHANGED: a cancelled cash order has nothing to collect, so it is not "cash pending"
     'cashpending': ~_UNPAID & _CASH & ~Q(payment_status='paid') & ~Q(status='cancelled'),
-    'refundpending': ~_UNPAID & ~_CASH & _CANCELLED_PAID & Q(refunded=False),
-    'refunded': ~_UNPAID & ~_CASH & _CANCELLED_PAID & Q(refunded=True),
+    'refundpending': ~_UNPAID & ~_CASH & _CANCELLED_PAID & Q(refund_status__in=['pending', 'partially_refunded']),
+    'refunded': ~_UNPAID & ~_CASH & _CANCELLED_PAID & Q(refund_status='refunded'),
     'online': ~_UNPAID & ~_CASH & ~_CANCELLED_PAID,
 }
 
@@ -1003,10 +1004,15 @@ def mark_refunded(request, pk):
     money back for a cancelled order that was paid online.
     The JSON carries both 'ok' and 'success' so any page script can read it."""
     order = get_object_or_404(Order, pk=pk)
-    if order.status != 'cancelled' or order.payment_method != 'online' or order.payment_status != 'paid':
+    if (
+        order.status != 'cancelled'
+        or order.payment_method != 'online'
+        or order.payment_status != 'paid'
+        or order.refund_status not in ('pending', 'partially_refunded')
+    ):
         return JsonResponse({'ok': False, 'success': False, 'error': 'No refund is due for this order.'}, status=400)
-    order.refunded = True
-    order.save(update_fields=['refunded'])
+    order.refund_status = 'refunded'
+    order.save(update_fields=['refund_status'])
     return JsonResponse({'ok': True, 'success': True})
 
 
@@ -1071,16 +1077,16 @@ def _reject_pending_order(pk, reason, user):
             return {'ok': False, 'error': f'Order #{order.id} is already {order.status}.'}, 409
 
         order.status = 'cancelled'
+        order.cancellation_reason = reason
         order.cancelled_at = timezone.now()
-        order.save(update_fields=['status', 'cancelled_at'])
+        fields = ['status', 'cancellation_reason', 'cancelled_at']
+        refund = order.payment_method == 'online' and order.payment_status == 'paid'
+        if refund and order.refund_status not in ('refunded', 'partially_refunded'):
+            order.refund_status = 'pending'
+            fields.append('refund_status')
+        order.save(update_fields=fields)
 
-        if order.table_session_id:
-            qr_session = TableSession.objects.select_for_update().filter(
-                pk=order.table_session_id,
-                source=TableSession.SOURCE_QR,
-            ).first()
-            if qr_session:
-                qr_session.cancel_seating()
+        release_cancelled_order_seats(order)
 
         # Give the coupon use back so usage-limited coupons are not wasted
         if order.coupon_id:
@@ -1093,16 +1099,11 @@ def _reject_pending_order(pk, reason, user):
             kind='rejected', order=order, created_by=user, is_read=True, message=note[:255])
 
     # Needs a refund if the customer already paid online
-    refund = order.payment_method == 'online' and order.payment_status == 'paid'
-
     # Automatic Razorpay refund (outside the transaction, so a slow API call holds no DB lock).
     # If it fails, the order stays rejected and shows as "Refund pending" for a manual refund.
     refund_done, refund_error = False, ''
-    if refund and not order.refunded:
-        refund_done, refund_error = _razorpay_refund(order, reason)
-        if refund_done:
-            order.refunded = True
-            order.save(update_fields=['refunded'])
+    if refund:
+        refund_done, refund_error = process_order_refund(order, reason)
 
     # Tell the customer (a mail failure must not break the reject action).
     # CHANGED: a guest order has no user, so there is nobody to email.
@@ -1140,7 +1141,8 @@ def _reject_pending_order(pk, reason, user):
             logger.exception('Could not send reject email for order %s', order.id)
 
     return {'ok': True, 'status': 'cancelled', 'refund': refund,
-            'refunded': refund_done, 'refund_error': refund_error}, 200
+            'refunded': refund_done, 'refund_status': order.refund_status,
+            'refund_error': refund_error}, 200
 
 
 def _unpaid_qr_order_queryset():
@@ -1216,7 +1218,7 @@ def server_cancel_unpaid_order(request, pk):
         order.cancellation_reason = reason
         order.cancelled_at = timezone.now()
         order.save(update_fields=['status', 'cancellation_reason', 'cancelled_at'])
-        session.cancel_seating()
+        release_cancelled_order_seats(order)
 
         if notify_kitchen:
             Notification.objects.create(
@@ -1937,7 +1939,8 @@ def _deduct_stock_for_order(order):
 def api_order_status(request, pk):
     """Used by the status dropdown on Manage Orders (admin only)."""
     try:
-        status = json.loads(request.body).get('status')
+        data = json.loads(request.body)
+        status = data.get('status')
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({'ok': False, 'error': 'Invalid data'}, status=400)
 
@@ -1952,7 +1955,7 @@ def api_order_status(request, pk):
 
         # An order whose money was already paid back must not be re-opened (the customer
         # would be served without paying). They should place a new order instead.
-        if was_cancelled and not now_cancelled and order.refunded:
+        if was_cancelled and not now_cancelled and order.refund_status in ('refunded', 'partially_refunded'):
             return JsonResponse(
                 {'ok': False, 'error': f'Order #{order.id} was already refunded, so it cannot be re-opened.'},
                 status=409)
@@ -1975,10 +1978,44 @@ def api_order_status(request, pk):
         order.status = status
         fields = ['status']
         if now_cancelled and not was_cancelled:
-            order.cancelled_at = timezone.now()
-            fields.append('cancelled_at')
+            now = timezone.now()
+            order.cancelled_at = now
+            order.cancellation_reason = (
+                str(data.get('reason') or '').strip()[:200]
+                or order.cancellation_reason
+                or 'Cancelled by administrator'
+            )
+            order.cancellation_status = 'direct'
+            fields += ['cancelled_at', 'cancellation_reason', 'cancellation_status']
+            if (
+                order.payment_method == 'online'
+                and order.payment_status == 'paid'
+                and order.refund_status not in ('refunded', 'partially_refunded')
+            ):
+                order.refund_status = 'pending'
+                fields.append('refund_status')
         order.save(update_fields=fields)
-    return JsonResponse({'ok': True, 'status': status, 'stock_used': needs_stock and getattr(settings, 'AUTO_DEDUCT_STOCK', True)})
+        if now_cancelled and not was_cancelled:
+            release_cancelled_order_seats(order)
+
+    refund_done = False
+    refund_error = ''
+    if now_cancelled and not was_cancelled and order.payment_method == 'online' and order.payment_status == 'paid':
+        refund_done, refund_error = process_order_refund(
+            order, order.cancellation_reason
+        )
+    payload = {
+        'ok': True,
+        'status': status,
+        'stock_used': needs_stock and getattr(settings, 'AUTO_DEDUCT_STOCK', True),
+    }
+    if now_cancelled and not was_cancelled:
+        payload.update({
+            'refund_status': order.refund_status,
+            'refunded': refund_done,
+            'refund_error': refund_error,
+        })
+    return JsonResponse(payload)
 
 
 # ---- Server ----
@@ -2161,6 +2198,16 @@ def server_dashboard(request):
                   .prefetch_related('items__food_item')
                   .order_by('-created_at'))
     unpaid_qr_orders = _unpaid_qr_order_queryset()
+    cancellation_requests = (
+        Order.objects.filter(
+            cancellation_status='pending',
+            source='qr',
+            payment_method='online',
+        )
+        .select_related('table', 'table_session', 'user')
+        .prefetch_related('items__food_item')
+        .order_by('cancellation_requested_at', 'id')
+    )
 
     # CHANGED: ready / served orders of a walk-in group carry group_label ('Tables 1, 2, 4'),
     # group_guests and group_session_id, so the page can show the whole group instead of "Table 1".
@@ -2272,6 +2319,7 @@ def server_dashboard(request):
     context = {
         'new_orders': new_orders,
         'unpaid_qr_orders': unpaid_qr_orders,
+        'cancellation_requests': cancellation_requests,
         'ready_orders': ready_orders,
         'delivered_today': delivered_today,
         'cancelled_orders': cancelled_orders,
@@ -2412,6 +2460,88 @@ def server_send_to_kitchen(request, pk):
 def server_reject_order(request, pk):
     payload, code = _reject_pending_order(pk, request.POST.get('reason'), request.user)
     return JsonResponse(payload, status=code)
+
+
+@server_required
+@require_POST
+def server_decide_cancellation(request, pk):
+    """Approve or reject a customer's cancellation request."""
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def decision_error(message, status=409):
+        if is_ajax:
+            return JsonResponse({'ok': False, 'error': message}, status=status)
+        messages.error(request, message)
+        return redirect('dashboard:server_dashboard')
+
+    approve = request.POST.get('decision') == 'approve'
+    if not approve and request.POST.get('decision') != 'reject':
+        return decision_error('Choose approve or reject.', status=400)
+
+    with transaction.atomic():
+        order = get_object_or_404(Order.objects.select_for_update(), pk=pk)
+        if order.cancellation_status != 'pending':
+            return decision_error('This cancellation request is no longer pending.')
+        if order.status == 'cancelled':
+            return decision_error('This order is already cancelled.')
+
+        now = timezone.now()
+        order.cancellation_status = 'approved' if approve else 'rejected'
+        order.cancellation_decided_at = now
+        order.cancellation_decided_by = request.user
+        fields = ['cancellation_status', 'cancellation_decided_at', 'cancellation_decided_by']
+        if approve:
+            if order.status not in ('preparing', 'ready'):
+                return decision_error(
+                    'Only a preparing or ready order can be approved for cancellation.'
+                )
+            order.status = 'cancelled'
+            order.cancelled_at = now
+            fields += ['status', 'cancelled_at']
+            if (
+                order.payment_method == 'online'
+                and order.payment_status == 'paid'
+                and order.refund_status not in ('refunded', 'partially_refunded')
+            ):
+                order.refund_status = 'pending'
+                fields.append('refund_status')
+            if order.coupon_id:
+                Coupon.objects.filter(pk=order.coupon_id, times_used__gt=0).update(
+                    times_used=F('times_used') - 1
+                )
+        order.save(update_fields=fields)
+
+        if approve:
+            release_cancelled_order_seats(order)
+            Notification.objects.create(
+                kind='cancelled',
+                order=order,
+                created_by=request.user,
+                message=f'Order #{order.id} cancellation approved: {order.cancellation_reason}'[:255],
+            )
+
+    refund_done = False
+    refund_error = ''
+    if approve and order.payment_status == 'paid':
+        refund_done, refund_error = process_order_refund(
+            order, order.cancellation_reason
+        )
+
+    message = (
+        f"Cancellation for order #{order.id} approved."
+        if approve else f"Cancellation for order #{order.id} rejected."
+    )
+    if is_ajax:
+        return JsonResponse({
+            'ok': True,
+            'decision': order.cancellation_status,
+            'refund_status': order.refund_status,
+            'refunded': refund_done,
+            'refund_error': refund_error,
+            'message': message,
+        })
+    messages.success(request, message)
+    return redirect('dashboard:server_dashboard')
 
 
 # NEW: seats of a normal table order (QR / Take Order) go to CLEANING when the customer leaves
@@ -2697,8 +2827,18 @@ def server_poll(request):
     pending_qr_rows = list(
         pending_qr.values_list('id', 'status', 'payment_status', 'table_id')
     )
+    pending_cancellations = Order.objects.filter(
+        cancellation_status='pending',
+        source='qr',
+        payment_method='online',
+    )
+    pending_cancellation_rows = list(
+        pending_cancellations.values_list(
+            'id', 'status', 'cancellation_requested_at', 'table_id'
+        )
+    )
     sig = hashlib.md5(
-        repr((list(_board), pending_qr_rows)).encode('utf-8')
+        repr((list(_board), pending_qr_rows, pending_cancellation_rows)).encode('utf-8')
     ).hexdigest()
 
     # NEW: the latest "cash received" alert (created by the admin Mark Received button)
@@ -2722,6 +2862,10 @@ def server_poll(request):
                 'table': o.table.number if o.table else None,
             }
             for o in pending_qr
+        ],
+        'cancellation_requests': [
+            {'id': o.id, 'table': o.table.number if o.table else None}
+            for o in pending_cancellations.select_related('table')
         ],
         'orders': [
             {'id': o.id, 'table': o.table.number if o.table else None}
@@ -2806,10 +2950,12 @@ def admin_poll(request):
         Order.objects.visible_to_staff()                 # CHANGED
         .filter(Q(created_at__date=today)
                 | Q(table__isnull=False, table_released=False)
-                | Q(status='pending'))
+                | Q(status='pending')
+                | Q(cancellation_status__in=['pending', 'approved', 'rejected', 'direct']))
         .order_by('id')
         .values_list('id', 'status', 'payment_status', 'payment_method',
-                     'table_id', 'table_released', 'refunded', 'total_amount'))
+                     'table_id', 'table_released', 'refund_status',
+                     'cancellation_status', 'cancellation_reason', 'total_amount'))
 
     # Bookings: pending ones + yesterday onwards
     bookings = list(

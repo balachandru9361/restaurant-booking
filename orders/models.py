@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.core.validators import RegexValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -111,6 +111,21 @@ class Order(models.Model):
         ('expired', 'Expired'),  # online order that was never paid
     ]
 
+    REFUND_STATUS_CHOICES = [
+        ('none', 'No refund'),
+        ('pending', 'Refund Pending'),
+        ('partially_refunded', 'Partially Refunded'),
+        ('refunded', 'Refunded'),
+    ]
+
+    CANCELLATION_STATUS_CHOICES = [
+        ('not_requested', 'Not requested'),
+        ('direct', 'Cancelled directly'),
+        ('pending', 'Pending approval'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
     ORDER_TYPE_CHOICES = [
         ('dine_in', 'Dine-in'),
         ('takeaway', 'Take away'),
@@ -153,6 +168,20 @@ class Order(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     cancellation_reason = models.CharField(max_length=200, blank=True)
+    cancellation_status = models.CharField(
+        max_length=20,
+        choices=CANCELLATION_STATUS_CHOICES,
+        default='not_requested',
+    )
+    cancellation_requested_at = models.DateTimeField(null=True, blank=True)
+    cancellation_decided_at = models.DateTimeField(null=True, blank=True)
+    cancellation_decided_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='decided_order_cancellations',
+    )
     cancelled_at = models.DateTimeField(null=True, blank=True)
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -178,9 +207,12 @@ class Order(models.Model):
     # Admin can open the table early (before the 2-hour hold ends)
     table_released = models.BooleanField(default=False)
 
-    # True once the money has been paid back for a cancelled online order
-    # (automatically through Razorpay, or by the admin pressing "Mark Refunded")
-    refunded = models.BooleanField(default=False)
+    # Kept separate from payment_status: cancellation does not itself refund money.
+    refund_status = models.CharField(
+        max_length=20,
+        choices=REFUND_STATUS_CHOICES,
+        default='none',
+    )
 
     # Time the kitchen promised the order will be ready.
     # Set by the chef when preparing starts; blank until then.
@@ -254,14 +286,23 @@ class Order(models.Model):
     def awaiting_payment(self):
         return self.payment_method == 'online' and self.payment_status == 'pending'
 
+    @transaction.atomic
     def expire_if_unpaid(self):
         """Cancel an online order that was never paid. Returns True if it was expired."""
-        if not self.awaiting_payment:
+        order = type(self).objects.select_for_update().get(pk=self.pk)
+        if not order.awaiting_payment:
             return False
-        self.payment_status = 'expired'
-        self.status = 'cancelled'
-        self.cancelled_at = timezone.now()
-        self.save(update_fields=['payment_status', 'status', 'cancelled_at'])
+        now = timezone.now()
+        order.payment_status = 'expired'
+        order.status = 'cancelled'
+        order.cancelled_at = now
+        order.save(update_fields=['payment_status', 'status', 'cancelled_at'])
+        from .services import release_cancelled_order_seats
+
+        release_cancelled_order_seats(order)
+        self.payment_status = order.payment_status
+        self.status = order.status
+        self.cancelled_at = now
         return True
 
 

@@ -173,6 +173,7 @@ table.orders-table { width:100%; border-collapse:collapse; }
     <a class="filter-chip {% if f_filter == 'kitchen' %}active{% endif %}" href="?filter=kitchen&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">In kitchen<b>{{ st.kitchen }}</b></a>
     <a class="filter-chip {% if f_filter == 'delivered' %}active{% endif %}" href="?filter=delivered&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">Delivered<b>{{ st.delivered }}</b></a>
     <a class="filter-chip {% if f_filter == 'cancelled' %}active{% endif %}" href="?filter=cancelled&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">Cancelled<b>{{ st.cancelled }}</b></a>
+    <a class="filter-chip {% if f_filter == 'cancellations' %}active{% endif %}" href="?filter=cancellations&pay={{ f_pay }}&sort={{ f_sort }}&q={{ f_q|urlencode }}">Cancellation history<b>{{ st.cancellations }}</b></a>
     <span class="shown">{{ page_obj.paginator.count }} orders match</span>
   </div>
 </div>
@@ -216,9 +217,12 @@ table.orders-table { width:100%; border-collapse:collapse; }
           <div class="ord-block">
             {% if order.sitting_count > 1 %}<div class="ord-sub">#{{ o.id }} <span>₹{{ o.total_amount|inr }}</span></div>{% endif %}
             {% include 'dashboard/_order_meta.html' with order=o %}
-            {% if o.status == 'cancelled' and o.cancellation_reason %}
+            {% if o.cancellation_reason %}
             <div class="cancel-reason">Cancellation reason: {{ o.cancellation_reason }}</div>
-            <div class="cancel-reason">{% if o.cancelled_at %}Cancelled: {{ o.cancelled_at|date:"d M Y, g:i A" }}{% else %}Cancellation time unavailable{% endif %}</div>
+            <div class="cancel-reason">Cancellation decision: {{ o.get_cancellation_status_display }}</div>
+            {% if o.cancellation_requested_at %}<div class="cancel-reason">Requested: {{ o.cancellation_requested_at|date:"d M Y, g:i A" }}</div>{% endif %}
+            {% if o.cancellation_decided_at %}<div class="cancel-reason">Decision time: {{ o.cancellation_decided_at|date:"d M Y, g:i A" }}</div>{% endif %}
+            {% if o.cancelled_at %}<div class="cancel-reason">Cancelled: {{ o.cancelled_at|date:"d M Y, g:i A" }}</div>{% endif %}
             {% endif %}
             <div class="items">
               {% for item in o.items.all %}
@@ -253,8 +257,11 @@ table.orders-table { width:100%; border-collapse:collapse; }
                 <span><span class="pay-id">{% if order.sitting_count > 1 %}#{{ o.id }}{% endif %}</span><span class="pay-badge paid" id="payBadge{{ o.id }}">💵 Cash Paid</span></span>
                 {% endif %}
               {% elif o.status == 'cancelled' and o.payment_status == 'paid' %}
-                {% if o.refunded %}
+                {% if o.refund_status == 'refunded' %}
                 <span><span class="pay-id">{% if order.sitting_count > 1 %}#{{ o.id }}{% endif %}</span><span class="pay-badge refunded" id="payBadge{{ o.id }}">↩️ Refunded</span></span>
+                {% elif o.refund_status == 'partially_refunded' %}
+                <span class="pay-badge refund-pending" id="payBadge{{ o.id }}">↩️ Partially refunded</span>
+                <button class="refund-btn" id="refundBtn{{ o.id }}" onclick="markRefunded({{ o.id }})">Mark Refund Complete</button>
                 {% else %}
                 <span class="pay-id">{% if order.sitting_count > 1 %}#{{ o.id }}{% endif %}</span>
                 <span class="pay-badge refund-pending" id="payBadge{{ o.id }}">💸 Refund pending</span>

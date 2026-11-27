@@ -970,6 +970,37 @@
 
     <div class="board-col">
       <div class="board-col-header">
+        <h3>⚠️ Pending Cancellation Requests</h3>
+        <span class="board-count">{{ cancellation_requests|length }}</span>
+      </div>
+      {% for order in cancellation_requests %}
+        <div class="order-card">
+          <div class="order-card-top">
+            <div>
+              <span class="order-id">Order #{{ order.id }}</span>
+              <div class="order-when">Requested {{ order.cancellation_requested_at|date:"d M Y" }} · {{ order.cancellation_requested_at|time:"h:i A" }}</div>
+            </div>
+            <span class="pay-badge">CANCELLATION PENDING</span>
+          </div>
+          <div class="order-user">
+            <span>👤 {{ order.customer_name }}{% if order.customer_phone %} · {{ order.customer_phone }}{% endif %}</span>
+            <span class="order-table-badge">🪑 {% if order.table %}Table {{ order.table.number }}{% else %}Table not assigned{% endif %}</span>
+          </div>
+          <div class="unpaid-qr-status">Order status: {{ order.get_status_display }} · Payment: {{ order.get_payment_status_display }}</div>
+          <p><strong>Cancellation reason:</strong> {{ order.cancellation_reason }}</p>
+          <form method="post" action="{% url 'dashboard:server_decide_cancellation' order.id %}" class="order-actions">
+            {% csrf_token %}
+            <button type="submit" name="decision" value="approve" class="btn-send">Approve Cancellation</button>
+            <button type="submit" name="decision" value="reject" class="btn-reject">Reject Cancellation</button>
+          </form>
+        </div>
+      {% empty %}
+        <div class="empty-col"><span class="empty-icon">✅</span>No pending cancellation requests</div>
+      {% endfor %}
+    </div>
+
+    <div class="board-col">
+      <div class="board-col-header">
         <h3>⏳ Unpaid QR Orders</h3>
         <span class="board-count">{{ unpaid_qr_orders|length }}</span>
       </div>

@@ -1202,12 +1202,12 @@
 
     <div class="orders-list" id="ordersList">
         {% for order in orders %}
-            <div class="order-card{% if order.status == 'cancelled' %} is-rejected{% endif %}" data-status="{{ order.status }}" data-id="{{ order.id }}">
+            <div class="order-card{% if order.status == 'cancelled' %} is-rejected{% endif %}" data-status="{{ order.status }}" data-cancellation-status="{{ order.cancellation_status }}" data-id="{{ order.id }}">
                 <div class="order-card-top">
                     <h3>Order #{{ order.id }}</h3>
                     <div class="badge-group">
 {% if order.table %}<span class="order-status-badge" style="background:#eef2ff;color:#3730a3">Table {{ order.table.number }}</span>{% endif %}
-                        <span class="order-status-badge {{ order.status }}">{% if order.status == 'cancelled' %}{% if order.reject_reason %}rejected{% else %}cancelled{% endif %}{% else %}{{ order.status }}{% endif %}</span>
+                        <span class="order-status-badge {{ order.status }}">{% if order.cancellation_status == 'pending' %}Cancellation pending{% elif order.cancellation_status == 'rejected' %}Cancellation rejected{% elif order.cancellation_status == 'approved' %}Cancellation approved{% elif order.status == 'cancelled' %}{% if order.reject_reason %}rejected{% else %}cancelled{% endif %}{% else %}{{ order.status }}{% endif %}</span>
                         {% if order.payment_method == 'cash' %}
                             {% if order.status == 'cancelled' %}
                                 <span class="payment-badge pending">Cancelled</span>
@@ -1219,8 +1219,10 @@
                         {% else %}
                             {% if order.payment_status == 'paid' %}
                                 {% if order.status == 'cancelled' %}
-                                    {% if order.refunded %}
+                                    {% if order.refund_status == 'refunded' %}
                                         <span class="payment-badge refunded">Refunded</span>
+                                    {% elif order.refund_status == 'partially_refunded' %}
+                                        <span class="payment-badge refund_pending">Partially Refunded</span>
                                     {% else %}
                                         <span class="payment-badge refund_pending">Refund Pending</span>
                                     {% endif %}
@@ -1234,6 +1236,17 @@
                     </div>
                 </div>
                 <p class="order-date">Placed on {{ order.created_at|date:"d M Y, h:i A" }}</p>
+                {% if order.cancellation_status == 'pending' %}
+                    <div class="rejected-box">
+                        <p class="rejected-reason"><strong>Cancellation request submitted.</strong> Awaiting server approval.</p>
+                        <p class="rejected-reason">Reason: {{ order.cancellation_reason }}</p>
+                    </div>
+                {% elif order.cancellation_status == 'rejected' %}
+                    <div class="rejected-box">
+                        <p class="rejected-reason"><strong>Cancellation request rejected.</strong> Your order and seating remain active.</p>
+                        <p class="rejected-reason">Reason: {{ order.cancellation_reason }}</p>
+                    </div>
+                {% endif %}
 
                 {# Payment not finished yet, so the customer can go back and pay (only while can_pay is true) #}
                 {% if order.can_pay %}
@@ -1246,8 +1259,9 @@
                     <div class="customer-cancel-actions">
                         <button type="button" class="btn-cancel-customer"
                                 data-order-id="{{ order.id }}"
+                                data-requires-approval="{% if order.needs_cancellation_approval %}true{% else %}false{% endif %}"
                                 data-cancel-url="{% url 'orders:cancel_customer_order' order.id %}">
-                            Cancel Order
+                            {% if order.needs_cancellation_approval %}Request Cancellation{% else %}Cancel Order{% endif %}
                         </button>
                     </div>
                 {% endif %}
@@ -1351,7 +1365,7 @@
 
                 {% if order.status == 'cancelled' %}
                     <div class="rejected-box">
-                        <div class="rejected-title">{% if order.reject_reason %}❌ Sorry, we could not accept this order{% else %}❌ This order was cancelled{% endif %}</div>
+                        <div class="rejected-title">{% if order.reject_reason %}❌ Sorry, we could not accept this order{% elif order.cancellation_status == 'approved' %}✅ Cancellation approved{% else %}❌ This order was cancelled{% endif %}</div>
                         {% if order.reject_reason %}
                             <p class="rejected-reason"><strong>Reason:</strong> {{ order.reject_reason }}</p>
                         {% elif order.cancellation_reason %}
@@ -1359,10 +1373,12 @@
                         {% endif %}
                         {% if order.cancelled_at %}<p class="rejected-reason"><strong>Cancelled:</strong> {{ order.cancelled_at|date:"d M Y, h:i A" }}</p>{% endif %}
                         {% if order.payment_method == 'online' and order.payment_status == 'paid' %}
-                            {% if order.refunded %}
+                            {% if order.refund_status == 'refunded' %}
                                 <p class="rejected-refund">✅ Your payment has been refunded.</p>
+                            {% elif order.refund_status == 'partially_refunded' %}
+                                <p class="rejected-refund">💸 Your payment was partially refunded; the remaining refund is pending.</p>
                             {% else %}
-                                <p class="rejected-refund">💸 Your payment will be refunded.</p>
+                                <p class="rejected-refund">💸 Refund status: Refund Pending.</p>
                             {% endif %}
                         {% endif %}
 
@@ -1426,7 +1442,7 @@
 <div class="cancel-modal-backdrop" id="cancelOrderModal" aria-hidden="true">
     <section class="cancel-modal" role="dialog" aria-modal="true" aria-labelledby="cancelModalTitle" aria-describedby="cancelModalIntro">
         <h2 id="cancelModalTitle">Cancel this order?</h2>
-        <p class="cancel-modal-intro" id="cancelModalIntro">Choose one reason. Orders can only be cancelled before food preparation starts.</p>
+        <p class="cancel-modal-intro" id="cancelModalIntro">Choose a reason. Orders before preparation can be cancelled directly; preparing or ready orders require server approval.</p>
         <form id="cancelOrderForm">
             {% csrf_token %}
             <div class="cancel-reason-list">
@@ -1460,6 +1476,8 @@
         const confirmButton = document.getElementById('cancelModalConfirm');
         const errorMessage = document.getElementById('cancelModalError');
         const successMessage = document.getElementById('cancelModalSuccess');
+        const modalTitle = document.getElementById('cancelModalTitle');
+        const modalIntro = document.getElementById('cancelModalIntro');
         let activeCard = null;
         let activeButton = null;
 
@@ -1487,6 +1505,13 @@
                 activeCard = button.closest('.order-card');
                 form.action = button.dataset.cancelUrl;
                 form.reset();
+                const requiresApproval = button.dataset.requiresApproval === 'true';
+                modalTitle.textContent = requiresApproval
+                    ? 'Request cancellation?'
+                    : 'Cancel this order?';
+                modalIntro.textContent = requiresApproval
+                    ? 'Choose one reason. A server must approve cancellation because preparation has started or the food is ready.'
+                    : 'Choose one reason. This order can be cancelled directly because preparation has not started.';
                 errorMessage.textContent = '';
                 successMessage.hidden = true;
                 successMessage.textContent = '';
@@ -1528,8 +1553,12 @@
 
                 successMessage.textContent = data.message;
                 successMessage.hidden = false;
-                updateOrderCard(activeCard, data);
-                if (window.markOrderStatus) window.markOrderStatus(data.order_id, 'cancelled');
+                if (data.cancelled) {
+                    updateOrderCard(activeCard, data);
+                    if (window.markOrderStatus) window.markOrderStatus(data.order_id, 'cancelled');
+                } else {
+                    updateCancellationRequestCard(activeCard, data);
+                }
                 window.setTimeout(closeModal, 1700);
             } catch (error) {
                 errorMessage.textContent = error.message || 'Cancellation failed. Please try again.';
@@ -1542,17 +1571,21 @@
             if (!card) return;
             card.dataset.status = 'cancelled';
             card.classList.add('is-rejected');
-            const statusBadge = card.querySelector('.order-card-top .order-status-badge.pending, .order-card-top .order-status-badge.confirmed');
+            const statusBadge = card.querySelector('.order-card-top .order-status-badge.pending, .order-card-top .order-status-badge.confirmed, .order-card-top .order-status-badge.preparing, .order-card-top .order-status-badge.ready');
             if (statusBadge) {
                 statusBadge.className = 'order-status-badge cancelled';
                 statusBadge.textContent = 'cancelled';
             }
             const paymentBadge = card.querySelector('.payment-badge');
             if (paymentBadge && data.payment_status === 'paid') {
-                paymentBadge.className = data.refunded
+                paymentBadge.className = data.refund_status === 'refunded'
                     ? 'payment-badge refunded'
                     : 'payment-badge refund_pending';
-                paymentBadge.textContent = data.refunded ? 'Refunded' : 'Refund Pending';
+                paymentBadge.textContent = data.refund_status === 'refunded'
+                    ? 'Refunded'
+                    : data.refund_status === 'partially_refunded'
+                        ? 'Partially Refunded'
+                        : 'Refund Pending';
             } else if (paymentBadge) {
                 paymentBadge.className = 'payment-badge pending';
                 paymentBadge.textContent = 'Cancelled';
@@ -1573,16 +1606,37 @@
             cancelledAt.className = 'rejected-reason';
             cancelledAt.textContent = 'Cancelled: ' + data.cancelled_at;
             summary.append(title, reason, cancelledAt);
-            if (data.refunded || data.refund_pending) {
+            if (data.refund_status !== 'none') {
                 const refund = document.createElement('p');
                 refund.className = 'rejected-refund';
-                refund.textContent = data.refunded
+                refund.textContent = data.refund_status === 'refunded'
                     ? '✅ Your payment has been refunded.'
-                    : '💸 Your refund is pending restaurant review.';
+                    : data.refund_status === 'partially_refunded'
+                        ? '💸 Your payment was partially refunded; the remaining refund is pending.'
+                        : '💸 Your refund is pending restaurant review.';
                 summary.appendChild(refund);
             }
             const placedDate = card.querySelector('.order-date');
             if (placedDate) placedDate.after(summary);
+        }
+
+        function updateCancellationRequestCard(card, data) {
+            if (!card) return;
+            card.dataset.cancellationStatus = 'pending';
+            const statusBadge = card.querySelector('.order-card-top .order-status-badge.pending, .order-card-top .order-status-badge.confirmed, .order-card-top .order-status-badge.preparing, .order-card-top .order-status-badge.ready');
+            if (statusBadge) statusBadge.textContent = 'Cancellation pending';
+            card.querySelectorAll('.customer-cancel-actions').forEach(element => element.remove());
+            const notice = document.createElement('div');
+            notice.className = 'rejected-box';
+            const reason = document.createElement('p');
+            reason.className = 'rejected-reason';
+            reason.innerHTML = '<strong>Cancellation request submitted.</strong> Awaiting server approval.';
+            const selectedReason = document.createElement('p');
+            selectedReason.className = 'rejected-reason';
+            selectedReason.textContent = 'Reason: ' + data.reason;
+            notice.append(reason, selectedReason);
+            const placedDate = card.querySelector('.order-date');
+            if (placedDate) placedDate.after(notice);
         }
     })();
 </script>
@@ -1600,8 +1654,10 @@
         };
 
         const known = {};
+        const knownCancellation = {};
         document.querySelectorAll('.order-card[data-id]').forEach(card => {
             known[card.dataset.id] = card.dataset.status;
+            knownCancellation[card.dataset.id] = card.dataset.cancellationStatus;
         });
         window.markOrderStatus = function (id, status) {
             known[String(id)] = status;
@@ -1636,6 +1692,15 @@
                         if (isReject && o.reason) msg += '. Reason: ' + o.reason;
                         if (o.status === 'delivered') { try { sessionStorage.setItem('tkServed', String(o.id)); } catch (e) {} }
                         showToast(msg, isReject);
+                    }
+                    const oldCancellation = knownCancellation[String(o.id)];
+                    if (oldCancellation && oldCancellation !== o.cancellation_status) {
+                        changed = true;
+                        if (o.cancellation_status === 'approved') {
+                            showToast('Cancellation approved for order #' + o.id, false);
+                        } else if (o.cancellation_status === 'rejected') {
+                            showToast('Cancellation rejected for order #' + o.id, true);
+                        }
                     }
                 });
                 if (changed) {

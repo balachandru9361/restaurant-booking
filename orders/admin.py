@@ -9,8 +9,12 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'status', 'coupon', 'discount_amount', 'total_amount', 'created_at')
-    list_filter = ('status', 'created_at')
+    list_display = (
+        'id', 'user', 'status', 'cancellation_status', 'payment_status',
+        'refund_status', 'coupon', 'discount_amount', 'total_amount', 'created_at',
+    )
+    list_filter = ('status', 'cancellation_status', 'payment_status', 'refund_status', 'created_at')
+    search_fields = ('id', 'guest_name', 'guest_phone', 'cancellation_reason')
     inlines = [OrderItemInline]
 
 

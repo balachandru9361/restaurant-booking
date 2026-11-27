@@ -1,12 +1,14 @@
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
+from django.contrib.auth.models import User
 from django.db import close_old_connections, connection
 from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
 from unittest.mock import patch
 
-from booking.models import Table, TableSession
+from accounts.models import Profile
+from booking.models import SeatAllocation, Table, TableSession
 from dashboard.views import _table_bill_orders
 from menu.models import Category, FoodItem
 from .cart_state import QR_SESSION_COOKIE
@@ -42,7 +44,7 @@ class CustomerOrderCancellationTests(TestCase):
             data,
         )
 
-    def test_customer_can_cancel_before_preparation_without_releasing_seats(self):
+    def test_customer_can_cancel_before_preparation_and_release_its_session(self):
         page = self.client.get(reverse('orders:order_history'))
         self.assertContains(page, 'Cancel Order')
         self.assertContains(page, 'Emergency Situation')
@@ -57,8 +59,8 @@ class CustomerOrderCancellationTests(TestCase):
         self.assertEqual(self.order.status, 'cancelled')
         self.assertEqual(self.order.cancellation_reason, 'Emergency Situation')
         self.assertIsNotNone(self.order.cancelled_at)
-        self.assertTrue(self.table_session.is_active)
-        self.assertEqual(self.table_session.status, TableSession.STATUS_ORDERING)
+        self.assertFalse(self.table_session.is_active)
+        self.assertEqual(self.table_session.status, TableSession.STATUS_CANCELLED)
 
     def test_other_reason_is_required_and_saved_verbatim(self):
         missing_reason = self.cancel(reason_choice='other', other_reason='   ')
@@ -76,7 +78,7 @@ class CustomerOrderCancellationTests(TestCase):
             'Our plans changed at the last minute',
         )
 
-    @patch('orders.views.refund_razorpay_payment', return_value=(True, ''))
+    @patch('orders.services.refund_razorpay_payment', return_value=(True, ''))
     def test_paid_confirmed_order_is_refunded_and_kitchen_is_notified(self, refund):
         self.order.status = 'confirmed'
         self.order.payment_status = 'paid'
@@ -88,7 +90,8 @@ class CustomerOrderCancellationTests(TestCase):
         self.assertTrue(response.json()['refunded'])
         refund.assert_called_once()
         self.order.refresh_from_db()
-        self.assertTrue(self.order.refunded)
+        self.assertEqual(self.order.payment_status, 'paid')
+        self.assertEqual(self.order.refund_status, 'refunded')
         self.assertTrue(
             Notification.objects.filter(
                 kind='cancelled', order=self.order,
@@ -96,24 +99,162 @@ class CustomerOrderCancellationTests(TestCase):
             ).exists()
         )
 
-    def test_preparing_order_and_duplicate_cancellation_are_blocked(self):
+    def test_preparing_order_requires_approval_and_duplicate_request_is_blocked(self):
         self.order.status = 'preparing'
         self.order.save(update_fields=['status'])
         preparing = self.cancel(reason_choice='Emergency Situation')
-        self.assertEqual(preparing.status_code, 409)
-
-        self.order.status = 'pending'
-        self.order.save(update_fields=['status'])
-        self.assertEqual(
-            self.cancel(reason_choice='Emergency Situation').status_code,
-            200,
-        )
+        self.assertEqual(preparing.status_code, 200)
+        self.assertFalse(preparing.json()['cancelled'])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'preparing')
+        self.assertEqual(self.order.cancellation_status, 'pending')
         duplicate = self.cancel(reason_choice='Emergency Situation')
         self.assertEqual(duplicate.status_code, 409)
 
     def test_cannot_cancel_order_from_another_browser_session(self):
         response = self.cancel(client=Client(), reason_choice='Duplicate Order')
         self.assertEqual(response.status_code, 404)
+
+    def test_server_approval_releases_only_the_cancelled_customer_session(self):
+        self.table_session.guest_count = None
+        self.table_session.save(update_fields=['guest_count'])
+        SeatAllocation.objects.create(
+            session=self.table_session, table=self.table, seats=2,
+            status=SeatAllocation.OCCUPIED,
+        )
+        other_session = TableSession.objects.create(
+            table=self.table, guests=2, source=TableSession.SOURCE_QR,
+        )
+        SeatAllocation.objects.create(
+            session=other_session, table=self.table, seats=2,
+            status=SeatAllocation.OCCUPIED,
+        )
+        Order.objects.create(
+            table=self.table, table_session=other_session, source='qr',
+            payment_method='online', payment_status='paid', status='confirmed',
+        )
+        self.order.status = 'ready'
+        self.order.payment_status = 'paid'
+        self.order.save(update_fields=['status', 'payment_status'])
+        self.assertEqual(self.table.seats_free, 2)
+
+        submitted = self.cancel(reason_choice='Long Waiting Time')
+        self.assertEqual(submitted.status_code, 200, submitted.content)
+        self.assertFalse(submitted.json()['cancelled'])
+        self.assertEqual(self.table.seats_free, 2)
+
+        server = User.objects.create_user('cancellation-server', password='x', is_staff=True)
+        Profile.objects.create(user=server, role='server')
+        server_client = Client()
+        server_client.force_login(server)
+        dashboard = server_client.get(reverse('dashboard:server_dashboard'))
+        self.assertContains(dashboard, 'Pending Cancellation Requests')
+        self.assertContains(dashboard, 'Long Waiting Time')
+        self.assertContains(dashboard, f'Order #{self.order.pk}')
+
+        with patch('orders.services.refund_razorpay_payment', return_value=(True, '')):
+            approved = server_client.post(
+                reverse('dashboard:server_decide_cancellation', args=[self.order.pk]),
+                {'decision': 'approve'},
+            )
+        self.assertEqual(approved.status_code, 302)
+        self.order.refresh_from_db()
+        self.table_session.refresh_from_db()
+        self.assertEqual(self.order.status, 'cancelled')
+        self.assertEqual(self.order.cancellation_status, 'approved')
+        self.assertEqual(self.order.refund_status, 'refunded')
+        self.assertFalse(self.table_session.is_active)
+        self.assertEqual(
+            self.table_session.allocations.get().status,
+            SeatAllocation.RELEASED,
+        )
+        self.assertTrue(other_session.is_active)
+        self.assertEqual(self.table.seats_free, 4)
+
+    def test_server_rejection_keeps_order_and_seat_allocation_unchanged(self):
+        allocation = SeatAllocation.objects.create(
+            session=self.table_session, table=self.table, seats=2,
+            status=SeatAllocation.OCCUPIED,
+        )
+        self.order.status = 'preparing'
+        self.order.payment_status = 'paid'
+        self.order.save(update_fields=['status', 'payment_status'])
+        self.assertEqual(self.cancel(reason_choice='Emergency Situation').status_code, 200)
+
+        server = User.objects.create_user('reject-cancellation-server', password='x', is_staff=True)
+        Profile.objects.create(user=server, role='server')
+        server_client = Client()
+        server_client.force_login(server)
+        rejected = server_client.post(
+            reverse('dashboard:server_decide_cancellation', args=[self.order.pk]),
+            {'decision': 'reject'},
+        )
+        self.assertEqual(rejected.status_code, 302)
+        self.order.refresh_from_db()
+        self.table_session.refresh_from_db()
+        allocation.refresh_from_db()
+        self.assertEqual(self.order.status, 'preparing')
+        self.assertEqual(self.order.cancellation_status, 'rejected')
+        self.assertTrue(self.table_session.is_active)
+        self.assertEqual(allocation.status, SeatAllocation.OCCUPIED)
+
+        admin = User.objects.create_superuser('history-admin', password='x')
+        admin_client = Client()
+        admin_client.force_login(admin)
+        history = admin_client.get(
+            reverse('dashboard:manage_orders'), {'filter': 'cancellations'}
+        )
+        self.assertContains(history, 'Cancellation history')
+        self.assertContains(history, 'Cancellation decision: Rejected')
+        self.assertContains(history, 'Emergency Situation')
+
+    def test_served_qr_order_cannot_use_customer_cancellation(self):
+        self.order.status = 'delivered'
+        self.order.payment_status = 'paid'
+        self.order.save(update_fields=['status', 'payment_status'])
+
+        response = self.cancel(reason_choice='Change of Plans')
+
+        self.assertEqual(response.status_code, 409)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'delivered')
+        self.assertEqual(self.order.cancellation_status, 'not_requested')
+
+    def test_cancelling_one_order_keeps_seats_until_the_session_has_no_active_orders(self):
+        allocation = SeatAllocation.objects.create(
+            session=self.table_session, table=self.table, seats=2,
+            status=SeatAllocation.OCCUPIED,
+        )
+        sibling = Order.objects.create(
+            guest_name='QR Customer',
+            guest_phone='1234567890',
+            table=self.table,
+            table_session=self.table_session,
+            source='qr',
+            payment_method='online',
+            payment_status='paid',
+            status='confirmed',
+        )
+        session = self.client.session
+        session['guest_order_ids'] = [self.order.pk, sibling.pk]
+        session.save()
+
+        cancelled_first = self.cancel(reason_choice='Ordered by Mistake')
+        self.assertEqual(cancelled_first.status_code, 200, cancelled_first.content)
+        allocation.refresh_from_db()
+        self.table_session.refresh_from_db()
+        self.assertEqual(allocation.status, SeatAllocation.OCCUPIED)
+        self.assertTrue(self.table_session.is_active)
+
+        cancelled_last = self.client.post(
+            reverse('orders:cancel_customer_order', args=[sibling.pk]),
+            {'reason_choice': 'Duplicate Order'},
+        )
+        self.assertEqual(cancelled_last.status_code, 200, cancelled_last.content)
+        allocation.refresh_from_db()
+        self.table_session.refresh_from_db()
+        self.assertEqual(allocation.status, SeatAllocation.RELEASED)
+        self.assertFalse(self.table_session.is_active)
 
 
 class QRGuestSessionTests(TransactionTestCase):

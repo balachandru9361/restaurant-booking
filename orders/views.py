@@ -18,7 +18,7 @@ from booking.availability import (
 from dashboard.models import Notification
 from .cart_state import QR_SESSION_COOKIE, clear_cart, get_cart, save_cart
 from .models import Bill, Coupon, Order, OrderItem, PAYMENT_HOLD_MINUTES
-from .services import refund_razorpay_payment
+from .services import process_order_refund, release_cancelled_order_seats
 
 # Highest quantity of one dish a customer can put in the cart
 MAX_QTY = 20
@@ -41,7 +41,7 @@ CUSTOMER_CANCELLATION_REASONS = (
     'Long Waiting Time',
     'Change of Plans',
 )
-CUSTOMER_CANCELLABLE_STATUSES = ('pending', 'confirmed')
+CUSTOMER_CANCELLABLE_STATUSES = ('pending', 'confirmed', 'preparing', 'ready')
 
 
 def _is_ajax(request):
@@ -1123,7 +1123,10 @@ def order_history(request):
             order.source == 'qr'
             and order.payment_method == 'online'
             and order.status in CUSTOMER_CANCELLABLE_STATUSES
+            and order.cancellation_status == 'not_requested'
+            and order.payment_status in ('pending', 'paid')
         )
+        order.needs_cancellation_approval = order.status in ('preparing', 'ready')
         if order.status != 'cancelled':
             continue
         order.reject_reason = reasons.get(order.id, '')
@@ -1141,7 +1144,7 @@ def order_history(request):
 
 @require_POST
 def cancel_customer_order(request, order_id):
-    """Cancel this browser's QR order before preparation starts."""
+    """Cancel a QR order directly before preparation, otherwise request approval."""
     choice = (request.POST.get('reason_choice') or '').strip()
     if choice == 'other':
         reason = (request.POST.get('other_reason') or '').strip()
@@ -1177,8 +1180,13 @@ def cancel_customer_order(request, order_id):
             return JsonResponse(
                 {
                     'ok': False,
-                    'error': 'This order can no longer be cancelled because preparation has started or it is already closed.',
+                    'error': 'This order can no longer be cancelled through the customer order page.',
                 },
+                status=409,
+            )
+        if order.cancellation_status != 'not_requested':
+            return JsonResponse(
+                {'ok': False, 'error': 'A cancellation request has already been submitted for this order.'},
                 status=409,
             )
         if order.payment_status not in ('pending', 'paid'):
@@ -1187,19 +1195,34 @@ def cancel_customer_order(request, order_id):
                 status=409,
             )
 
-        notify_kitchen = order.status == 'confirmed'
-        refund_required = order.payment_status == 'paid' and not order.refunded
-        order.status = 'cancelled'
+        now = timezone.now()
+        requires_approval = order.status in ('preparing', 'ready')
         order.cancellation_reason = reason
-        order.cancelled_at = timezone.now()
-        order.save(update_fields=['status', 'cancellation_reason', 'cancelled_at'])
+        order.cancellation_requested_at = now
+        fields = ['cancellation_reason', 'cancellation_requested_at']
+        if requires_approval:
+            order.cancellation_status = 'pending'
+            fields.append('cancellation_status')
+        else:
+            order.status = 'cancelled'
+            order.cancellation_status = 'direct'
+            order.cancelled_at = now
+            fields.extend(['status', 'cancellation_status', 'cancelled_at'])
+            if (
+                order.payment_status == 'paid'
+                and order.refund_status not in ('refunded', 'partially_refunded')
+            ):
+                order.refund_status = 'pending'
+                fields.append('refund_status')
+        order.save(update_fields=fields)
 
-        if order.coupon_id:
+        if not requires_approval and order.coupon_id:
             Coupon.objects.filter(
                 pk=order.coupon_id, times_used__gt=0
             ).update(times_used=F('times_used') - 1)
 
-        if notify_kitchen:
+        if not requires_approval:
+            release_cancelled_order_seats(order)
             Notification.objects.create(
                 kind='cancelled',
                 order=order,
@@ -1208,13 +1231,13 @@ def cancel_customer_order(request, order_id):
 
     refund_done = False
     refund_error = ''
+    refund_required = not requires_approval and order.payment_status == 'paid'
     if refund_required:
-        refund_done, refund_error = refund_razorpay_payment(order, reason)
-        if refund_done:
-            order.refunded = True
-            order.save(update_fields=['refunded'])
+        refund_done, refund_error = process_order_refund(order, reason)
 
-    if refund_required and not refund_done:
+    if requires_approval:
+        message = 'Your cancellation request has been submitted for server approval.'
+    elif refund_required and not refund_done:
         message = 'Your order was cancelled. Your refund is pending restaurant review.'
     elif refund_required:
         message = 'Your order was cancelled and the online payment was refunded.'
@@ -1225,9 +1248,15 @@ def cancel_customer_order(request, order_id):
         'ok': True,
         'order_id': order.id,
         'reason': order.cancellation_reason,
-        'cancelled_at': timezone.localtime(order.cancelled_at).strftime('%d %b %Y, %I:%M %p'),
+        'cancelled': not requires_approval,
+        'cancellation_status': order.cancellation_status,
+        'cancelled_at': (
+            timezone.localtime(order.cancelled_at).strftime('%d %b %Y, %I:%M %p')
+            if order.cancelled_at else ''
+        ),
         'payment_status': order.payment_status,
-        'refunded': order.refunded,
+        'refund_status': order.refund_status,
+        'refunded': order.refund_status == 'refunded',
         'refund_pending': refund_required and not refund_done,
         'refund_error': refund_error,
         'message': message,
@@ -1248,6 +1277,8 @@ def order_status_poll(request):
                 'id': o.id,
                 'status': o.status,
                 'payment_status': o.payment_status,
+                'refund_status': o.refund_status,
+                'cancellation_status': o.cancellation_status,
                 'reason': o.cancellation_reason or reasons.get(o.id, ''),
             }
             for o in orders
