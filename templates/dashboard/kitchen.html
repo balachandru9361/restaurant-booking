@@ -991,6 +991,24 @@
     setTimeout(() => toast.remove(), 4600);
   }
 
+  function showCancellationToast(message) {
+    const stack = document.getElementById('toastStack');
+    const toast = document.createElement('div');
+    toast.className = 'kitchen-toast';
+    const icon = document.createElement('span');
+    icon.className = 'toast-bell';
+    icon.textContent = '⚠️';
+    const text = document.createElement('span');
+    text.className = 'toast-text';
+    const title = document.createElement('span');
+    title.className = 'toast-title';
+    title.textContent = 'Order Cancelled';
+    text.append(title, document.createTextNode(message));
+    toast.append(icon, text);
+    stack.appendChild(toast);
+    setTimeout(() => toast.remove(), 7000);
+  }
+
   function checkForNewOrders() {
     const currentIds = Array.from(document.querySelectorAll('.col-confirmed .order-card'))
       .map(c => c.getAttribute('data-order-id'));
@@ -1055,6 +1073,42 @@
 
   renderSoundToggle();
   checkForNewOrders();
+
+  // Kitchen receives a durable alert when a server cancels an order already on its board.
+  const cancellationStorageKey = 'kitchenLastCancellationId';
+  const initialCancellationId = Number('{{ latest_cancelled_id|default:0 }}') || 0;
+  let lastCancellationId = initialCancellationId;
+  try {
+    const storedValue = localStorage.getItem(cancellationStorageKey);
+    const storedCancellationId = Number(storedValue);
+    if (storedValue !== null && Number.isFinite(storedCancellationId)) {
+      lastCancellationId = Math.min(initialCancellationId, storedCancellationId);
+    } else {
+      localStorage.setItem(cancellationStorageKey, String(initialCancellationId));
+    }
+  } catch (e) { /* storage may be unavailable in private browsing */ }
+
+  function pollCancellations() {
+    const url = "{% url 'dashboard:kitchen_notifications_poll' %}"
+      + '?cancelled_after=' + encodeURIComponent(lastCancellationId);
+    fetch(url, { credentials: 'same-origin', cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error('Could not load kitchen notifications.');
+        return response.json();
+      })
+      .then(data => {
+        (data.cancellations || []).forEach(notification => {
+          showCancellationToast(notification.message);
+          lastCancellationId = Math.max(lastCancellationId, notification.id);
+        });
+        try {
+          localStorage.setItem(cancellationStorageKey, String(lastCancellationId));
+        } catch (e) { /* storage may be unavailable in private browsing */ }
+      })
+      .catch(() => {});
+  }
+  pollCancellations();
+  setInterval(pollCancellations, 5000);
 
   // ---- Live board refresh (WebSocket push, polling as a fallback) ----
   // The board is refreshed in place (no page reload), so Display Mode stays

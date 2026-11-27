@@ -53,6 +53,7 @@ urlpatterns = [
     path('menu/<int:pk>/toggle/', views.toggle_menu_availability, name='toggle_menu_availability'),
     path('server/send-to-kitchen/<int:pk>/', views.server_send_to_kitchen, name='server_send_to_kitchen'),
     path('server/reject/<int:pk>/', views.server_reject_order, name='server_reject_order'),
+    path('server/cancel-unpaid/<int:pk>/', views.server_cancel_unpaid_order, name='server_cancel_unpaid_order'),
     path('server/bill/<int:pk>/', views.server_table_bill, name='server_table_bill'),
     path('server/bill/<int:pk>/cash-received/', views.server_table_cash_received, name='server_table_cash_received'),
 

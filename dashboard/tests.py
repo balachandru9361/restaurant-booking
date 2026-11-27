@@ -254,6 +254,27 @@ class SharedTableGroupSeatingTests(TestCase):
             )
         return session, order
 
+    def make_unpaid_qr_group(self, group_name, seats=3, status='pending',
+                             payment_status='pending'):
+        session = TableSession.objects.create(
+            table=self.table,
+            guests=seats,
+            guest_count=seats,
+            group_name=group_name,
+            source=TableSession.SOURCE_QR,
+            status=TableSession.STATUS_ORDERING,
+        )
+        order = Order.objects.create(
+            table=self.table,
+            table_session=session,
+            guests=seats,
+            status=status,
+            payment_method='online',
+            payment_status=payment_status,
+            total_amount='30.00',
+        )
+        return session, order
+
     def table_overview(self):
         response = self.client.get(reverse('dashboard:server_tables_overview'))
         self.assertEqual(response.status_code, 200, response.content)
@@ -354,6 +375,123 @@ class SharedTableGroupSeatingTests(TestCase):
         self.assertEqual(group.status, TableSession.STATUS_CANCELLED)
         self.assertFalse(order.refunded)
         self.assertEqual(self.table.seats_free, self.table.capacity)
+
+    def test_cancel_unpaid_qr_order_releases_only_its_group_and_keeps_history(self):
+        group_a, order_a = self.make_unpaid_qr_group('Unpaid A', seats=2)
+        group_b, _ = self.make_unpaid_qr_group('Unpaid B', seats=3)
+        self.assertEqual(self.table.seats_free, 1)
+
+        response = self.client.post(
+            reverse('dashboard:server_cancel_unpaid_order', args=[order_a.pk]),
+            {'reason': 'Customer Emergency'},
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(response.json()['ok'])
+
+        order_a.refresh_from_db()
+        group_a.refresh_from_db()
+        self.assertEqual(order_a.status, 'cancelled')
+        self.assertEqual(order_a.payment_status, 'pending')
+        self.assertEqual(order_a.cancellation_reason, 'Customer Emergency')
+        self.assertEqual(group_a.status, TableSession.STATUS_CANCELLED)
+        self.assertEqual(self.table.seats_free, 3)
+        self.assertTrue(group_b.is_active)
+
+        repeated = self.client.post(
+            reverse('dashboard:server_cancel_unpaid_order', args=[order_a.pk]),
+            {'reason': 'Customer Emergency'},
+        )
+        self.assertEqual(repeated.status_code, 409)
+        self.assertEqual(self.table.seats_free, 3)
+
+        billing = self.client.get(
+            reverse('dashboard:server_table_billing', args=[self.table.pk])
+        )
+        self.assertEqual(billing.status_code, 200)
+        self.assertEqual(billing.context['free_seats'], 3)
+        self.assertEqual(billing.context['used_seats'], 3)
+
+        server_page = self.client.get(reverse('dashboard:server_dashboard'))
+        self.assertNotContains(server_page, f'Order #{order_a.pk}')
+
+        admin = User.objects.create_superuser('cancel-history-admin', password='x')
+        self.client.force_login(admin)
+        history = self.client.get(reverse('dashboard:manage_orders'))
+        self.assertContains(history, 'Customer Emergency')
+        self.assertContains(history, 'Cancelled')
+        admin_tables = self.client.get(reverse('dashboard:manage_tables'))
+        row = next(
+            item for item in admin_tables.context['rows']
+            if item['table'].pk == self.table.pk
+        )
+        self.assertEqual(row['free_seats'], 3)
+
+    def test_cancel_unpaid_qr_order_already_in_kitchen_notifies_kitchen(self):
+        _, order = self.make_unpaid_qr_group(
+            'Kitchen cancellation', status='preparing'
+        )
+
+        response = self.client.post(
+            reverse('dashboard:server_cancel_unpaid_order', args=[order.pk]),
+            {'reason': 'Customer Emergency'},
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertTrue(response.json()['kitchen_notified'])
+        notification = Notification.objects.get(kind='cancelled', order=order)
+        self.assertIn('Customer Emergency', notification.message)
+        repeated = self.client.post(
+            reverse('dashboard:server_cancel_unpaid_order', args=[order.pk]),
+            {'reason': 'Customer Emergency'},
+        )
+        self.assertEqual(repeated.status_code, 409)
+        self.assertEqual(Notification.objects.filter(kind='cancelled', order=order).count(), 1)
+
+        chef = User.objects.create_user('cancel-notified-chef', password='x', is_staff=True)
+        Profile.objects.create(user=chef, role='kitchen')
+        self.client.force_login(chef)
+        polled = self.client.get(
+            reverse('dashboard:kitchen_notifications_poll')
+        )
+        self.assertEqual(polled.status_code, 200)
+        self.assertEqual(polled.json()['cancellations'][0]['id'], notification.id)
+        self.assertIn(
+            'Customer Emergency', polled.json()['cancellations'][0]['message']
+        )
+        kitchen = self.client.get(reverse('dashboard:kitchen_dashboard'))
+        self.assertEqual(kitchen.context['confirmed_orders'], [])
+        self.assertEqual(kitchen.context['preparing_orders'], [])
+
+    def test_paid_qr_order_cannot_use_unpaid_cancellation(self):
+        group, order = self.make_unpaid_qr_group(
+            'Paid group', payment_status='paid'
+        )
+
+        response = self.client.post(
+            reverse('dashboard:server_cancel_unpaid_order', args=[order.pk]),
+            {'reason': 'Customer Emergency'},
+        )
+
+        self.assertEqual(response.status_code, 409)
+        order.refresh_from_db()
+        group.refresh_from_db()
+        self.assertEqual(order.status, 'pending')
+        self.assertEqual(order.payment_status, 'paid')
+        self.assertEqual(order.cancellation_reason, '')
+        self.assertTrue(group.is_active)
+        self.assertEqual(self.table.seats_free, 3)
+
+    def test_unpaid_qr_order_appears_with_cancellation_action_on_server_dashboard(self):
+        _, order = self.make_unpaid_qr_group('Visible unpaid')
+
+        page = self.client.get(reverse('dashboard:server_dashboard'))
+
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, f'Order #{order.pk}')
+        self.assertContains(page, 'Cancel Unpaid Order &amp; Release Seats')
+        poll = self.client.get(reverse('dashboard:server_poll')).json()
+        self.assertEqual(
+            poll['unpaid_qr_orders'], [{'id': order.pk, 'table': self.table.number}]
+        )
 
 
 class ServerBillAdjustmentTests(TestCase):

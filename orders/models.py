@@ -72,10 +72,11 @@ class OrderQuerySet(models.QuerySet):
 
     def visible_to_staff(self):
         # Online orders reach the admin / server / kitchen only after payment.
-        # Orders taken by the server (cash at the counter) are always visible.
+        # Orders taken by the server (cash at the counter) and explicitly
+        # cancelled unpaid orders remain visible for staff history.
         return self.exclude(
-            payment_method='online',
-            payment_status__in=['pending', 'expired'],
+            Q(payment_method='online', payment_status__in=['pending', 'expired'])
+            & ~Q(status='cancelled', cancellation_reason__gt='')
         )
 
     def awaiting_payment(self):
@@ -151,6 +152,7 @@ class Order(models.Model):
     )
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    cancellation_reason = models.CharField(max_length=200, blank=True)
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)

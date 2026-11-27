@@ -180,7 +180,14 @@
   .btn-send:hover { background: #f59e0b; color: #fff; }
   .btn-reject { flex: 1; background: #fee2e2; color: #b91c1c; }
   .btn-reject:hover { background: #b91c1c; color: #fff; }
-  .btn-send:disabled, .btn-reject:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-send:disabled, .btn-reject:disabled, .btn-cancel-unpaid:disabled { opacity: 0.6; cursor: not-allowed; }
+  .btn-cancel-unpaid {
+    width: 100%; border: 0; cursor: pointer; padding: 10px; border-radius: 8px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700;
+    background: #fee2e2; color: #b91c1c;
+  }
+  .btn-cancel-unpaid:hover { background: #b91c1c; color: #fff; }
+  .unpaid-qr-status { color: #92400e; font-size: 12px; font-weight: 700; margin: 8px 0; }
 
   /* Bill button (now a link to the combined table bill page) */
   .btn-bill {
@@ -464,6 +471,24 @@
   .rj-title { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 800; color: #0d1b2a; margin-bottom: 4px; }
   .rj-sub { font-size: 13px; color: #6b7280; margin-bottom: 16px; }
   .rj-sub b { color: #0d1b2a; }
+  .uc-overlay {
+    position: fixed; inset: 0; background: rgba(13,27,42,0.6); z-index: 9510;
+    display: none; align-items: center; justify-content: center; padding: 16px;
+  }
+  .uc-overlay.open { display: flex; }
+  .uc-modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 520px;
+    padding: 22px; box-sizing: border-box; font-family: 'Inter', sans-serif;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  }
+  .uc-title { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 800; color: #0d1b2a; }
+  .uc-sub { font-size: 13px; color: #6b7280; margin: 6px 0 14px; }
+  .uc-reason { width: 100%; min-height: 90px; box-sizing: border-box; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; resize: vertical; }
+  .uc-error { min-height: 18px; margin-top: 5px; color: #b91c1c; font-size: 12px; }
+  .uc-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .uc-actions button { border: 0; border-radius: 8px; padding: 10px 14px; font: inherit; font-weight: 700; cursor: pointer; }
+  .uc-close { background: #eef1f5; color: #374151; }
+  .uc-confirm { background: #b91c1c; color: #fff; }
   .rj-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .rj-chip {
     border: 1.5px solid #e5e7eb; background: #fff; color: #374151;
@@ -722,6 +747,20 @@
   </div>
 </div>
 
+<div class="uc-overlay" id="ucOverlay">
+  <div class="uc-modal" role="dialog" aria-modal="true" aria-labelledby="ucTitle">
+    <div class="uc-title" id="ucTitle">Cancel Unpaid Order &amp; Release Seats</div>
+    <div class="uc-sub">Confirm cancellation of Order <b id="ucOrderLabel"></b>. Only its seating group will be released. The kitchen will be notified if it has received the order.</div>
+    <label for="ucReason">Cancellation reason (required)</label>
+    <textarea class="uc-reason" id="ucReason" maxlength="200" placeholder="For example: Customer Emergency"></textarea>
+    <div class="uc-error" id="ucError" aria-live="polite"></div>
+    <div class="uc-actions">
+      <button type="button" class="uc-close" id="ucClose">Keep Order</button>
+      <button type="button" class="uc-confirm" id="ucConfirm">Confirm Cancellation</button>
+    </div>
+  </div>
+</div>
+
 <!-- Walk-in Seat Availability: server types the number of guests, the system suggests tables -->
 <div class="wk-overlay" id="wkOverlay">
   <div class="wk-modal" role="dialog" aria-modal="true" aria-labelledby="wkTitle">
@@ -770,6 +809,7 @@
 
 <div id="liveRegion"
      data-new-ids="{% for o in new_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+     data-unpaid-ids="{% for o in unpaid_qr_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
      data-ready-ids="{% for o in ready_orders %}{{ o.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
 
 <div class="kitchen-stats">
@@ -794,6 +834,43 @@
 <div class="server-board">
 
   <div>
+
+    <div class="board-col">
+      <div class="board-col-header">
+        <h3>⏳ Unpaid QR Orders</h3>
+        <span class="board-count">{{ unpaid_qr_orders|length }}</span>
+      </div>
+      {% for order in unpaid_qr_orders %}
+        <div class="order-card" data-order-id="{{ order.id }}"
+             data-cancel-url="{% url 'dashboard:server_cancel_unpaid_order' order.id %}">
+          <div class="order-card-top">
+            <div>
+              <span class="order-id">Order #{{ order.id }}</span>
+              <div class="order-when">🕒 {{ order.created_at|date:"d M Y" }} · {{ order.created_at|time:"h:i A" }}</div>
+            </div>
+            <span class="pay-badge unpaid">⏳ UNPAID</span>
+          </div>
+          <div class="order-user">
+            <span>👤 {{ order.customer_name }}</span>
+            <span class="badge-group">
+              {% if order.table %}<span class="order-table-badge">🪑 Table {{ order.table.number }}</span>{% endif %}
+              <span class="taken-badge qr">📱 QR Order</span>
+            </span>
+          </div>
+          <div class="unpaid-qr-status">Current status: {{ order.get_status_display }}</div>
+          {% include 'dashboard/_order_meta.html' %}
+          <ul class="order-items">
+            {% for item in order.items.all %}
+              <li><span>{{ item.food_item.name }} x{{ item.quantity }}</span>{% if item.options_text %}<small style="display:block;font-size:.8em;font-weight:600;color:#d97706;margin-top:2px">{{ item.options_text }}</small>{% endif %}</li>
+            {% endfor %}
+          </ul>
+          <div class="order-total">₹{{ order.total_amount|inr }}</div>
+          <button type="button" class="btn-cancel-unpaid">Cancel Unpaid Order &amp; Release Seats</button>
+        </div>
+      {% empty %}
+        <div class="empty-col"><span class="empty-icon">⏳</span>No unpaid QR orders</div>
+      {% endfor %}
+    </div>
 
     <!-- customer orders waiting for the server (newest first) -->
     <div class="board-col new-col">
@@ -1231,6 +1308,7 @@
           currentRegion.innerHTML = freshRegion.innerHTML;
           currentRegion.dataset.readyIds = freshRegion.dataset.readyIds;
           currentRegion.dataset.newIds = freshRegion.dataset.newIds;
+          currentRegion.dataset.unpaidIds = freshRegion.dataset.unpaidIds;
 
           // the dining cards were re-rendered, so fill the elapsed time again
           updateDining();
@@ -1264,6 +1342,7 @@
     const toSet = str => new Set((str || '').split(',').filter(Boolean).map(Number));
     let knownReady = toSet(region().dataset.readyIds);
     let knownNew = toSet(region().dataset.newIds);
+    let knownUnpaid = toSet(region().dataset.unpaidIds);
     let knownSig = null;       // first poll only sets the baseline
     let knownCashId = null;    // first poll only sets the baseline
 
@@ -1280,21 +1359,31 @@
 
           const ready = data.orders || [];
           const fresh = data.new_orders || [];
+          const unpaid = data.unpaid_qr_orders || [];
 
           const readyIds = new Set(ready.map(o => o.id));
           const newIds = new Set(fresh.map(o => o.id));
+          const unpaidIds = new Set(unpaid.map(o => o.id));
 
           const freshReady = ready.filter(o => !knownReady.has(o.id));
           const freshNew = fresh.filter(o => !knownNew.has(o.id));
+          const freshUnpaid = unpaid.filter(o => !knownUnpaid.has(o.id));
 
           const removedReady = [...knownReady].some(id => !readyIds.has(id));
           const removedNew = [...knownNew].some(id => !newIds.has(id));
+          const removedUnpaid = [...knownUnpaid].some(id => !unpaidIds.has(id));
 
           // payment / status / table-release changed somewhere (admin or server)
           const sigChanged = knownSig !== null && data.sig && data.sig !== knownSig;
           if (data.sig) knownSig = data.sig;
 
-          if (freshReady.length || freshNew.length || removedReady || removedNew || sigChanged) {
+          if (freshReady.length || freshNew.length || freshUnpaid.length || removedReady || removedNew || removedUnpaid || sigChanged) {
+            freshUnpaid.forEach(o => showToast(
+              'Payment Pending',
+              o.table ? '🪑 TABLE ' + o.table : '📱 QR ORDER',
+              'Order #' + o.id + ' — cancel if the customer has left',
+              '⏳'
+            ));
             freshNew.forEach(o => showToast(
               'New Order',
               o.table ? '🪑 TABLE ' + o.table : '🆕 NEW ORDER',
@@ -1313,9 +1402,10 @@
 
             knownReady = readyIds;
             knownNew = newIds;
+            knownUnpaid = unpaidIds;
 
             refreshLive().then(() => {
-              [...freshReady, ...freshNew].forEach(o => {
+              [...freshReady, ...freshNew, ...freshUnpaid].forEach(o => {
                 const card = document.querySelector('[data-order-id="' + o.id + '"]');
                 if (card) card.classList.add('is-new');
               });
@@ -1480,6 +1570,96 @@
       if (!card) return;
       if (sendBtn) sendToKitchen(card, false);
       else openRejectPopup(card);
+    });
+  })();
+
+  // ---- Cancel one unpaid QR order and release its seating group ----
+  (function () {
+    const overlay = document.getElementById('ucOverlay');
+    const orderLabel = document.getElementById('ucOrderLabel');
+    const reasonInput = document.getElementById('ucReason');
+    const errorEl = document.getElementById('ucError');
+    const confirmButton = document.getElementById('ucConfirm');
+    let orderId = null;
+    let cancelUrl = '';
+
+    document.body.appendChild(overlay);
+
+    function closePopup() {
+      overlay.classList.remove('open');
+      orderId = null;
+      cancelUrl = '';
+      reasonInput.value = '';
+      errorEl.textContent = '';
+    }
+
+    document.addEventListener('click', function (event) {
+      const button = event.target.closest('.btn-cancel-unpaid');
+      if (!button) return;
+      const card = button.closest('.order-card');
+      if (!card) return;
+      orderId = card.dataset.orderId;
+      cancelUrl = card.dataset.cancelUrl;
+      orderLabel.textContent = '#' + orderId;
+      reasonInput.value = '';
+      errorEl.textContent = '';
+      overlay.classList.add('open');
+      reasonInput.focus();
+    });
+
+    document.getElementById('ucClose').addEventListener('click', closePopup);
+    overlay.addEventListener('click', function (event) {
+      if (event.target === overlay) closePopup();
+    });
+
+    confirmButton.addEventListener('click', function () {
+      if (!orderId || !cancelUrl) return;
+      const reason = reasonInput.value.trim();
+      if (!reason) {
+        errorEl.textContent = 'Enter a reason before confirming.';
+        reasonInput.focus();
+        return;
+      }
+
+      const currentId = orderId;
+      confirmButton.disabled = true;
+      confirmButton.textContent = 'Cancelling...';
+      fetch(cancelUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'X-CSRFToken': CSRF_TOKEN,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({ reason: reason }).toString()
+      })
+        .then(response => response.json().then(data => ({
+          ok: response.ok,
+          status: response.status,
+          data: data
+        })))
+        .then(result => {
+          if (!result.ok || !result.data.ok) {
+            throw new Error(result.data.error || 'Could not cancel this order.');
+          }
+          closePopup();
+          showToast(
+            'Order Cancelled',
+            'Order #' + currentId,
+            'Unpaid order cancelled and its seats released',
+            '✅'
+          );
+          return refreshLive().then(() => {
+            if (window.refreshSeatingPanel) window.refreshSeatingPanel();
+          });
+        })
+        .catch(error => {
+          errorEl.textContent = error.message;
+        })
+        .finally(() => {
+          confirmButton.disabled = false;
+          confirmButton.textContent = 'Confirm Cancellation';
+        });
     });
   })();
 

@@ -1010,24 +1010,27 @@ def payment_success(request, order_id):
     A customer can ONLY pay online here. Cash orders are created by the server
     (waiter) in the staff dashboard, never from this public page, otherwise anybody
     could post payment_method=cash and push an unpaid order to the kitchen."""
-    order = get_object_or_404(_my_orders(request), id=order_id)
+    with transaction.atomic():
+        order = get_object_or_404(
+            _my_orders(request).select_for_update(), id=order_id
+        )
 
-    blocked = _payment_block(request, order)
-    if blocked:
-        return blocked
+        blocked = _payment_block(request, order)
+        if blocked:
+            return blocked
 
-    # status is NOT changed here - approval moves it to 'confirmed'
-    order.payment_method = 'online'
-    order.payment_status = 'paid'
+        # status is NOT changed here - approval moves it to 'confirmed'
+        order.payment_method = 'online'
+        order.payment_status = 'paid'
 
-    # This checkout is a MOCK, so no real Razorpay payment exists. A mock id is saved
-    # so the automatic refund on Reject works end to end (see _razorpay_refund in
-    # dashboard/views.py: ids starting with "mock_" are refunded without calling Razorpay).
-    # With the REAL Razorpay checkout, verify the signature here (server side) and save
-    # the real "pay_xxx" id instead. That real id is what the Razorpay refund API needs.
-    order.razorpay_payment_id = f'mock_pay_{order.id}'
+        # This checkout is a MOCK, so no real Razorpay payment exists. A mock id is saved
+        # so the automatic refund on Reject works end to end (see _razorpay_refund in
+        # dashboard/views.py: ids starting with "mock_" are refunded without calling Razorpay).
+        # With the REAL Razorpay checkout, verify the signature here (server side) and save
+        # the real "pay_xxx" id instead. That real id is what the Razorpay refund API needs.
+        order.razorpay_payment_id = f'mock_pay_{order.id}'
 
-    order.save(update_fields=['payment_method', 'payment_status', 'razorpay_payment_id'])
+        order.save(update_fields=['payment_method', 'payment_status', 'razorpay_payment_id'])
 
     messages.success(request, f'Payment received. Order #{order.id} is waiting for restaurant approval.')
     return redirect('orders:order_history')

@@ -1173,6 +1173,96 @@ def _reject_pending_order(pk, reason, user):
             'refunded': refund_done, 'refund_error': refund_error}, 200
 
 
+def _unpaid_qr_order_queryset():
+    return (
+        Order.objects.filter(
+            source='qr',
+            payment_method='online',
+            payment_status='pending',
+            status__in=['pending', 'confirmed', 'preparing', 'ready', 'delivered'],
+            table_session__source=TableSession.SOURCE_QR,
+            table_session__is_active=True,
+        )
+        .select_related('table', 'table_session', 'user')
+        .prefetch_related('items__food_item')
+        .order_by('-created_at')
+    )
+
+
+@server_required
+@require_POST
+def server_cancel_unpaid_order(request, pk):
+    """Cancel one unpaid QR order and release only its active QR seating group."""
+    reason = (request.POST.get('reason') or '').strip()
+    if not reason:
+        return JsonResponse(
+            {'ok': False, 'error': 'A cancellation reason is required.'}, status=400
+        )
+    if len(reason) > 200:
+        return JsonResponse(
+            {'ok': False, 'error': 'Cancellation reason must be 200 characters or fewer.'},
+            status=400,
+        )
+
+    with transaction.atomic():
+        order = get_object_or_404(Order.objects.select_for_update(), pk=pk)
+        if order.status == 'cancelled':
+            return JsonResponse(
+                {'ok': False, 'error': f'Order #{order.id} is already cancelled.'},
+                status=409,
+            )
+        if order.source != 'qr' or order.payment_method != 'online':
+            return JsonResponse(
+                {'ok': False, 'error': 'Only QR online orders can use this action.'},
+                status=400,
+            )
+        if order.payment_status == 'paid':
+            return JsonResponse(
+                {'ok': False, 'error': 'Paid orders cannot be cancelled as unpaid.'},
+                status=409,
+            )
+        if order.payment_status != 'pending':
+            return JsonResponse(
+                {'ok': False, 'error': 'This order is not awaiting online payment.'},
+                status=409,
+            )
+        if not order.table_session_id:
+            return JsonResponse(
+                {'ok': False, 'error': 'This QR order has no linked seating group.'},
+                status=409,
+            )
+
+        session = get_object_or_404(
+            TableSession.objects.select_for_update(), pk=order.table_session_id
+        )
+        if session.source != TableSession.SOURCE_QR or not session.is_active:
+            return JsonResponse(
+                {'ok': False, 'error': 'The order seating group is no longer active.'},
+                status=409,
+            )
+
+        notify_kitchen = order.status in ('confirmed', 'preparing', 'ready')
+        order.status = 'cancelled'
+        order.cancellation_reason = reason
+        order.save(update_fields=['status', 'cancellation_reason'])
+        session.cancel_seating()
+
+        if notify_kitchen:
+            Notification.objects.create(
+                kind='cancelled',
+                order=order,
+                created_by=request.user,
+                message=f'Order #{order.id} cancelled before payment: {reason}'[:255],
+            )
+
+    return JsonResponse({
+        'ok': True,
+        'order_id': order.id,
+        'payment_status': order.payment_status,
+        'kitchen_notified': notify_kitchen,
+    })
+
+
 @admin_required
 @require_POST
 def approve_order(request, pk):
@@ -1556,6 +1646,7 @@ def kitchen_dashboard(request):
 
     grocery_items, store_low = _store_stock_overview()
     low_stock_count = len(store_low)
+    latest_cancelled = Notification.objects.filter(kind='cancelled').first()
 
     context = {
         'confirmed_orders': confirmed_orders,
@@ -1563,6 +1654,7 @@ def kitchen_dashboard(request):
         'ready_orders': ready_orders,
         'grocery_items': grocery_items,
         'low_stock_count': low_stock_count,
+        'latest_cancelled_id': latest_cancelled.id if latest_cancelled else 0,
     }
     return render(request, 'dashboard/kitchen.html', context)
 
@@ -1644,12 +1736,22 @@ def kitchen_request_stock(request, pk):
 def kitchen_notifications_poll(request):
     """Latest store stock update for the kitchen toast; also latest kitchen report for the store toast."""
     from .models import StockRequest
+    try:
+        cancelled_after = max(int(request.GET.get('cancelled_after', '0')), 0)
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid cancellation cursor.'}, status=400)
+
     latest = (StockRequest.objects.filter(status='restocked')
               .exclude(restocked_message='')
               .order_by('-restocked_at')
               .first())
     stock_in = Notification.objects.filter(kind='stock_in').order_by('-id').first()
     stock_out = Notification.objects.filter(kind='stock_out').order_by('-id').first()
+    cancellations = list(
+        Notification.objects.filter(kind='cancelled', id__gt=cancelled_after)
+        .order_by('id')
+        .values('id', 'message')[:50]
+    )
     return JsonResponse({
         'latest_ts': int(latest.restocked_at.timestamp() * 1000) if latest and latest.restocked_at else 0,
         'latest_message': latest.restocked_message if latest else '',
@@ -1659,6 +1761,7 @@ def kitchen_notifications_poll(request):
         'stock_out_id': stock_out.id if stock_out else 0,
         'stock_out_message': stock_out.message if stock_out else '',
         'stock_out_reason': _stock_out_reason_from_message(stock_out.message) if stock_out else '',  # NEW
+        'cancellations': cancellations,
     })
 
 
@@ -2078,6 +2181,7 @@ def server_dashboard(request):
                   .select_related('table', 'user', 'taken_by')
                   .prefetch_related('items__food_item')
                   .order_by('-created_at'))
+    unpaid_qr_orders = _unpaid_qr_order_queryset()
 
     # CHANGED: ready / served orders of a walk-in group carry group_label ('Tables 1, 2, 4'),
     # group_guests and group_session_id, so the page can show the whole group instead of "Table 1".
@@ -2181,6 +2285,7 @@ def server_dashboard(request):
 
     context = {
         'new_orders': new_orders,
+        'unpaid_qr_orders': unpaid_qr_orders,
         'ready_orders': ready_orders,
         'delivered_today': delivered_today,
         'dining_orders': dining_orders,
@@ -2600,7 +2705,13 @@ def server_poll(request):
                       | Q(table__isnull=False, table_released=False))
               .order_by('id')
               .values_list('id', 'status', 'payment_status', 'table_id', 'table_released', 'total_amount'))
-    sig = hashlib.md5(repr(list(_board)).encode('utf-8')).hexdigest()
+    pending_qr = _unpaid_qr_order_queryset()
+    pending_qr_rows = list(
+        pending_qr.values_list('id', 'status', 'payment_status', 'table_id')
+    )
+    sig = hashlib.md5(
+        repr((list(_board), pending_qr_rows)).encode('utf-8')
+    ).hexdigest()
 
     # NEW: the latest "cash received" alert (created by the admin Mark Received button)
     last_cash = Notification.objects.filter(kind='cash_received').order_by('-id').first()
@@ -2616,6 +2727,13 @@ def server_poll(request):
                 'created_at': timezone.localtime(o.created_at).strftime('%d %b %Y, %I:%M %p'),
             }
             for o in new_orders
+        ],
+        'unpaid_qr_orders': [
+            {
+                'id': o.id,
+                'table': o.table.number if o.table else None,
+            }
+            for o in pending_qr
         ],
         'orders': [
             {'id': o.id, 'table': o.table.number if o.table else None}
