@@ -819,6 +819,14 @@
     <div class="uc-title" id="ucTitle">Cancel Unpaid Order &amp; Release Seats</div>
     <div class="uc-sub">Confirm cancellation of Order <b id="ucOrderLabel"></b>. Only its seating group will be released. The kitchen will be notified if it has received the order.</div>
     <label for="ucReason">Cancellation reason (required)</label>
+    <div class="rj-grid" id="ucReasonGrid" aria-label="Quick cancellation reasons">
+      <button type="button" class="rj-chip" data-reason="Customer emergency">Customer emergency</button>
+      <button type="button" class="rj-chip" data-reason="Customer left">Customer left</button>
+      <button type="button" class="rj-chip" data-reason="Changed mind">Changed mind</button>
+      <button type="button" class="rj-chip" data-reason="Wrong order placed">Wrong order placed</button>
+      <button type="button" class="rj-chip" data-reason="Payment issue">Payment issue</button>
+      <button type="button" class="rj-chip" data-reason="__other__">Other (type your own)</button>
+    </div>
     <textarea class="uc-reason" id="ucReason" maxlength="200" placeholder="For example: Customer Emergency"></textarea>
     <div class="uc-error" id="ucError" aria-live="polite"></div>
     <div class="uc-actions">
@@ -1300,6 +1308,45 @@
 <script>
   const CSRF_TOKEN = '{{ csrf_token }}';
 
+  function bindReasonChips(container, textarea, options) {
+    container.addEventListener('click', function (event) {
+      const chip = event.target.closest('.rj-chip');
+      if (!chip || !container.contains(chip)) return;
+
+      if (options.allowToggle && chip.classList.contains('selected')) {
+        chip.classList.remove('selected');
+        if (options.hideTextareaForPreset) textarea.hidden = true;
+        if (options.clearOnToggleOff) textarea.value = '';
+        if (options.onSelection) options.onSelection('');
+        return;
+      }
+
+      container.querySelectorAll('.rj-chip').forEach(function (item) {
+        item.classList.remove('selected');
+      });
+      chip.classList.add('selected');
+
+      const isOther = chip.dataset.reason === '__other__';
+      if (options.populateText) textarea.value = isOther ? '' : chip.dataset.reason;
+      if (options.hideTextareaForPreset) textarea.hidden = !isOther;
+      if (isOther && options.focusOther) textarea.focus();
+      if (options.onSelection) options.onSelection(chip.dataset.reason);
+    });
+
+    if (options.trackManualInput) {
+      textarea.addEventListener('input', function () {
+        const matchingChip = Array.from(container.querySelectorAll('.rj-chip'))
+          .find(function (chip) {
+            return chip.dataset.reason !== '__other__'
+              && chip.dataset.reason === textarea.value;
+          });
+        container.querySelectorAll('.rj-chip').forEach(function (chip) {
+          chip.classList.toggle('selected', chip === matchingChip);
+        });
+      });
+    }
+  }
+
   function updateClock() {
     document.getElementById('liveClock').textContent = new Date().toLocaleTimeString();
   }
@@ -1632,6 +1679,13 @@
     let rjUrl = '';             // reject url of that order
     let rjReason = '';          // chosen quick reason ('__other__' = type your own)
 
+    bindReasonChips(rjGrid, rjOther, {
+      allowToggle: true,
+      hideTextareaForPreset: true,
+      focusOther: true,
+      onSelection: function (reason) { rjReason = reason; }
+    });
+
     function openRejectPopup(card) {
       // the card can be re-rendered while the popup is open, so remember id + url here
       rjOrderId = card.dataset.orderId;
@@ -1650,23 +1704,6 @@
       rjOrderId = null;
       rjUrl = '';
     }
-
-    rjGrid.addEventListener('click', function (e) {
-      const chip = e.target.closest('.rj-chip');
-      if (!chip) return;
-      // click the same chip again to un-select it (reason is optional)
-      if (chip.classList.contains('selected')) {
-        chip.classList.remove('selected');
-        rjReason = '';
-        rjOther.hidden = true;
-        return;
-      }
-      rjGrid.querySelectorAll('.rj-chip').forEach(c => c.classList.remove('selected'));
-      chip.classList.add('selected');
-      rjReason = chip.dataset.reason;
-      rjOther.hidden = (rjReason !== '__other__');
-      if (!rjOther.hidden) rjOther.focus();
-    });
 
     document.getElementById('rjCancel').addEventListener('click', closeRejectPopup);
     rjOverlay.addEventListener('click', function (e) { if (e.target === rjOverlay) closeRejectPopup(); });
@@ -1730,19 +1767,34 @@
   (function () {
     const overlay = document.getElementById('ucOverlay');
     const orderLabel = document.getElementById('ucOrderLabel');
+    const reasonGrid = document.getElementById('ucReasonGrid');
     const reasonInput = document.getElementById('ucReason');
     const errorEl = document.getElementById('ucError');
     const confirmButton = document.getElementById('ucConfirm');
     let orderId = null;
     let cancelUrl = '';
 
+    bindReasonChips(reasonGrid, reasonInput, {
+      allowToggle: false,
+      populateText: true,
+      focusOther: true,
+      trackManualInput: true
+    });
+
     document.body.appendChild(overlay);
+
+    function resetReasonChips() {
+      reasonInput.value = '';
+      reasonGrid.querySelectorAll('.rj-chip').forEach(function (chip) {
+        chip.classList.remove('selected');
+      });
+    }
 
     function closePopup() {
       overlay.classList.remove('open');
       orderId = null;
       cancelUrl = '';
-      reasonInput.value = '';
+      resetReasonChips();
       errorEl.textContent = '';
     }
 
@@ -1754,7 +1806,7 @@
       orderId = card.dataset.orderId;
       cancelUrl = card.dataset.cancelUrl;
       orderLabel.textContent = '#' + orderId;
-      reasonInput.value = '';
+      resetReasonChips();
       errorEl.textContent = '';
       overlay.classList.add('open');
       reasonInput.focus();

@@ -556,6 +556,20 @@ class SharedTableGroupSeatingTests(TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, f'Order #{order.pk}')
         self.assertContains(page, 'Cancel Unpaid Order &amp; Release Seats')
+        for reason in (
+            'Customer emergency',
+            'Customer left',
+            'Changed mind',
+            'Wrong order placed',
+            'Payment issue',
+            '__other__',
+        ):
+            self.assertContains(
+                page,
+                f'class="rj-chip" data-reason="{reason}"',
+                html=False,
+            )
+        self.assertContains(page, 'id="ucReasonGrid"', html=False)
         poll = self.client.get(reverse('dashboard:server_poll')).json()
         self.assertEqual(
             poll['unpaid_qr_orders'], [{'id': order.pk, 'table': self.table.number}]
