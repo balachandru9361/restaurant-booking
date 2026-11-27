@@ -419,6 +419,55 @@
     width: 100%; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 10px;
     font-size: 14px; margin-bottom: 12px; box-sizing: border-box;
   }
+  .menu-category-filters {
+    display: flex; gap: 7px; max-width: 100%; min-width: 0; box-sizing: border-box;
+    overflow-x: auto; overflow-y: hidden; white-space: nowrap; margin-bottom: 9px;
+    padding: 2px 0 7px; -webkit-overflow-scrolling: touch;
+  }
+  .menu-category-filter {
+    flex: 0 0 auto; border: 1px solid #d1d5db; border-radius: 999px;
+    background: #fff; color: #374151; padding: 7px 12px; font-size: 12px;
+    font-weight: 700; cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+  }
+  .menu-category-filter:hover { border-color: #0f766e; color: #0f766e; }
+  .menu-category-filter.active { border-color: #0f766e; background: #0f766e; color: #fff; }
+  .veg-toggle-row {
+    display: flex; gap: 9px; width: 100%; max-width: 100%; min-width: 0;
+    box-sizing: border-box; overflow-x: auto; overflow-y: hidden; flex-wrap: nowrap;
+    padding: 2px 0 9px; margin-bottom: 5px; -webkit-overflow-scrolling: touch;
+  }
+  .veg-toggle-pill {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+    border: 1.5px solid #70443d; border-radius: 999px; background: #fff;
+    color: #4b342f; padding: 6px 11px; font-size: 12px; font-weight: 800;
+    cursor: pointer; transition: background .15s, border-color .15s, box-shadow .15s;
+  }
+  .veg-toggle-pill.active { border-color: #57302a; box-shadow: 0 0 0 2px rgba(112,68,61,.12); }
+  .veg-toggle-symbol {
+    width: 18px; height: 18px; flex: 0 0 18px; display: inline-flex;
+    align-items: center; justify-content: center; box-sizing: border-box;
+    background: #fff; border: 2px solid #16803c; border-radius: 4px;
+  }
+  .veg-toggle-symbol.non-veg { border-color: #a31624; }
+  .veg-toggle-mark.veg {
+    width: 8px; height: 8px; border-radius: 50%; background: #16803c;
+  }
+  .veg-toggle-mark.non-veg {
+    width: 0; height: 0; border-left: 5px solid transparent;
+    border-right: 5px solid transparent; border-bottom: 9px solid #a31624;
+  }
+  .veg-toggle-track {
+    position: relative; width: 34px; height: 18px; flex: 0 0 34px;
+    border-radius: 999px; background: #d1d5db; transition: background .15s;
+  }
+  .veg-toggle-pill[data-veg="true"].active .veg-toggle-track { background: #bbf7d0; }
+  .veg-toggle-pill[data-veg="false"].active .veg-toggle-track { background: #fecaca; }
+  .veg-toggle-knob {
+    position: absolute; top: 2px; left: 2px; width: 14px; height: 14px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+    transition: transform .15s;
+  }
+  .veg-toggle-pill.active .veg-toggle-knob { transform: translateX(16px); }
   .to-item {
     display: flex; justify-content: space-between; align-items: center; gap: 10px;
     padding: 10px 12px; border: 1px solid #eef0f3; border-radius: 10px; margin-bottom: 8px;
@@ -684,10 +733,28 @@
       </div>
 
       <p class="to-label">2. Add Items</p>
+      <div class="menu-category-filters" id="toCategories" aria-label="Filter menu by category">
+        <button type="button" class="menu-category-filter active" data-category-id="all" aria-pressed="true">All</button>
+        {% for category in categories %}
+          <button type="button" class="menu-category-filter" data-category-id="{{ category.id }}" aria-pressed="false">{{ category.name }}</button>
+        {% endfor %}
+      </div>
+      <div class="veg-toggle-row" id="toVeg" aria-label="Filter menu by veg type">
+        <button type="button" class="veg-toggle-pill" id="toVegOnly" data-veg="true" aria-label="Veg only" aria-pressed="false">
+          <span class="veg-toggle-symbol" aria-hidden="true"><span class="veg-toggle-mark veg"></span></span>
+          <span class="veg-toggle-track" aria-hidden="true"><span class="veg-toggle-knob"></span></span>
+          <span>Veg</span>
+        </button>
+        <button type="button" class="veg-toggle-pill" id="toNonVegOnly" data-veg="false" aria-label="Non-Veg only" aria-pressed="false">
+          <span class="veg-toggle-symbol non-veg" aria-hidden="true"><span class="veg-toggle-mark non-veg"></span></span>
+          <span class="veg-toggle-track" aria-hidden="true"><span class="veg-toggle-knob"></span></span>
+          <span>Non-Veg</span>
+        </button>
+      </div>
       <input type="text" class="to-search" id="toSearch" placeholder="🔍 Search menu...">
       <div id="toMenu">
         {% for item in food_items %}
-          <div class="to-item" data-id="{{ item.id }}" data-price="{{ item.price|stringformat:'s' }}" data-name="{{ item.name|lower }}">
+          <div class="to-item" data-id="{{ item.id }}" data-price="{{ item.price|stringformat:'s' }}" data-name="{{ item.name|lower }}" data-category-id="{{ item.category_id }}" data-veg="{{ item.is_veg|yesno:'true,false' }}">
             <div class="to-item-info">
               {% if item.image %}
                 <img class="to-thumb" src="{{ item.image.url }}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="to-ph" style="display:none" data-n="{{ item.name }}"></span>
@@ -802,6 +869,64 @@
 </div>
 
 {# Individual billing: one bill per customer on a shared table (outside #liveRegion) #}
+<script>
+  window.createMenuCategoryFilter = function (categoryContainerSelector, vegContainerSelector, menuSelector, searchSelector) {
+    const categoryContainer = document.querySelector(categoryContainerSelector);
+    const vegContainer = document.querySelector(vegContainerSelector);
+    const menu = document.querySelector(menuSelector);
+    const search = document.querySelector(searchSelector);
+    const buttons = Array.from(categoryContainer.querySelectorAll('.menu-category-filter'));
+    const vegButtons = Array.from(vegContainer.querySelectorAll('.veg-toggle-pill'));
+    const items = Array.from(menu.querySelectorAll('.to-item, .ib-item'));
+    let selectedCategory = 'all';
+    let vegType = 'all';
+
+    function apply() {
+      const searchTerm = search.value.trim().toLowerCase();
+      items.forEach(function (item) {
+        const categoryMatches = selectedCategory === 'all'
+          || item.dataset.categoryId === selectedCategory;
+        const vegMatches = vegType === 'all' || item.dataset.veg === vegType;
+        const searchMatches = (item.dataset.name || '').includes(searchTerm);
+        item.style.display = categoryMatches && vegMatches && searchMatches ? '' : 'none';
+      });
+      buttons.forEach(function (button) {
+        const active = button.dataset.categoryId === selectedCategory;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      vegButtons.forEach(function (button) {
+        const active = button.dataset.veg === vegType;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+    }
+
+    categoryContainer.addEventListener('click', function (event) {
+      const button = event.target.closest('.menu-category-filter');
+      if (!button) return;
+      selectedCategory = button.dataset.categoryId;
+      apply();
+    });
+    vegContainer.addEventListener('click', function (event) {
+      const button = event.target.closest('.veg-toggle-pill');
+      if (!button) return;
+      vegType = vegType === button.dataset.veg ? 'all' : button.dataset.veg;
+      apply();
+    });
+    search.addEventListener('input', apply);
+    apply();
+
+    return {
+      reset: function () {
+        selectedCategory = 'all';
+        vegType = 'all';
+        search.value = '';
+        apply();
+      }
+    };
+  };
+</script>
 {% include 'dashboard/_individual_bill.html' %}
 
 {# Walk-in groups: seated / needs cleaning (outside #liveRegion, it refreshes itself) #}
@@ -1136,6 +1261,34 @@
         </div>
       {% empty %}
         <div class="empty-col"><span class="empty-icon">🍽️</span>Nothing served yet today</div>
+      {% endfor %}
+    </div>
+
+    <div class="board-col">
+      <div class="board-col-header">
+        <h3>❌ Recent Cancellations</h3>
+        <span class="board-count">{{ cancelled_orders|length }}</span>
+      </div>
+      {% for order in cancelled_orders %}
+        <div class="booking-row">
+          <div>
+            <div class="booking-name">Order #{{ order.id }} · {{ order.customer_name }}</div>
+            <div class="booking-meta">
+              {% if order.table %}Table {{ order.table.number }}{% elif order.is_takeaway %}Takeaway{% else %}Table not assigned{% endif %}
+              · <strong>Reason:</strong> {{ order.cancellation_reason }}
+            </div>
+          </div>
+          <div class="served-right">
+            <span class="status-badge status-cancelled">{{ order.get_status_display }}</span>
+            {% if order.cancelled_at %}
+              <span class="order-when">{{ order.cancelled_at|date:"d M Y" }} · {{ order.cancelled_at|time:"h:i A" }}</span>
+            {% else %}
+              <span class="order-when">Time unavailable</span>
+            {% endif %}
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty-col"><span class="empty-icon">❌</span>No recent cancellations</div>
       {% endfor %}
     </div>
   </div>
@@ -1736,6 +1889,9 @@
     let selectedTable = null;   // table id, or 'takeaway'
     let selectedLabel = '';
     const qty = {};             // { foodItemId: quantity }
+    const menuFilter = window.createMenuCategoryFilter(
+      '#toCategories', '#toVeg', '#toMenu', '#toSearch'
+    );
 
     function openModal() { overlay.classList.add('open'); }
     function closeModal() { overlay.classList.remove('open'); }
@@ -1824,11 +1980,10 @@
       document.querySelectorAll('#toMenu .to-item').forEach(row => {
         row.querySelector('.num').textContent = '0';
       });
-      document.getElementById('toSearch').value = '';
       guestsInput.value = '';
       groupNameInput.value = '';
       customerTypeInput.value = 'other';
-      filterMenu('');
+      menuFilter.reset();
       errBox.style.display = 'none';
       recalc();
     }
@@ -1846,20 +2001,12 @@
       placeBtn.disabled = !(selectedTable && count > 0 && gs.ok);
     }
 
-    function filterMenu(text) {
-      const t = text.trim().toLowerCase();
-      document.querySelectorAll('#toMenu .to-item').forEach(row => {
-        row.style.display = row.dataset.name.includes(t) ? '' : 'none';
-      });
-    }
-
     document.getElementById('toOpen').addEventListener('click', function () {
       if (String(selectedTable).indexOf('session:') === 0) setGroup(null);
       openModal();
     });
     document.getElementById('toClose').addEventListener('click', closeModal);
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-    document.getElementById('toSearch').addEventListener('input', e => filterMenu(e.target.value));
     guestsInput.addEventListener('input', recalc);
 
     document.getElementById('toTables').addEventListener('click', e => {

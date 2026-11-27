@@ -153,6 +153,7 @@ class Order(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     cancellation_reason = models.CharField(max_length=200, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
     coupon = models.ForeignKey(Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -259,7 +260,8 @@ class Order(models.Model):
             return False
         self.payment_status = 'expired'
         self.status = 'cancelled'
-        self.save(update_fields=['payment_status', 'status'])
+        self.cancelled_at = timezone.now()
+        self.save(update_fields=['payment_status', 'status', 'cancelled_at'])
         return True
 
 

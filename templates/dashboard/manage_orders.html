@@ -216,7 +216,10 @@ table.orders-table { width:100%; border-collapse:collapse; }
           <div class="ord-block">
             {% if order.sitting_count > 1 %}<div class="ord-sub">#{{ o.id }} <span>₹{{ o.total_amount|inr }}</span></div>{% endif %}
             {% include 'dashboard/_order_meta.html' with order=o %}
-            {% if o.cancellation_reason %}<div class="cancel-reason">Cancellation reason: {{ o.cancellation_reason }}</div>{% endif %}
+            {% if o.status == 'cancelled' and o.cancellation_reason %}
+            <div class="cancel-reason">Cancellation reason: {{ o.cancellation_reason }}</div>
+            <div class="cancel-reason">{% if o.cancelled_at %}Cancelled: {{ o.cancelled_at|date:"d M Y, g:i A" }}{% else %}Cancellation time unavailable{% endif %}</div>
+            {% endif %}
             <div class="items">
               {% for item in o.items.all %}
               <div class="it">

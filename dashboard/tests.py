@@ -230,6 +230,70 @@ class SharedTableGroupSeatingTests(TestCase):
             html=False,
         )
 
+    def test_both_server_menus_render_dynamic_categories_and_item_links(self):
+        juice = Category.objects.create(name='Juice', slug='filter-juice')
+        biriyani = Category.objects.create(name='Biriyani', slug='filter-biriyani')
+        juice_item = FoodItem.objects.create(
+            category=juice, name='Apple Juice', price='12.00'
+        )
+        biriyani_item = FoodItem.objects.create(
+            category=biriyani, name='Chicken Biriyani', price='20.00',
+            is_veg=False,
+        )
+
+        response = self.client.get(reverse('dashboard:server_dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            list(response.context['categories'].values_list('name', flat=True)),
+            ['Biriyani', 'Juice'],
+        )
+        self.assertContains(
+            response,
+            'class="menu-category-filter active" data-category-id="all" aria-pressed="true">All',
+            count=2,
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'class="veg-toggle-pill" id="toVegOnly" data-veg="true" aria-label="Veg only" aria-pressed="false"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'class="veg-toggle-pill" id="toNonVegOnly" data-veg="false" aria-label="Non-Veg only" aria-pressed="false"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'class="veg-toggle-pill" id="ibVegOnly" data-veg="true" aria-label="Veg only" aria-pressed="false"',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'class="veg-toggle-pill" id="ibNonVegOnly" data-veg="false" aria-label="Non-Veg only" aria-pressed="false"',
+            html=False,
+        )
+        for category in (juice, biriyani):
+            self.assertContains(
+                response,
+                f'data-category-id="{category.pk}" aria-pressed="false">{category.name}</button>',
+                count=2,
+                html=False,
+            )
+        self.assertContains(response, f'class="to-item" data-id="{juice_item.pk}"', html=False)
+        self.assertContains(response, f'class="ib-item" data-id="{juice_item.pk}"', html=False)
+        self.assertContains(response, f'class="to-item" data-id="{biriyani_item.pk}"', html=False)
+        self.assertContains(response, f'class="ib-item" data-id="{biriyani_item.pk}"', html=False)
+        self.assertContains(
+            response, f'data-category-id="{juice.pk}" data-veg="true"',
+            count=2, html=False,
+        )
+        self.assertContains(
+            response, f'data-category-id="{biriyani.pk}" data-veg="false"',
+            count=2, html=False,
+        )
+
     def make_qr_group(self, group_name, with_order=False, refunded=False):
         session = TableSession.objects.create(
             table=self.table,
@@ -393,6 +457,7 @@ class SharedTableGroupSeatingTests(TestCase):
         self.assertEqual(order_a.status, 'cancelled')
         self.assertEqual(order_a.payment_status, 'pending')
         self.assertEqual(order_a.cancellation_reason, 'Customer Emergency')
+        self.assertIsNotNone(order_a.cancelled_at)
         self.assertEqual(group_a.status, TableSession.STATUS_CANCELLED)
         self.assertEqual(self.table.seats_free, 3)
         self.assertTrue(group_b.is_active)
@@ -412,13 +477,16 @@ class SharedTableGroupSeatingTests(TestCase):
         self.assertEqual(billing.context['used_seats'], 3)
 
         server_page = self.client.get(reverse('dashboard:server_dashboard'))
-        self.assertNotContains(server_page, f'Order #{order_a.pk}')
+        self.assertContains(server_page, f'Order #{order_a.pk}')
+        self.assertContains(server_page, 'Customer Emergency')
+        self.assertContains(server_page, 'Recent Cancellations')
 
         admin = User.objects.create_superuser('cancel-history-admin', password='x')
         self.client.force_login(admin)
         history = self.client.get(reverse('dashboard:manage_orders'))
         self.assertContains(history, 'Customer Emergency')
         self.assertContains(history, 'Cancelled')
+        self.assertContains(history, 'Cancelled:')
         admin_tables = self.client.get(reverse('dashboard:manage_tables'))
         row = next(
             item for item in admin_tables.context['rows']

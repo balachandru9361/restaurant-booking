@@ -7,7 +7,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from django.db import transaction
-from django.db.models import Max, Q
+from django.db.models import F, Max, Q
 from django.utils import timezone
 from menu.models import FoodItem, Option
 from booking.models import Table, TableSession
@@ -15,8 +15,10 @@ from booking.availability import (
     table_available_seats, table_status_map, is_table_reserved_now,
     upcoming_holds, WALKIN_BUFFER,
 )
+from dashboard.models import Notification
 from .cart_state import QR_SESSION_COOKIE, clear_cart, get_cart, save_cart
-from .models import Bill, Order, OrderItem, PAYMENT_HOLD_MINUTES
+from .models import Bill, Coupon, Order, OrderItem, PAYMENT_HOLD_MINUTES
+from .services import refund_razorpay_payment
 
 # Highest quantity of one dish a customer can put in the cart
 MAX_QTY = 20
@@ -32,6 +34,14 @@ TABLE_SESSION_MAX_HOURS = 4
 # CHANGED (guests-all): most guests allowed when the customer has NO table attached
 # (no QR scan). The staff assign the table later. Same as MAX_GUESTS in booking/forms.py.
 MAX_GUESTS_NO_TABLE = 30
+CUSTOMER_CANCELLATION_REASONS = (
+    'Emergency Situation',
+    'Ordered by Mistake',
+    'Duplicate Order',
+    'Long Waiting Time',
+    'Change of Plans',
+)
+CUSTOMER_CANCELLABLE_STATUSES = ('pending', 'confirmed')
 
 
 def _is_ajax(request):
@@ -1024,8 +1034,8 @@ def payment_success(request, order_id):
         order.payment_status = 'paid'
 
         # This checkout is a MOCK, so no real Razorpay payment exists. A mock id is saved
-        # so the automatic refund on Reject works end to end (see _razorpay_refund in
-        # dashboard/views.py: ids starting with "mock_" are refunded without calling Razorpay).
+        # so the automatic refund on cancellation works end to end; mock ids are handled
+        # without calling Razorpay.
         # With the REAL Razorpay checkout, verify the signature here (server side) and save
         # the real "pay_xxx" id instead. That real id is what the Razorpay refund API needs.
         order.razorpay_payment_id = f'mock_pay_{order.id}'
@@ -1109,6 +1119,11 @@ def order_history(request):
         order.suggestions = []
         # True while the customer can still open the payment page for this order
         order.can_pay = order.awaiting_payment and order.status == 'pending'
+        order.can_customer_cancel = (
+            order.source == 'qr'
+            and order.payment_method == 'online'
+            and order.status in CUSTOMER_CANCELLABLE_STATUSES
+        )
         if order.status != 'cancelled':
             continue
         order.reject_reason = reasons.get(order.id, '')
@@ -1122,6 +1137,101 @@ def order_history(request):
         order.suggestions = list(alt[:3])
 
     return render(request, 'orders/order_history.html', {'orders': orders})
+
+
+@require_POST
+def cancel_customer_order(request, order_id):
+    """Cancel this browser's QR order before preparation starts."""
+    choice = (request.POST.get('reason_choice') or '').strip()
+    if choice == 'other':
+        reason = (request.POST.get('other_reason') or '').strip()
+        if not reason:
+            return JsonResponse(
+                {'ok': False, 'error': 'Enter a reason for choosing Other.'},
+                status=400,
+            )
+    elif choice in CUSTOMER_CANCELLATION_REASONS:
+        reason = choice
+    else:
+        return JsonResponse(
+            {'ok': False, 'error': 'Select a valid cancellation reason.'},
+            status=400,
+        )
+    if len(reason) > 200:
+        return JsonResponse(
+            {'ok': False, 'error': 'Cancellation reason must be 200 characters or fewer.'},
+            status=400,
+        )
+
+    with transaction.atomic():
+        order = get_object_or_404(
+            _my_orders(request).select_for_update(),
+            pk=order_id,
+        )
+        if order.source != 'qr' or order.payment_method != 'online':
+            return JsonResponse(
+                {'ok': False, 'error': 'Only your QR online orders can be cancelled here.'},
+                status=409,
+            )
+        if order.status not in CUSTOMER_CANCELLABLE_STATUSES:
+            return JsonResponse(
+                {
+                    'ok': False,
+                    'error': 'This order can no longer be cancelled because preparation has started or it is already closed.',
+                },
+                status=409,
+            )
+        if order.payment_status not in ('pending', 'paid'):
+            return JsonResponse(
+                {'ok': False, 'error': 'This order is not eligible for customer cancellation.'},
+                status=409,
+            )
+
+        notify_kitchen = order.status == 'confirmed'
+        refund_required = order.payment_status == 'paid' and not order.refunded
+        order.status = 'cancelled'
+        order.cancellation_reason = reason
+        order.cancelled_at = timezone.now()
+        order.save(update_fields=['status', 'cancellation_reason', 'cancelled_at'])
+
+        if order.coupon_id:
+            Coupon.objects.filter(
+                pk=order.coupon_id, times_used__gt=0
+            ).update(times_used=F('times_used') - 1)
+
+        if notify_kitchen:
+            Notification.objects.create(
+                kind='cancelled',
+                order=order,
+                message=f'Order #{order.id} cancelled by customer: {reason}'[:255],
+            )
+
+    refund_done = False
+    refund_error = ''
+    if refund_required:
+        refund_done, refund_error = refund_razorpay_payment(order, reason)
+        if refund_done:
+            order.refunded = True
+            order.save(update_fields=['refunded'])
+
+    if refund_required and not refund_done:
+        message = 'Your order was cancelled. Your refund is pending restaurant review.'
+    elif refund_required:
+        message = 'Your order was cancelled and the online payment was refunded.'
+    else:
+        message = 'Your order was cancelled successfully.'
+
+    return JsonResponse({
+        'ok': True,
+        'order_id': order.id,
+        'reason': order.cancellation_reason,
+        'cancelled_at': timezone.localtime(order.cancelled_at).strftime('%d %b %Y, %I:%M %p'),
+        'payment_status': order.payment_status,
+        'refunded': order.refunded,
+        'refund_pending': refund_required and not refund_done,
+        'refund_error': refund_error,
+        'message': message,
+    })
 
 
 def order_status_poll(request):
@@ -1138,7 +1248,7 @@ def order_status_poll(request):
                 'id': o.id,
                 'status': o.status,
                 'payment_status': o.payment_status,
-                'reason': reasons.get(o.id, ''),
+                'reason': o.cancellation_reason or reasons.get(o.id, ''),
             }
             for o in orders
         ]

@@ -1125,6 +1125,60 @@
         transition: transform 0.15s ease;
     }
     .btn-pay-now:hover { color: #fff; text-decoration: none; transform: translateY(-2px); }
+    .customer-cancel-actions { margin: -4px 0 16px; }
+    .btn-cancel-customer {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 40px; padding: 8px 18px; border: 1px solid #fecaca;
+        border-radius: 999px; background: #fff; color: #b91c1c;
+        font-size: .88rem; font-weight: 800; cursor: pointer;
+    }
+    .btn-cancel-customer:hover { background: #fef2f2; }
+    .btn-cancel-customer:disabled { opacity: .6; cursor: wait; }
+    .cancel-modal-backdrop {
+        position: fixed; inset: 0; z-index: 10000; display: none;
+        align-items: center; justify-content: center; padding: 16px;
+        background: rgba(15, 23, 42, .62);
+    }
+    .cancel-modal-backdrop.open { display: flex; }
+    .cancel-modal {
+        width: min(100%, 520px); max-height: min(90vh, 760px); overflow-y: auto;
+        padding: 24px; border-radius: 20px; background: #fff;
+        box-shadow: 0 24px 70px rgba(0,0,0,.28);
+    }
+    .cancel-modal h2 { margin: 0 0 6px; color: #1f2937; font-size: 1.3rem; }
+    .cancel-modal-intro { margin: 0 0 18px; color: #64748b; font-size: .92rem; }
+    .cancel-reason-list { display: grid; gap: 9px; }
+    .cancel-reason-option {
+        display: flex; align-items: center; gap: 11px; padding: 11px 12px;
+        border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer;
+        color: #334155; font-weight: 650;
+    }
+    .cancel-reason-option:has(input:checked) {
+        border-color: #b91c1c; background: #fff7f7; color: #7f1d1d;
+    }
+    .cancel-reason-option input { accent-color: #b91c1c; }
+    .cancel-reason-icon { width: 25px; text-align: center; font-size: 1.15rem; }
+    .cancel-other-wrap { display: none; margin-top: 12px; }
+    .cancel-other-wrap.open { display: block; }
+    .cancel-other-wrap label { display: block; margin-bottom: 6px; font-size: .86rem; font-weight: 750; color: #374151; }
+    .cancel-other-wrap input {
+        width: 100%; min-height: 44px; box-sizing: border-box; padding: 10px 12px;
+        border: 1px solid #cbd5e1; border-radius: 10px; font: inherit;
+    }
+    .cancel-modal-error { min-height: 20px; margin: 10px 0 0; color: #b91c1c; font-size: .86rem; }
+    .cancel-modal-success { margin: 10px 0 0; color: #166534; font-size: .9rem; font-weight: 750; }
+    .cancel-modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 16px; }
+    .cancel-modal-actions button {
+        min-height: 42px; padding: 8px 16px; border: 0; border-radius: 999px;
+        font: inherit; font-weight: 800; cursor: pointer;
+    }
+    .cancel-modal-close { background: #f1f5f9; color: #334155; }
+    .cancel-modal-confirm { background: #b91c1c; color: #fff; }
+    .cancel-modal-confirm:disabled { background: #cbd5e1; cursor: not-allowed; }
+    @media (max-width: 520px) {
+        .cancel-modal { padding: 19px; border-radius: 16px; }
+        .cancel-modal-actions { display: grid; grid-template-columns: 1fr 1fr; }
+    }
 
 </style>
 
@@ -1153,7 +1207,7 @@
                     <h3>Order #{{ order.id }}</h3>
                     <div class="badge-group">
 {% if order.table %}<span class="order-status-badge" style="background:#eef2ff;color:#3730a3">Table {{ order.table.number }}</span>{% endif %}
-                        <span class="order-status-badge {{ order.status }}">{% if order.status == 'cancelled' %}rejected{% else %}{{ order.status }}{% endif %}</span>
+                        <span class="order-status-badge {{ order.status }}">{% if order.status == 'cancelled' %}{% if order.reject_reason %}rejected{% else %}cancelled{% endif %}{% else %}{{ order.status }}{% endif %}</span>
                         {% if order.payment_method == 'cash' %}
                             {% if order.status == 'cancelled' %}
                                 <span class="payment-badge pending">Cancelled</span>
@@ -1186,6 +1240,15 @@
                     <div class="pay-now-box">
                         <span class="pay-now-text">💳 Payment is not done yet. The restaurant gets your order only after you pay.</span>
                         <a class="btn-pay-now" href="{% url 'orders:initiate_payment' order.id %}">Pay now</a>
+                    </div>
+                {% endif %}
+                {% if order.can_customer_cancel %}
+                    <div class="customer-cancel-actions">
+                        <button type="button" class="btn-cancel-customer"
+                                data-order-id="{{ order.id }}"
+                                data-cancel-url="{% url 'orders:cancel_customer_order' order.id %}">
+                            Cancel Order
+                        </button>
                     </div>
                 {% endif %}
 
@@ -1288,10 +1351,13 @@
 
                 {% if order.status == 'cancelled' %}
                     <div class="rejected-box">
-                        <div class="rejected-title">❌ Sorry, we could not accept this order</div>
+                        <div class="rejected-title">{% if order.reject_reason %}❌ Sorry, we could not accept this order{% else %}❌ This order was cancelled{% endif %}</div>
                         {% if order.reject_reason %}
                             <p class="rejected-reason"><strong>Reason:</strong> {{ order.reject_reason }}</p>
+                        {% elif order.cancellation_reason %}
+                            <p class="rejected-reason"><strong>Cancellation reason:</strong> {{ order.cancellation_reason }}</p>
                         {% endif %}
+                        {% if order.cancelled_at %}<p class="rejected-reason"><strong>Cancelled:</strong> {{ order.cancelled_at|date:"d M Y, h:i A" }}</p>{% endif %}
                         {% if order.payment_method == 'online' and order.payment_status == 'paid' %}
                             {% if order.refunded %}
                                 <p class="rejected-refund">✅ Your payment has been refunded.</p>
@@ -1357,6 +1423,170 @@
     </div>
 {% endif %}
 
+<div class="cancel-modal-backdrop" id="cancelOrderModal" aria-hidden="true">
+    <section class="cancel-modal" role="dialog" aria-modal="true" aria-labelledby="cancelModalTitle" aria-describedby="cancelModalIntro">
+        <h2 id="cancelModalTitle">Cancel this order?</h2>
+        <p class="cancel-modal-intro" id="cancelModalIntro">Choose one reason. Orders can only be cancelled before food preparation starts.</p>
+        <form id="cancelOrderForm">
+            {% csrf_token %}
+            <div class="cancel-reason-list">
+                <label class="cancel-reason-option"><input type="radio" name="reason_choice" value="Emergency Situation"><span class="cancel-reason-icon">🚨</span><span>Emergency Situation</span></label>
+                <label class="cancel-reason-option"><input type="radio" name="reason_choice" value="Ordered by Mistake"><span class="cancel-reason-icon">🛍️</span><span>Ordered by Mistake</span></label>
+                <label class="cancel-reason-option"><input type="radio" name="reason_choice" value="Duplicate Order"><span class="cancel-reason-icon">📋</span><span>Duplicate Order</span></label>
+                <label class="cancel-reason-option"><input type="radio" name="reason_choice" value="Long Waiting Time"><span class="cancel-reason-icon">⏱️</span><span>Long Waiting Time</span></label>
+                <label class="cancel-reason-option"><input type="radio" name="reason_choice" value="Change of Plans"><span class="cancel-reason-icon">🔄</span><span>Change of Plans</span></label>
+                <label class="cancel-reason-option"><input type="radio" name="reason_choice" value="other"><span class="cancel-reason-icon">✍️</span><span>Other (Enter your reason)</span></label>
+            </div>
+            <div class="cancel-other-wrap" id="cancelOtherWrap">
+                <label for="cancelOtherReason">Your reason</label>
+                <input type="text" id="cancelOtherReason" name="other_reason" maxlength="200" autocomplete="off">
+            </div>
+            <p class="cancel-modal-error" id="cancelModalError" role="alert"></p>
+            <p class="cancel-modal-success" id="cancelModalSuccess" role="status" hidden></p>
+            <div class="cancel-modal-actions">
+                <button type="button" class="cancel-modal-close" id="cancelModalClose">Keep Order</button>
+                <button type="submit" class="cancel-modal-confirm" id="cancelModalConfirm" disabled>Confirm Cancellation</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<script>
+    (function () {
+        const modal = document.getElementById('cancelOrderModal');
+        const form = document.getElementById('cancelOrderForm');
+        const otherWrap = document.getElementById('cancelOtherWrap');
+        const otherReason = document.getElementById('cancelOtherReason');
+        const confirmButton = document.getElementById('cancelModalConfirm');
+        const errorMessage = document.getElementById('cancelModalError');
+        const successMessage = document.getElementById('cancelModalSuccess');
+        let activeCard = null;
+        let activeButton = null;
+
+        function validateReason() {
+            const selected = form.querySelector('input[name="reason_choice"]:checked');
+            const isOther = selected && selected.value === 'other';
+            otherWrap.classList.toggle('open', Boolean(isOther));
+            const otherValue = otherReason.value.trim();
+            confirmButton.disabled = !selected || (isOther && (!otherValue || otherValue.length > 200));
+            if (isOther) otherReason.setAttribute('required', '');
+            else otherReason.removeAttribute('required');
+        }
+
+        function closeModal() {
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            if (activeButton && activeButton.isConnected) activeButton.focus();
+            activeCard = null;
+            activeButton = null;
+        }
+
+        document.querySelectorAll('.btn-cancel-customer').forEach(function (button) {
+            button.addEventListener('click', function () {
+                activeButton = button;
+                activeCard = button.closest('.order-card');
+                form.action = button.dataset.cancelUrl;
+                form.reset();
+                errorMessage.textContent = '';
+                successMessage.hidden = true;
+                successMessage.textContent = '';
+                otherWrap.classList.remove('open');
+                validateReason();
+                modal.classList.add('open');
+                modal.setAttribute('aria-hidden', 'false');
+                const firstReason = form.querySelector('input[name="reason_choice"]');
+                if (firstReason) firstReason.focus();
+            });
+        });
+
+        form.addEventListener('change', validateReason);
+        otherReason.addEventListener('input', validateReason);
+        document.getElementById('cancelModalClose').addEventListener('click', closeModal);
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) closeModal();
+        });
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && modal.classList.contains('open')) closeModal();
+        });
+
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            if (!activeButton || confirmButton.disabled) return;
+            confirmButton.disabled = true;
+            activeButton.disabled = true;
+            errorMessage.textContent = '';
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: new URLSearchParams(new FormData(form))
+                });
+                const data = await response.json();
+                if (!response.ok || !data.ok) {
+                    throw new Error(data.error || 'Could not cancel this order.');
+                }
+
+                successMessage.textContent = data.message;
+                successMessage.hidden = false;
+                updateOrderCard(activeCard, data);
+                if (window.markOrderStatus) window.markOrderStatus(data.order_id, 'cancelled');
+                window.setTimeout(closeModal, 1700);
+            } catch (error) {
+                errorMessage.textContent = error.message || 'Cancellation failed. Please try again.';
+                activeButton.disabled = false;
+                validateReason();
+            }
+        });
+
+        function updateOrderCard(card, data) {
+            if (!card) return;
+            card.dataset.status = 'cancelled';
+            card.classList.add('is-rejected');
+            const statusBadge = card.querySelector('.order-card-top .order-status-badge.pending, .order-card-top .order-status-badge.confirmed');
+            if (statusBadge) {
+                statusBadge.className = 'order-status-badge cancelled';
+                statusBadge.textContent = 'cancelled';
+            }
+            const paymentBadge = card.querySelector('.payment-badge');
+            if (paymentBadge && data.payment_status === 'paid') {
+                paymentBadge.className = data.refunded
+                    ? 'payment-badge refunded'
+                    : 'payment-badge refund_pending';
+                paymentBadge.textContent = data.refunded ? 'Refunded' : 'Refund Pending';
+            } else if (paymentBadge) {
+                paymentBadge.className = 'payment-badge pending';
+                paymentBadge.textContent = 'Cancelled';
+            }
+            card.querySelectorAll('.pay-now-box, .tracker, .t-msg, .eta-box, .customer-cancel-actions').forEach(function (element) {
+                element.remove();
+            });
+
+            const summary = document.createElement('div');
+            summary.className = 'rejected-box';
+            const title = document.createElement('div');
+            title.className = 'rejected-title';
+            title.textContent = '❌ This order was cancelled';
+            const reason = document.createElement('p');
+            reason.className = 'rejected-reason';
+            reason.textContent = 'Cancellation reason: ' + data.reason;
+            const cancelledAt = document.createElement('p');
+            cancelledAt.className = 'rejected-reason';
+            cancelledAt.textContent = 'Cancelled: ' + data.cancelled_at;
+            summary.append(title, reason, cancelledAt);
+            if (data.refunded || data.refund_pending) {
+                const refund = document.createElement('p');
+                refund.className = 'rejected-refund';
+                refund.textContent = data.refunded
+                    ? '✅ Your payment has been refunded.'
+                    : '💸 Your refund is pending restaurant review.';
+                summary.appendChild(refund);
+            }
+            const placedDate = card.querySelector('.order-date');
+            if (placedDate) placedDate.after(summary);
+        }
+    })();
+</script>
+
 <script>
     (function () {
         const POLL_URL = "{% url 'orders:order_status_poll' %}";
@@ -1373,6 +1603,9 @@
         document.querySelectorAll('.order-card[data-id]').forEach(card => {
             known[card.dataset.id] = card.dataset.status;
         });
+        window.markOrderStatus = function (id, status) {
+            known[String(id)] = status;
+        };
         if (!Object.keys(known).length) return;
 
         function showToast(text, isReject) {

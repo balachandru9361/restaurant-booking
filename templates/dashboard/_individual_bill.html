@@ -111,10 +111,28 @@
       </select>
 
       <p class="ib-label">3. Add Items</p>
+      <div class="menu-category-filters" id="ibCategories" aria-label="Filter menu by category">
+        <button type="button" class="menu-category-filter active" data-category-id="all" aria-pressed="true">All</button>
+        {% for category in categories %}
+          <button type="button" class="menu-category-filter" data-category-id="{{ category.id }}" aria-pressed="false">{{ category.name }}</button>
+        {% endfor %}
+      </div>
+      <div class="veg-toggle-row" id="ibVeg" aria-label="Filter menu by veg type">
+        <button type="button" class="veg-toggle-pill" id="ibVegOnly" data-veg="true" aria-label="Veg only" aria-pressed="false">
+          <span class="veg-toggle-symbol" aria-hidden="true"><span class="veg-toggle-mark veg"></span></span>
+          <span class="veg-toggle-track" aria-hidden="true"><span class="veg-toggle-knob"></span></span>
+          <span>Veg</span>
+        </button>
+        <button type="button" class="veg-toggle-pill" id="ibNonVegOnly" data-veg="false" aria-label="Non-Veg only" aria-pressed="false">
+          <span class="veg-toggle-symbol non-veg" aria-hidden="true"><span class="veg-toggle-mark non-veg"></span></span>
+          <span class="veg-toggle-track" aria-hidden="true"><span class="veg-toggle-knob"></span></span>
+          <span>Non-Veg</span>
+        </button>
+      </div>
       <input type="text" class="ib-search" id="ibSearch" placeholder="🔍 Search menu...">
       <div id="ibMenu">
         {% for item in food_items %}
-          <div class="ib-item" data-id="{{ item.id }}" data-price="{{ item.price|stringformat:'s' }}" data-name="{{ item.name|lower }}">
+          <div class="ib-item" data-id="{{ item.id }}" data-price="{{ item.price|stringformat:'s' }}" data-name="{{ item.name|lower }}" data-category-id="{{ item.category_id }}" data-veg="{{ item.is_veg|yesno:'true,false' }}">
             <div class="to-item-info">
               {% if item.image %}
                 <img class="to-thumb" src="{{ item.image.url }}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="to-ph" style="display:none" data-n="{{ item.name }}"></span>
@@ -161,6 +179,9 @@
     let tableId = null;
     let tableNumber = '';
     const qty = {};
+    const menuFilter = window.createMenuCategoryFilter(
+      '#ibCategories', '#ibVeg', '#ibMenu', '#ibSearch'
+    );
 
     function toast(title, target, sub, icon, isError) {
       if (typeof showToast === 'function') showToast(title, target, sub, icon, isError ? { error: true } : {});
@@ -212,8 +233,7 @@
       document.querySelectorAll('#ibMenu .ib-item .num').forEach(function (n) { n.textContent = '0'; });
       nameInput.value = '';
       customerTypeInput.value = 'individual';
-      document.getElementById('ibSearch').value = '';
-      document.querySelectorAll('#ibMenu .ib-item').forEach(function (r) { r.style.display = ''; });
+      menuFilter.reset();
       errBox.style.display = 'none';
       recalc();
     }
@@ -236,13 +256,6 @@
       tableId = chip.dataset.id;
       tableNumber = chip.dataset.number;
       recalc();
-    });
-
-    document.getElementById('ibSearch').addEventListener('input', function (e) {
-      const t = e.target.value.trim().toLowerCase();
-      document.querySelectorAll('#ibMenu .ib-item').forEach(function (row) {
-        row.style.display = row.dataset.name.indexOf(t) !== -1 ? '' : 'none';
-      });
     });
 
     document.getElementById('ibMenu').addEventListener('click', function (e) {

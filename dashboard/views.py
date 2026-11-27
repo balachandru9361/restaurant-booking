@@ -7,11 +7,6 @@ import json
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 
-try:
-    import razorpay
-except ImportError:          # library not installed: refunds fall back to manual
-    razorpay = None
-
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.shortcuts import render, redirect, get_object_or_404
@@ -45,6 +40,7 @@ from booking.availability import (
     table_available_seats, walkin_blocked_table_ids,
 )
 from orders.models import Order, OrderItem, Coupon
+from orders.services import refund_razorpay_payment as _razorpay_refund
 
 logger = logging.getLogger(__name__)
 
@@ -1063,33 +1059,6 @@ def _approve_pending_order(pk, force=False, table_id=None):
     return {'ok': True, 'status': 'confirmed'}, 200
 
 
-def _razorpay_refund(order, reason=''):
-    """Full refund to the customer's original payment method. Returns (ok, error).
-    Never raises: a failed refund must not break the reject action."""
-    payment_id = getattr(order, 'razorpay_payment_id', '')
-    if not payment_id:
-        return False, 'No Razorpay payment id saved for this order.'
-    if payment_id.startswith('mock_'):
-        # Mock checkout: no real money moved, so there is nothing to send to Razorpay.
-        return True, ''
-    if razorpay is None:
-        return False, 'razorpay library is not installed.'
-    key_id = getattr(settings, 'RAZORPAY_KEY_ID', '')
-    key_secret = getattr(settings, 'RAZORPAY_KEY_SECRET', '')
-    if not key_id or not key_secret:
-        return False, 'Razorpay keys are missing in settings.'
-    try:
-        client = razorpay.Client(auth=(key_id, key_secret))
-        client.payment.refund(payment_id, {
-            'amount': int(order.total_amount * 100),   # rupees -> paise
-            'notes': {'order_id': str(order.id), 'reason': (reason or 'Order rejected')[:200]},
-        })
-        return True, ''
-    except Exception as e:
-        logger.exception('Razorpay refund failed for order %s', order.id)
-        return False, str(e)[:200]
-
-
 # The reject logic lives in a helper so the SERVER can use it too.
 def _reject_pending_order(pk, reason, user):
     """pending -> cancelled. Gives the coupon back, logs it, emails the customer.
@@ -1102,7 +1071,8 @@ def _reject_pending_order(pk, reason, user):
             return {'ok': False, 'error': f'Order #{order.id} is already {order.status}.'}, 409
 
         order.status = 'cancelled'
-        order.save(update_fields=['status'])
+        order.cancelled_at = timezone.now()
+        order.save(update_fields=['status', 'cancelled_at'])
 
         if order.table_session_id:
             qr_session = TableSession.objects.select_for_update().filter(
@@ -1244,7 +1214,8 @@ def server_cancel_unpaid_order(request, pk):
         notify_kitchen = order.status in ('confirmed', 'preparing', 'ready')
         order.status = 'cancelled'
         order.cancellation_reason = reason
-        order.save(update_fields=['status', 'cancellation_reason'])
+        order.cancelled_at = timezone.now()
+        order.save(update_fields=['status', 'cancellation_reason', 'cancelled_at'])
         session.cancel_seating()
 
         if notify_kitchen:
@@ -1897,7 +1868,11 @@ def update_order_status(request, pk, new_status):
         error = _transition_error(order, request.user, role, new_status)
         if not error:
             fields = ['status']
+            was_cancelled = order.status == 'cancelled'
             order.status = new_status
+            if new_status == 'cancelled' and not was_cancelled:
+                order.cancelled_at = timezone.now()
+                fields.append('cancelled_at')
             if new_status == 'preparing':
                 # Chef picks "ready in N minutes"; the customer sees the time left.
                 minutes = _parse_eta_minutes(request.POST.get('eta_minutes'))
@@ -1998,7 +1973,11 @@ def api_order_status(request, pk):
                 Coupon.objects.filter(pk=order.coupon_id).update(times_used=F('times_used') + 1)
 
         order.status = status
-        order.save(update_fields=['status'])
+        fields = ['status']
+        if now_cancelled and not was_cancelled:
+            order.cancelled_at = timezone.now()
+            fields.append('cancelled_at')
+        order.save(update_fields=fields)
     return JsonResponse({'ok': True, 'status': status, 'stock_used': needs_stock and getattr(settings, 'AUTO_DEDUCT_STOCK', True)})
 
 
@@ -2194,6 +2173,12 @@ def server_dashboard(request):
         .filter(status='delivered', created_at__date=timezone.localdate())
         .select_related('table', 'taken_by')
         .order_by('-created_at'))
+    cancelled_orders = list(
+        Order.objects.visible_to_staff()
+        .filter(status='cancelled', cancellation_reason__gt='')
+        .select_related('table', 'user')
+        .order_by('-cancelled_at', '-id')[:20]
+    )
 
     # Served, but the customer has not left yet (table still held until "Customer Left")
     dining_all = _mark_groups(
@@ -2283,16 +2268,19 @@ def server_dashboard(request):
     _state_rank = {'active': 0, 'upcoming': 1, 'completed': 2}
     todays_bookings.sort(key=lambda b: (_state_rank[b.ui_state], b.booking_time))
 
+    food_items = _orderable_food_items()
     context = {
         'new_orders': new_orders,
         'unpaid_qr_orders': unpaid_qr_orders,
         'ready_orders': ready_orders,
         'delivered_today': delivered_today,
+        'cancelled_orders': cancelled_orders,
         'dining_orders': dining_orders,
         'todays_bookings': todays_bookings,
         'tables': _free_tables(),
         'tables_info': _tables_info(),
-        'food_items': _orderable_food_items(),
+        'food_items': food_items,
+        'categories': Category.objects.filter(items__in=food_items).distinct().order_by('name'),
     }
     return render(request, 'dashboard/server.html', context)
 
